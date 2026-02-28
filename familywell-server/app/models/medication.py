@@ -9,7 +9,7 @@ from app.database import Base
 
 class Medication(Base):
     __tablename__ = "medication"
-    __table_args__ = (Index("idx_user_active", "user_id", "is_active"),)
+    __table_args__ = (Index("idx_med_user_active", "user_id", "is_active"),)
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(
@@ -43,7 +43,7 @@ class MedicationTask(Base):
     __tablename__ = "medication_task"
     __table_args__ = (
         UniqueConstraint("medication_id", "scheduled_date", "scheduled_time"),
-        Index("idx_user_date", "user_id", "scheduled_date"),
+        Index("idx_medtask_user_date", "user_id", "scheduled_date"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)

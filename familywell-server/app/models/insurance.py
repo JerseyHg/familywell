@@ -9,7 +9,7 @@ from app.database import Base
 class Insurance(Base):
     __tablename__ = "insurance"
     __table_args__ = (
-        Index("idx_user_active", "user_id", "is_active"),
+        Index("idx_ins_user_active", "user_id", "is_active"),
         Index("idx_end_date", "end_date"),
     )
 

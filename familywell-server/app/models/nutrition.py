@@ -6,7 +6,7 @@ from app.database import Base
 
 class NutritionLog(Base):
     __tablename__ = "nutrition_log"
-    __table_args__ = (Index("idx_user_date", "user_id", "logged_at"),)
+    __table_args__ = (Index("idx_nutri_user_date", "user_id", "logged_at"),)
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(
