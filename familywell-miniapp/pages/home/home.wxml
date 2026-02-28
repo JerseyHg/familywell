@@ -31,10 +31,13 @@
       <view class="vm-close" bindtap="hideVoiceModal">✕</view>
     </view>
     <view class="vm-body">
-      <text class="vm-hint">说说你的情况，AI 会自动帮你添加用药和提醒</text>
-      <text class="vm-example">例如："我得了灰指甲，医生开了伊曲康唑200mg，3个疗程每个疗程7天，每天吃2次"</text>
+      <text class="vm-hint">说说你的情况，AI 会自动识别并记录</text>
+      <text class="vm-example">💊 用药："医生开了氨氯地平5mg，每天一次长期吃"
+🍽️ 饮食："中午吃了一碗米饭、红烧鱼、炒青菜"
+❤️ 指标："今天血压 135/85，心率 72"
+📝 症状："最近头疼，晚上睡不好"</text>
       <textarea class="vm-textarea" placeholder="点击输入或粘贴语音转文字内容..." value="{{voiceText}}" bindinput="onVoiceTextInput" maxlength="500" auto-height />
-      <button class="vm-submit" bindtap="onSubmitVoice" loading="{{voiceSubmitting}}">AI 识别并添加</button>
+      <button class="vm-submit" bindtap="onSubmitVoice" loading="{{voiceSubmitting}}">AI 识别并记录</button>
     </view>
   </view>
 </view>

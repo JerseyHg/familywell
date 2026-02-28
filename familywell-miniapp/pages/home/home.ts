@@ -136,16 +136,30 @@ Page({
       const res: any = await medsApi.voiceAdd(text)
       this.setData({ voiceSubmitting: false, showVoiceModal: false })
 
-      const count = res.medications?.length || 0
-      const names = (res.medications || []).map((m: any) => m.name).join('、')
+      // 根据 AI 判断的类型显示不同提示
+      const type = res.type || 'unknown'
+      let title = '已记录'
+      let content = res.message || res.summary || '记录成功'
 
-      wx.showModal({
-        title: `已添加 ${count} 个药物`,
-        content: names ? `${names}\n今天的服药提醒已生成` : '未识别到药物信息',
-        showCancel: false,
-      })
+      if (type === 'medication') {
+        const names = (res.medications || []).map((m: any) => m.name).join('、')
+        title = `💊 已添加 ${(res.medications || []).length} 个药物`
+        content = names ? `${names}\n今日服药提醒已生成` : content
+      } else if (type === 'food') {
+        const items = (res.nutrition?.food_items || []).join('、')
+        const cal = res.nutrition?.calories
+        title = '🍽️ 饮食已记录'
+        content = items + (cal ? `\n约 ${cal} 千卡` : '')
+      } else if (type === 'vitals') {
+        const inds = (res.indicators || []).map((i: any) => `${i.type}: ${i.value}${i.unit || ''}`).join('\n')
+        title = '❤️ 指标已记录'
+        content = inds || content
+      } else if (type === 'symptom') {
+        title = '📝 症状已记录'
+      }
 
-      // 刷新首页数据
+      wx.showModal({ title, content, showCancel: false })
+
       this.loadHomeData()
     } catch (e) {
       this.setData({ voiceSubmitting: false })

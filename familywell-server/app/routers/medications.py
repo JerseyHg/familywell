@@ -121,42 +121,59 @@ async def voice_add_medication(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    接收语音转文字内容，用 AI 解析出药物信息，自动创建 Medication + 当天 Task。
-    
-    示例输入: "我得了灰指甲，医生开了伊曲康唑200mg，3个疗程每个疗程7天，每天吃2次"
+    通用语音记录入口。AI 自动判断内容类型并分发处理：
+    - 用药 → 创建 Medication + 当天 Task
+    - 饮食 → 创建 Record(food) + NutritionLog
+    - 血压/指标 → 创建 HealthIndicator
+    - 症状/其他 → 创建 Record + 文字记录
     """
-    from app.services import ai_service
+    from app.config import get_settings
+    from app.models.record import Record
+    from app.models.health_indicator import HealthIndicator
+    from app.models.nutrition import NutritionLog
+    from openai import AsyncOpenAI
     import json
 
-    # 1. AI 解析语音内容
-    prompt = """从以下用户描述中提取用药信息，返回JSON数组（可能有多个药）：
-[{
-  "name": "药品名称",
-  "dosage": "剂量如 200mg/片",
-  "med_type": "long_term|course|temporary",
-  "course_count": 疗程数(仅course类型),
-  "days_per_course": 每疗程天数(仅course类型),
-  "total_days": 总天数(仅temporary类型),
-  "times_per_day": 每天几次(默认1),
-  "disease": "疾病名称(可选)"
-}]
+    _settings = get_settings()
+    client = AsyncOpenAI(
+        api_key=_settings.DOUBAO_API_KEY,
+        base_url=_settings.DOUBAO_BASE_URL,
+    )
+
+    # 1. AI 分类 + 提取
+    prompt = """你是一个健康记录助手。分析用户描述，判断类型并提取信息。
+返回JSON（只返回JSON，不要多余文字）：
+
+{
+  "type": "medication|food|vitals|symptom",
+  "summary": "一句话总结",
+  "data": { ... }
+}
+
+各类型的data格式：
+
+type=medication 时:
+  "data": {"medications": [{"name":"药名","dosage":"剂量","med_type":"long_term|course|temporary","course_count":1,"days_per_course":7,"total_days":7,"times_per_day":1}]}
+
+type=food 时:
+  "data": {"meal_type":"breakfast|lunch|dinner|snack","food_items":["食物1","食物2"],"calories":估算总卡路里,"protein_g":蛋白质克,"fat_g":脂肪克,"carb_g":碳水克}
+
+type=vitals 时(血压/体重/血糖等):
+  "data": {"indicators":[{"type":"bp_systolic|bp_diastolic|heart_rate|weight|glucose_fasting|temperature","value":数值,"unit":"单位"}]}
+
+type=symptom 时:
+  "data": {"symptoms":["症状1","症状2"],"severity":"mild|moderate|severe","notes":"补充说明"}
+
 注意：
-- 如果说"长期吃"、"一直吃"、"终身服用"，med_type 为 long_term
-- 如果提到"疗程"，med_type 为 course
-- 如果说"吃几天"、"感冒药"，med_type 为 temporary
-- 只返回JSON，不要多余文字
+- "吃了/喝了+食物" → type=food
+- "吃了/服了+药名" → type=medication  
+- "血压/体重/血糖+数值" → type=vitals
+- "头疼/不舒服/拉肚子" → type=symptom
+- 如果同时包含多种信息，选最主要的类型
 
 用户描述："""
 
     try:
-        from openai import AsyncOpenAI
-        from app.config import get_settings
-
-        _settings = get_settings()
-        client = AsyncOpenAI(
-            api_key=_settings.DOUBAO_API_KEY,
-            base_url=_settings.DOUBAO_BASE_URL,
-        )
         response = await client.chat.completions.create(
             model=_settings.DOUBAO_MODEL,
             messages=[{"role": "user", "content": prompt + req.text}],
@@ -165,84 +182,128 @@ async def voice_add_medication(
         )
 
         text = response.choices[0].message.content.strip()
-        # 清理 markdown
         if text.startswith("```"):
             text = text.split("\n", 1)[1]
         if text.endswith("```"):
             text = text.rsplit("```", 1)[0]
         text = text.strip()
 
-        meds_data = json.loads(text)
-        if not isinstance(meds_data, list):
-            meds_data = [meds_data]
-
+        result = json.loads(text)
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"AI 解析失败: {str(e)}")
 
-    # 2. 创建 Medication + Task
-    DEFAULT_TIMES = {
-        1: ["08:00"],
-        2: ["08:00", "20:00"],
-        3: ["08:00", "12:00", "20:00"],
-    }
-
+    record_type = result.get("type", "symptom")
+    summary = result.get("summary", req.text[:50])
+    data = result.get("data", {})
     today = date.today()
-    created = []
 
-    for m in meds_data:
-        name = m.get("name", "").strip()
-        if not name:
-            continue
+    # 2. 根据类型分发处理
+    response_data = {"type": record_type, "summary": summary}
 
-        med_type = m.get("med_type", "long_term")
-        times_per_day = int(m.get("times_per_day", 1))
-        scheduled_times = DEFAULT_TIMES.get(times_per_day, ["08:00"])
+    if record_type == "medication":
+        # ── 用药 ──
+        DEFAULT_TIMES = {1: ["08:00"], 2: ["08:00", "20:00"], 3: ["08:00", "12:00", "20:00"]}
+        created_meds = []
 
-        # 计算 end_date
-        end_date = None
-        if med_type == "course":
-            course_count = int(m.get("course_count", 1))
-            days_per_course = int(m.get("days_per_course", 7))
-            total_days = course_count * days_per_course
-            if total_days > 0:
+        for m in data.get("medications", []):
+            name = m.get("name", "").strip()
+            if not name:
+                continue
+
+            med_type = m.get("med_type", "long_term")
+            times_per_day = int(m.get("times_per_day", 1))
+            scheduled_times = DEFAULT_TIMES.get(times_per_day, ["08:00"])
+
+            end_date = None
+            if med_type == "course":
+                total = int(m.get("course_count", 1)) * int(m.get("days_per_course", 7))
+                if total > 0:
+                    from datetime import timedelta
+                    end_date = today + timedelta(days=total)
+            elif med_type == "temporary":
                 from datetime import timedelta
-                end_date = today + timedelta(days=total_days)
-        elif med_type == "temporary":
-            total_days = int(m.get("total_days", 7))
-            from datetime import timedelta
-            end_date = today + timedelta(days=total_days)
+                end_date = today + timedelta(days=int(m.get("total_days", 7)))
 
-        med = Medication(
-            user_id=user.id,
-            name=name,
-            dosage=m.get("dosage"),
-            frequency=f"每天{times_per_day}次",
-            scheduled_times=scheduled_times,
-            start_date=today,
-            end_date=end_date,
-            is_active=True,
+            med = Medication(
+                user_id=user.id, name=name, dosage=m.get("dosage"),
+                frequency=f"每天{times_per_day}次", scheduled_times=scheduled_times,
+                start_date=today, end_date=end_date, is_active=True,
+            )
+            db.add(med)
+            await db.flush()
+            await _generate_tasks_for_med(db, med, today)
+            created_meds.append({"name": name, "dosage": m.get("dosage")})
+
+        response_data["medications"] = created_meds
+        response_data["message"] = f"已添加 {len(created_meds)} 个药物，今日服药提醒已生成"
+
+    elif record_type == "food":
+        # ── 饮食 ──
+        record = Record(
+            user_id=user.id, category="food", title=summary,
+            record_date=today, ai_status="completed", source="voice",
+            ai_raw_result=data,
         )
-        db.add(med)
+        db.add(record)
         await db.flush()
 
-        # 立即生成当天任务
-        await _generate_tasks_for_med(db, med, today)
+        log = NutritionLog(
+            user_id=user.id, record_id=record.id,
+            meal_type=data.get("meal_type"),
+            food_items=data.get("food_items"),
+            calories=data.get("calories"),
+            protein_g=data.get("protein_g"),
+            fat_g=data.get("fat_g"),
+            carb_g=data.get("carb_g"),
+            logged_at=today,
+        )
+        db.add(log)
 
-        created.append({
-            "id": med.id,
-            "name": med.name,
-            "dosage": med.dosage,
-            "med_type": med_type,
-            "end_date": end_date.isoformat() if end_date else None,
-            "times_per_day": times_per_day,
-        })
+        response_data["nutrition"] = {
+            "calories": data.get("calories"),
+            "food_items": data.get("food_items"),
+        }
+        response_data["message"] = f"饮食记录已保存：{summary}"
+
+    elif record_type == "vitals":
+        # ── 指标 ──
+        record = Record(
+            user_id=user.id, category="bp_reading", title=summary,
+            record_date=today, ai_status="completed", source="voice",
+            ai_raw_result=data,
+        )
+        db.add(record)
+        await db.flush()
+
+        indicators = data.get("indicators", [])
+        for ind in indicators:
+            hi = HealthIndicator(
+                user_id=user.id, record_id=record.id,
+                indicator_type=ind.get("type", "unknown"),
+                value=float(ind.get("value", 0)),
+                unit=ind.get("unit"),
+                measured_at=datetime.utcnow(),
+                source="voice",
+            )
+            db.add(hi)
+
+        response_data["indicators"] = indicators
+        response_data["message"] = f"健康指标已记录：{summary}"
+
+    else:
+        # ── 症状/其他 ──
+        record = Record(
+            user_id=user.id, category="visit", title=summary,
+            record_date=today, ai_status="completed", source="voice",
+            notes=req.text,
+            ai_raw_result=data,
+        )
+        db.add(record)
+
+        response_data["message"] = f"已记录：{summary}"
 
     await db.flush()
-
-    return {
-        "message": f"已添加 {len(created)} 个药物",
-        "medications": created,
-    }
+    return response_data
 
 
 # ─── Tasks ───
