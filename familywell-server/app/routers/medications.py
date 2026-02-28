@@ -150,14 +150,15 @@ async def voice_add_medication(
 
     try:
         from openai import AsyncOpenAI
-        from app.config import settings
+        from app.config import get_settings
 
+        _settings = get_settings()
         client = AsyncOpenAI(
-            api_key=settings.DOUBAO_API_KEY,
-            base_url=settings.DOUBAO_BASE_URL,
+            api_key=_settings.DOUBAO_API_KEY,
+            base_url=_settings.DOUBAO_BASE_URL,
         )
         response = await client.chat.completions.create(
-            model=settings.DOUBAO_MODEL,
+            model=_settings.DOUBAO_MODEL,
             messages=[{"role": "user", "content": prompt + req.text}],
             max_tokens=1024,
             temperature=0.1,
