@@ -23,9 +23,10 @@ Page({
 
   async loadData() {
     try {
-      const [profile, family] = await Promise.all([
+      const [profile, family, records] = await Promise.all([
         profileApi.get(),
         familyApi.mine().catch(() => null),
+        recordsApi.list({ page: 1, size: 1 }).catch(() => null),
       ])
 
       const p = profile as any
@@ -40,7 +41,7 @@ Page({
         },
         inviteCode: (family as any)?.invite_code || '',
         familyMembers: (family as any)?.members || [],
-        recordCount: (family as any)?.record_count || 0,
+        recordCount: (records as any)?.total || 0,
       })
     } catch (err) {
       console.error('Settings load failed:', err)

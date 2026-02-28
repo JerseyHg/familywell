@@ -1,9 +1,16 @@
+/* ══════════════════════════════
+   FamilyWell — Chat Page Styles
+   ══════════════════════════════ */
+
 page { background: var(--bg); height: 100vh; overflow: hidden; }
 
 .chat-page {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  /* ✅ 修复：为底部自定义 TabBar 留出空间 */
+  padding-bottom: calc(env(safe-area-inset-bottom) + 100rpx);
+  box-sizing: border-box;
 }
 
 /* ── Header ── */
@@ -134,57 +141,36 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 .bar-label { font-size: 18rpx; color: var(--muted); }
 
 /* ── Chart Legend ── */
-.chart-legend { display: flex; justify-content: center; gap: 24rpx; margin-top: 8rpx; }
-.legend-item { display: flex; align-items: center; gap: 8rpx; font-size: 18rpx; color: var(--sub); }
+.chart-legend { display: flex; justify-content: center; gap: 24rpx; margin-top: 12rpx; }
+.legend-item { display: flex; align-items: center; gap: 8rpx; font-size: 20rpx; color: var(--sub); }
 .legend-dot { width: 16rpx; height: 16rpx; border-radius: 4rpx; }
 
-/* ── Chart Stat ── */
-.chart-stat { display: flex; align-items: baseline; gap: 8rpx; padding: 12rpx 0; }
-.stat-big { font-size: 40rpx; font-weight: 800; color: var(--text); }
-.stat-unit { font-size: 20rpx; color: var(--muted); }
-.stat-change { font-size: 22rpx; font-weight: 600; padding: 2rpx 12rpx; border-radius: 8rpx; }
-.stat-change.down { background: var(--primary-light); color: var(--primary); }
-.stat-change.up { background: var(--accent-light); color: var(--accent); }
+/* ── Chart Stats ── */
+.chart-stat { display: flex; align-items: baseline; gap: 8rpx; margin-top: 16rpx; }
+.stat-big { font-size: 40rpx; font-weight: 700; color: var(--text); }
+.stat-unit { font-size: 22rpx; color: var(--sub); }
+.stat-change { font-size: 22rpx; font-weight: 600; margin-left: 12rpx; }
+.stat-change.up { color: #E85D3A; }
+.stat-change.down { color: #2D8B6F; }
 
-/* ── Dot Chart ── */
-.dot {
-  width: 20rpx; height: 20rpx; border-radius: 10rpx;
-  background: var(--primary); border: 3rpx solid #fff;
-  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.15);
-}
-
-/* ── Adherence ── */
-.adherence-header { display: flex; align-items: center; gap: 24rpx; margin-bottom: 20rpx; }
+/* ── Adherence Chart ── */
+.adherence-summary { display: flex; align-items: center; gap: 24rpx; margin-bottom: 16rpx; }
 .adherence-ring {
-  width: 100rpx; height: 100rpx; border-radius: 50rpx;
-  border: 8rpx solid var(--primary);
+  width: 100rpx; height: 100rpx; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+  font-size: 28rpx; font-weight: 700;
 }
-.ring-num { font-size: 28rpx; font-weight: 800; color: var(--primary); }
-.adherence-stats { display: flex; flex-direction: column; gap: 4rpx; }
-.ad-stat { font-size: 22rpx; color: var(--sub); }
-.ad-stat.missed { color: var(--accent); }
-
-/* ── Med Progress ── */
-.med-progress {
-  display: flex; align-items: center; gap: 12rpx;
-  padding: 10rpx 0;
-  border-top: 1rpx solid var(--border);
-}
-.med-name { font-size: 22rpx; font-weight: 500; color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.med-bar-track { width: 120rpx; height: 10rpx; background: #EEF0F3; border-radius: 5rpx; overflow: hidden; }
-.med-bar-fill { height: 100%; border-radius: 5rpx; transition: width 0.3s; }
-.med-ratio { font-size: 18rpx; color: var(--muted); min-width: 50rpx; text-align: right; }
+.adherence-detail { font-size: 24rpx; color: var(--sub); line-height: 1.8; }
+.med-item { display: flex; align-items: center; gap: 12rpx; margin-bottom: 12rpx; }
+.med-name { font-size: 24rpx; color: var(--text); width: 160rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.med-bar-bg { flex: 1; height: 16rpx; background: var(--bg); border-radius: 8rpx; overflow: hidden; }
+.med-bar-fill { height: 100%; border-radius: 8rpx; transition: width 0.3s; }
+.med-ratio { font-size: 20rpx; color: var(--sub); width: 60rpx; text-align: right; }
 
 /* ── Alerts ── */
-.alert-item {
-  display: flex; gap: 16rpx; padding: 16rpx 0;
-  border-bottom: 1rpx solid var(--border);
-  align-items: flex-start;
-}
+.alert-item { display: flex; align-items: flex-start; gap: 12rpx; padding: 12rpx 0; border-bottom: 1rpx solid var(--border); }
 .alert-item:last-child { border-bottom: none; }
-.alert-icon { font-size: 36rpx; margin-top: 4rpx; }
+.alert-icon { font-size: 28rpx; margin-top: 4rpx; }
 .alert-info { flex: 1; }
 .alert-title { display: block; font-size: 26rpx; font-weight: 600; color: var(--accent); }
 .alert-desc { display: block; font-size: 22rpx; color: var(--sub); margin-top: 4rpx; }
@@ -223,12 +209,20 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 }
 
 /* ── Input Bar ── */
+/* ✅ 修复：确保 input-bar 在自定义 TabBar 之上可见 */
 .input-bar {
   display: flex; align-items: center; gap: 16rpx;
   padding: 16rpx 32rpx calc(16rpx + env(safe-area-inset-bottom));
   background: var(--card);
   border-top: 1rpx solid var(--border);
   flex-shrink: 0;
+  /* ✅ 关键修复：用 position fixed 确保始终在 TabBar 上方显示 */
+  position: fixed;
+  left: 0;
+  right: 0;
+  /* 自定义 TabBar 高度大约 100rpx，input-bar 需要在它上方 */
+  bottom: calc(env(safe-area-inset-bottom) + 100rpx);
+  z-index: 100;
 }
 .input-wrap {
   flex: 1;

@@ -9,12 +9,21 @@ Chart Service — 从结构化表查数据，生成前端可渲染的图表 JSON
 - adherence:    用药依从性（环形进度 + 柱状图 + 药物进度条）
 - alerts:       待处理事项列表
 - indicators:   关键指标卡片
+- insurance:    保险概览
+
+意图识别策略：
+- 主力：调用豆包 LLM 理解用户自然语言意图（准确率高）
+- 兜底：关键词匹配（LLM 调用失败时降级使用）
 """
+import json
 import logging
 from datetime import date, timedelta
+
+from openai import AsyncOpenAI
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.models.health_indicator import HealthIndicator
 from app.models.nutrition import NutritionLog
 from app.models.medication import Medication, MedicationTask
@@ -23,15 +32,105 @@ from app.models.reminder import Reminder
 from app.models.record import Record
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
+
+# 复用一个 AsyncOpenAI 客户端
+_client = AsyncOpenAI(
+    api_key=settings.DOUBAO_API_KEY,
+    base_url=settings.DOUBAO_BASE_URL,
+)
+
+# 所有合法的图表 handler 名称（用于校验 LLM 返回值）
+VALID_HANDLERS = {
+    "nutrition",
+    "blood_pressure",
+    "medication_adherence",
+    "indicator_psa",
+    "indicator_glucose",
+    "insurance",
+    "overview",
+    "alerts",
+}
 
 
-# ────────────────────────────────────────
-# 意图识别：根据用户问题判断需要什么图表
-# ────────────────────────────────────────
+# ════════════════════════════════════════
+# 意图识别 — LLM 模式（主力）
+# ════════════════════════════════════════
 
-CHART_INTENTS = [
+INTENT_PROMPT = """你是一个意图分类器。根据用户的健康相关提问，判断需要展示哪些图表。
+
+可选的图表类型（只能从以下列表中选）：
+- nutrition：饮食、营养摄入、吃了什么、蛋白质/碳水/脂肪/热量
+- blood_pressure：血压、高压、低压、收缩压、舒张压
+- medication_adherence：用药、吃药、服药、漏服、药物依从性、药吃齐了吗
+- indicator_psa：PSA、前列腺相关指标
+- indicator_glucose：血糖、空腹血糖、糖化血红蛋白
+- insurance：保险、保单、到期、续保
+- overview：最近怎么样、身体状况、整体健康、综合总结
+- alerts：提醒、待办、待处理事项
+
+规则：
+1. 只返回一个 JSON 数组，包含匹配的图表类型字符串
+2. 如果用户问题不需要任何图表（比如闲聊、问医学知识、问诊断建议），返回空数组 []
+3. 一个问题可以匹配多个图表类型，例如"血压和吃药情况"→ ["blood_pressure", "medication_adherence"]
+4. 注意区分"吃药"和"吃饭"——"吃药/药吃齐了吗/服药"是 medication_adherence，"吃了什么/饮食/营养"是 nutrition
+5. 只返回 JSON，不要任何多余文字、不要 markdown 代码块
+
+用户提问：{question}"""
+
+
+async def detect_chart_intent_llm(question: str) -> list[str]:
+    """
+    用 LLM 判断用户提问需要哪些图表。
+
+    返回: handler 名称列表，如 ["medication_adherence"]
+    异常: 任何错误都会抛出，由调用方降级到关键词模式
+    """
+    response = await _client.chat.completions.create(
+        model=settings.DOUBAO_CHAT_MODEL,
+        messages=[
+            {"role": "user", "content": INTENT_PROMPT.format(question=question)},
+        ],
+        max_tokens=100,
+        temperature=0,
+    )
+
+    text = response.choices[0].message.content.strip()
+
+    # 清理可能的 markdown 代码块包裹
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+    if text.endswith("```"):
+        text = text.rsplit("```", 1)[0]
+    text = text.strip()
+
+    handlers = json.loads(text)
+
+    # 校验：只保留合法的 handler 名称
+    if not isinstance(handlers, list):
+        logger.warning(f"LLM intent returned non-list: {handlers}")
+        raise ValueError(f"LLM returned non-list: {handlers}")
+
+    valid = [h for h in handlers if h in VALID_HANDLERS]
+    if len(valid) != len(handlers):
+        logger.warning(
+            f"LLM intent had invalid handlers, dropped: "
+            f"{[h for h in handlers if h not in VALID_HANDLERS]}"
+        )
+
+    logger.info(f"LLM intent for '{question}': {valid}")
+    return valid
+
+
+# ════════════════════════════════════════
+# 意图识别 — 关键词模式（兜底）
+# ════════════════════════════════════════
+
+CHART_INTENTS_KEYWORDS = [
     {
-        "keywords": ["饮食", "营养", "吃", "食物", "蛋白质", "碳水", "脂肪", "热量", "卡路里"],
+        "keywords": ["饮食", "营养", "食物", "蛋白质", "碳水", "脂肪",
+                     "热量", "卡路里", "吃了什么", "吃了啥", "吃的怎么样",
+                     "今天吃", "昨天吃", "最近吃"],
         "handler": "nutrition",
     },
     {
@@ -39,7 +138,8 @@ CHART_INTENTS = [
         "handler": "blood_pressure",
     },
     {
-        "keywords": ["药", "用药", "吃药", "服药", "打卡", "漏服", "依从"],
+        "keywords": ["药", "用药", "吃药", "服药", "打卡", "漏服",
+                     "依从", "吃齐", "药吃"],
         "handler": "medication_adherence",
     },
     {
@@ -65,25 +165,52 @@ CHART_INTENTS = [
 ]
 
 
-def detect_chart_intent(question: str) -> list[str]:
-    """根据用户提问检测需要生成哪些图表。"""
+def detect_chart_intent_keyword(question: str) -> list[str]:
+    """关键词兜底：当 LLM 调用失败时使用。"""
     question_lower = question.lower()
     handlers = []
-    for intent in CHART_INTENTS:
+    for intent in CHART_INTENTS_KEYWORDS:
         if any(kw in question_lower for kw in intent["keywords"]):
             handlers.append(intent["handler"])
+
+    # 互斥规则：同时命中 nutrition + medication 时，含"药"优先 medication
+    if "medication_adherence" in handlers and "nutrition" in handlers:
+        med_keywords = ["药", "用药", "吃药", "服药", "漏服", "依从", "吃齐", "药吃"]
+        if any(kw in question_lower for kw in med_keywords):
+            handlers.remove("nutrition")
+
+    logger.info(f"Keyword fallback intent for '{question}': {handlers}")
     return handlers
 
 
-# ────────────────────────────────────────
-# 各类图表数据生成器
-# ────────────────────────────────────────
+# ════════════════════════════════════════
+# 统一入口：先 LLM，失败则降级关键词
+# ════════════════════════════════════════
+
+async def detect_chart_intent(question: str) -> list[str]:
+    """
+    检测用户提问需要哪些图表。
+
+    策略：LLM 优先 → 关键词兜底。
+    LLM 调用约增加 200-500ms，但图表在 SSE 文字之前推送，
+    用户几乎感知不到这段额外延迟。
+    """
+    try:
+        return await detect_chart_intent_llm(question)
+    except Exception:
+        logger.info("Falling back to keyword intent detection")
+        return detect_chart_intent_keyword(question)
+
+
+# ════════════════════════════════════════
+# 图表数据生成
+# ════════════════════════════════════════
 
 async def generate_charts(
     db: AsyncSession, user_id: int, question: str, days: int = 7
 ) -> list[dict]:
     """根据问题意图生成图表数据。"""
-    handlers = detect_chart_intent(question)
+    handlers = await detect_chart_intent(question)
     charts = []
 
     for handler in handlers:
@@ -113,7 +240,6 @@ async def generate_charts(
                 if chart:
                     charts.append(chart)
             elif handler == "overview":
-                # 综合概览：返回多张图表
                 for sub in ["blood_pressure", "medication_adherence", "alerts"]:
                     sub_chart = None
                     if sub == "blood_pressure":
@@ -134,6 +260,10 @@ async def generate_charts(
     return charts
 
 
+# ════════════════════════════════════════
+# 各类图表数据生成器
+# ════════════════════════════════════════
+
 async def _chart_nutrition(db: AsyncSession, user_id: int, days: int) -> dict | None:
     """营养摄入堆叠柱状图。"""
     since = date.today() - timedelta(days=days)
@@ -146,7 +276,6 @@ async def _chart_nutrition(db: AsyncSession, user_id: int, days: int) -> dict | 
     if not logs:
         return None
 
-    # 按天聚合
     daily = {}
     for log in logs:
         d = str(log.logged_at)
@@ -161,7 +290,7 @@ async def _chart_nutrition(db: AsyncSession, user_id: int, days: int) -> dict | 
     data = []
     for d, v in sorted(daily.items()):
         data.append({
-            "label": d[5:],  # MM-DD
+            "label": d[5:],
             "蛋白质": round(v["protein"]),
             "脂肪": round(v["fat"]),
             "碳水": round(v["carb"]),
@@ -219,7 +348,6 @@ async def _chart_bp(db: AsyncSession, user_id: int, days: int) -> dict | None:
     if not sys_data:
         return None
 
-    # 按天合并
     bp_map = {}
     for s in sys_data:
         d = str(s.measured_at)[:10]
@@ -261,13 +389,11 @@ async def _chart_med_adherence(db: AsyncSession, user_id: int, days: int) -> dic
     if not tasks:
         return None
 
-    # 总体统计
     total = len(tasks)
     done = sum(1 for t in tasks if t.status == "done")
     missed = sum(1 for t in tasks if t.status == "missed")
     rate = round(done / total * 100) if total else 0
 
-    # 按天统计
     daily = {}
     for t in tasks:
         d = str(t.scheduled_date)
@@ -284,7 +410,6 @@ async def _chart_med_adherence(db: AsyncSession, user_id: int, days: int) -> dic
             "rate": round(v["done"] / v["total"] * 100) if v["total"] else 0,
         })
 
-    # 按药物统计
     meds_result = await db.execute(
         select(Medication)
         .where(Medication.user_id == user_id, Medication.is_active == True)
