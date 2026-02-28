@@ -113,6 +113,9 @@ def ai_result_to_texts(record: Record) -> list[dict]:
     result = record.ai_raw_result
     if not result:
         return []
+    if isinstance(result, str):
+        import json
+        result = json.loads(result)
 
     fragments = []
     category = result.get("category", "other")
