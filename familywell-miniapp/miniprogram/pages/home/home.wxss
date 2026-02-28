@@ -1,0 +1,121 @@
+page { background: var(--bg); }
+
+.safe-top { height: calc(44px + env(safe-area-inset-top)); }
+
+.header { padding: 16rpx 48rpx 8rpx; }
+.greeting { display: block; font-size: 28rpx; color: var(--sub); }
+.title { display: block; font-size: 48rpx; font-weight: 800; color: var(--text); margin-top: 4rpx; }
+
+/* Upload Button */
+.upload-btn {
+  margin: 28rpx 48rpx;
+  background: linear-gradient(135deg, #2D8B6F, #34A882 50%, #3CC492);
+  border-radius: 48rpx;
+  padding: 44rpx 48rpx;
+  display: flex;
+  align-items: center;
+  gap: 36rpx;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 16rpx 56rpx rgba(45,139,111,0.3);
+}
+.upload-deco {
+  position: absolute; right: -60rpx; top: -60rpx;
+  width: 240rpx; height: 240rpx; border-radius: 120rpx;
+  background: rgba(255,255,255,0.07);
+}
+.upload-icon {
+  width: 112rpx; height: 112rpx; border-radius: 36rpx;
+  background: rgba(255,255,255,0.2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 56rpx; flex-shrink: 0;
+}
+.upload-text { position: relative; z-index: 1; }
+.upload-title { display: block; color: #fff; font-size: 36rpx; font-weight: 700; }
+.upload-desc { display: block; color: rgba(255,255,255,0.75); font-size: 24rpx; margin-top: 6rpx; }
+
+/* AI Card */
+.ai-card {
+  margin: 0 48rpx 32rpx;
+  background: var(--card);
+  border-radius: 40rpx;
+  padding: 32rpx 36rpx;
+  display: flex;
+  gap: 24rpx;
+  align-items: flex-start;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+}
+.ai-avatar {
+  width: 72rpx; height: 72rpx; border-radius: 36rpx;
+  background: linear-gradient(135deg, #2D8B6F, #4DB892);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 32rpx; flex-shrink: 0;
+}
+.ai-content { flex: 1; }
+.ai-text { display: block; font-size: 27rpx; color: var(--text); line-height: 1.6; }
+.ai-time { display: block; font-size: 22rpx; color: var(--muted); margin-top: 12rpx; }
+
+/* Task Card */
+.task-card {
+  margin: 0 48rpx 16rpx;
+  background: var(--card);
+  border-radius: 40rpx;
+  padding: 28rpx 36rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+}
+.task-left { display: flex; align-items: center; gap: 20rpx; }
+.task-icon { font-size: 40rpx; }
+.task-name { display: block; font-size: 28rpx; font-weight: 600; color: var(--text); }
+.task-time { display: block; font-size: 22rpx; color: var(--muted); margin-top: 2rpx; }
+.task-punch {
+  padding: 16rpx 40rpx; border-radius: 40rpx;
+  background: var(--primary); color: #fff;
+  font-size: 26rpx; font-weight: 600;
+}
+
+/* Section Label */
+.section-label {
+  padding: 24rpx 48rpx 16rpx;
+  font-size: 26rpx; font-weight: 600; color: var(--sub);
+}
+
+/* Prompts Grid */
+.prompts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+  padding: 0 48rpx;
+}
+.prompt-item {
+  background: var(--card);
+  border-radius: 32rpx;
+  padding: 28rpx 32rpx;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  border: 1rpx solid var(--border);
+  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
+}
+.prompt-icon { font-size: 40rpx; }
+.prompt-text { font-size: 26rpx; font-weight: 500; color: var(--text); }
+
+/* Activity List */
+.activity-list { padding: 0 48rpx; }
+.activity-item {
+  display: flex; align-items: center; gap: 24rpx;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid var(--border);
+}
+.activity-item:last-child { border-bottom: none; }
+.activity-icon { font-size: 40rpx; }
+.activity-info { flex: 1; }
+.activity-title { display: block; font-size: 26rpx; font-weight: 500; color: var(--text); }
+.activity-date { display: block; font-size: 22rpx; color: var(--muted); margin-top: 2rpx; }
+.activity-tag {
+  padding: 4rpx 16rpx; border-radius: 12rpx;
+  background: var(--primary-light); color: var(--primary);
+  font-size: 20rpx; font-weight: 600;
+}

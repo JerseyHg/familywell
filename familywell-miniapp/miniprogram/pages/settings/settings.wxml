@@ -1,0 +1,108 @@
+<view class="safe-top" />
+<view class="page-title">设置</view>
+
+<!-- ── Emergency Card ── -->
+<view class="emergency-card" bindtap="showEmergency">
+  <view class="em-deco" />
+  <view class="em-badge">紧急信息卡</view>
+  <view class="em-name-row">
+    <text class="em-name">{{emergency.name || '未设置'}}</text>
+    <text class="em-tag" wx:if="{{emergency.bloodType}}">{{emergency.bloodType}}</text>
+    <text class="em-tag" wx:if="{{emergency.age}}">{{emergency.age}}岁</text>
+  </view>
+  <text class="em-detail" wx:if="{{emergency.allergies}}">过敏: {{emergency.allergies}}</text>
+  <text class="em-detail" wx:if="{{emergency.diseases}}">疾病: {{emergency.diseases}}</text>
+  <text class="em-hint">点击全屏出示给医生 →</text>
+</view>
+
+<!-- ── Emergency Modal ── -->
+<view class="modal-mask" wx:if="{{showEmergencyModal}}" bindtap="hideEmergency">
+  <view class="modal-body" catchtap="">
+    <view class="modal-header">
+      <text class="modal-title">紧急医疗信息</text>
+      <view class="modal-close" bindtap="hideEmergency">✕</view>
+    </view>
+    <view class="modal-content">
+      <view class="modal-row">
+        <text class="modal-label">姓名</text>
+        <text class="modal-value">{{emergency.name}}</text>
+      </view>
+      <view class="modal-row">
+        <text class="modal-label">血型</text>
+        <text class="modal-value">{{emergency.bloodType}}</text>
+      </view>
+      <view class="modal-row">
+        <text class="modal-label">年龄</text>
+        <text class="modal-value">{{emergency.age}}岁</text>
+      </view>
+      <view class="modal-row full">
+        <text class="modal-label">过敏</text>
+        <text class="modal-value">{{emergency.allergies || '无'}}</text>
+      </view>
+      <view class="modal-row full">
+        <text class="modal-label">用药</text>
+        <text class="modal-value">{{emergency.medications || '无'}}</text>
+      </view>
+    </view>
+  </view>
+</view>
+
+<!-- ── Menu Sections ── -->
+<view class="section-label">个人信息</view>
+<view class="menu-group">
+  <view class="menu-item">
+    <text class="mi-icon">👤</text><text class="mi-label">个人资料</text><text class="mi-arrow">›</text>
+  </view>
+  <view class="menu-item">
+    <text class="mi-icon">📋</text><text class="mi-label">既往病史</text><text class="mi-arrow">›</text>
+  </view>
+  <view class="menu-item">
+    <text class="mi-icon">📞</text><text class="mi-label">紧急联系人</text><text class="mi-arrow">›</text>
+  </view>
+</view>
+
+<view class="section-label">家庭</view>
+<view class="menu-group">
+  <view class="menu-item">
+    <text class="mi-icon">👨‍👩‍👦</text>
+    <text class="mi-label">家庭成员</text>
+    <text class="mi-desc">{{familyMembers.length || 0}} 人</text>
+    <text class="mi-arrow">›</text>
+  </view>
+  <view class="menu-item" bindtap="copyInviteCode" wx:if="{{inviteCode}}">
+    <text class="mi-icon">🔗</text>
+    <text class="mi-label">邀请码</text>
+    <text class="mi-code">{{inviteCode}}</text>
+    <text class="mi-copy">复制</text>
+  </view>
+</view>
+
+<view class="section-label">数据</view>
+<view class="menu-group">
+  <view class="menu-item">
+    <text class="mi-icon">📂</text>
+    <text class="mi-label">全部记录</text>
+    <text class="mi-desc">{{recordCount}} 条</text>
+    <text class="mi-arrow">›</text>
+  </view>
+  <view class="menu-item">
+    <text class="mi-icon">📤</text><text class="mi-label">导出数据</text><text class="mi-arrow">›</text>
+  </view>
+</view>
+
+<view class="section-label">关于</view>
+<view class="menu-group">
+  <view class="menu-item">
+    <text class="mi-icon">❓</text><text class="mi-label">帮助与反馈</text><text class="mi-arrow">›</text>
+  </view>
+  <view class="menu-item">
+    <text class="mi-icon">🔒</text><text class="mi-label">隐私政策</text><text class="mi-arrow">›</text>
+  </view>
+  <view class="menu-item">
+    <text class="mi-icon">ℹ️</text><text class="mi-label">关于 FamilyWell</text>
+    <text class="mi-desc">v2.0</text><text class="mi-arrow">›</text>
+  </view>
+</view>
+
+<view class="logout-btn" bindtap="onLogout">退出登录</view>
+<view class="safe-bottom" />

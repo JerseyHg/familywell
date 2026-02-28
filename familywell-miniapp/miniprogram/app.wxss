@@ -1,0 +1,130 @@
+/* ─── Design Tokens ─── */
+page {
+  --primary: #2D8B6F;
+  --primary-light: #E8F5EE;
+  --primary-dark: #1A6B4E;
+  --accent: #E85D3A;
+  --accent-light: #FFF0EC;
+  --yellow: #F5A623;
+  --yellow-light: #FFF8EC;
+  --blue: #3B7DD8;
+  --blue-light: #EDF4FF;
+  --purple: #7B61C4;
+  --text: #1C2024;
+  --sub: #6B7785;
+  --muted: #9BA5B0;
+  --border: #E8ECF0;
+  --bg: #F6F7F5;
+  --card: #FFFFFF;
+
+  font-family: -apple-system, 'PingFang SC', 'Noto Sans SC', sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  font-size: 28rpx;
+  line-height: 1.5;
+}
+
+/* ─── Shared Classes ─── */
+.card {
+  background: var(--card);
+  border-radius: 32rpx;
+  padding: 28rpx 32rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 40rpx 16rpx;
+}
+
+.section-title .title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.section-title .action {
+  font-size: 24rpx;
+  color: var(--primary);
+}
+
+.tag {
+  display: inline-block;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+  font-size: 22rpx;
+  font-weight: 500;
+}
+
+.tag-primary {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.tag-accent {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.tag-blue {
+  background: var(--blue-light);
+  color: var(--blue);
+}
+
+.tag-ai {
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 20rpx;
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.divider {
+  height: 2rpx;
+  background: var(--border);
+  margin: 12rpx 0;
+}
+
+.page-header {
+  padding: 24rpx 40rpx 8rpx;
+}
+
+.page-header .page-title {
+  font-size: 44rpx;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.page-header .page-sub {
+  font-size: 26rpx;
+  color: var(--sub);
+  margin-top: 4rpx;
+}
+
+.ai-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+  padding: 14rpx 20rpx;
+  background: #F5F8FF;
+  border-radius: 16rpx;
+  margin-top: 16rpx;
+}
+
+.ai-tip .ai-icon {
+  font-size: 24rpx;
+  flex-shrink: 0;
+}
+
+.ai-tip .ai-text {
+  font-size: 22rpx;
+  color: var(--sub);
+  line-height: 1.5;
+}
+
+/* ─── Safe Area ─── */
+.safe-bottom {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 130rpx);
+}

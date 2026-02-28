@@ -1,0 +1,69 @@
+<!-- ── Greeting ── -->
+<view class="safe-top" />
+<view class="header">
+  <text class="greeting">{{greeting}}</text>
+  <text class="title">{{profile.nickname || '我'}}的健康档案</text>
+</view>
+
+<!-- ── Upload Button ── -->
+<view class="upload-btn" bindtap="onUpload">
+  <view class="upload-deco" />
+  <view class="upload-icon">📷</view>
+  <view class="upload-text">
+    <text class="upload-title">拍照上传</text>
+    <text class="upload-desc">体检单、处方、食物… AI 自动识别归档</text>
+  </view>
+</view>
+
+<!-- ── AI Proactive Tip ── -->
+<view class="ai-card" wx:if="{{aiTip}}">
+  <view class="ai-avatar">🤖</view>
+  <view class="ai-content">
+    <text class="ai-text">{{aiTip}}</text>
+    <text class="ai-time">基于今日数据 · 刚刚更新</text>
+  </view>
+</view>
+
+<!-- ── Pending Med Tasks ── -->
+<view class="task-card" wx:for="{{pendingTasks}}" wx:key="id">
+  <view class="task-left">
+    <text class="task-icon">💊</text>
+    <view class="task-info">
+      <text class="task-name">{{item.name}}</text>
+      <text class="task-time">{{item.time}} · 今日待服</text>
+    </view>
+  </view>
+  <view class="task-punch" data-id="{{item.id}}" bindtap="onPunchTask">打卡</view>
+</view>
+
+<!-- ── Suggested Prompts ── -->
+<view class="section-label">问问 AI 助手</view>
+<view class="prompts-grid">
+  <view
+    class="prompt-item"
+    wx:for="{{prompts}}"
+    wx:key="text"
+    data-text="{{item.text}}"
+    bindtap="onPromptTap"
+  >
+    <text class="prompt-icon">{{item.icon}}</text>
+    <text class="prompt-text">{{item.text}}</text>
+  </view>
+</view>
+
+<!-- ── Recent Activity ── -->
+<view class="section-label" wx:if="{{recentActivity.length}}">最近动态</view>
+<view class="activity-list">
+  <view class="activity-item" wx:for="{{recentActivity}}" wx:key="id">
+    <text class="activity-icon">
+      {{item.category === 'lab' ? '🔬' : item.category === 'prescription' ? '📝' : item.category === 'checkup' ? '📊' : item.category === 'insurance' ? '🛡️' : item.category === 'food' ? '🍽️' : '📄'}}
+    </text>
+    <view class="activity-info">
+      <text class="activity-title">{{item.title}}</text>
+      <text class="activity-date">{{item.date}}</text>
+    </view>
+    <view class="activity-tag">AI已识别</view>
+  </view>
+</view>
+
+<view class="safe-bottom" />
