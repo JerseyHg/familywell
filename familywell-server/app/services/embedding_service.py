@@ -1,7 +1,7 @@
 """
 Embedding Service
 ─────────────────
-- 调用豆包 embedding API 生成向量
+- 调用豆包 embedding-vision API 生成向量
 - 将 AI 识别结果转为自然语言文本 → embedding → 存入 record_embedding
 - 支持按用户检索 top-K 相似片段
 """
@@ -9,7 +9,7 @@ import json
 import logging
 from datetime import datetime
 
-from openai import AsyncOpenAI
+import httpx
 from sqlalchemy import select, text, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,24 +21,39 @@ from app.models.embedding import RecordEmbedding
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-_client = AsyncOpenAI(
-    api_key=settings.DOUBAO_API_KEY,
-    base_url=settings.DOUBAO_BASE_URL,
-)
+# httpx 异步客户端（复用连接池）
+_http_client = httpx.AsyncClient(timeout=30.0)
 
 
 # ════════════════════════════════════════
 # 1. 生成 Embedding 向量
 # ════════════════════════════════════════
 
-async def generate_embedding(text: str) -> list[float]:
-    """调用豆包 embedding API，返回向量列表。"""
+async def generate_embedding(text_input: str) -> list[float]:
+    """
+    调用豆包 embedding-vision multimodal API，返回 2048 维向量。
+
+    接口格式：POST /embeddings/multimodal
+    请求体：{"model": "...", "input": [{"type": "text", "text": "..."}]}
+    响应体：{"data": {"embedding": [...]}}
+    """
+    url = f"{settings.DOUBAO_BASE_URL}/embeddings/multimodal"
+
     try:
-        response = await _client.embeddings.create(
-            model=settings.DOUBAO_EMBEDDING_MODEL,
-            input=text,
+        resp = await _http_client.post(
+            url,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {settings.DOUBAO_API_KEY}",
+            },
+            json={
+                "model": settings.DOUBAO_EMBEDDING_MODEL,
+                "input": [{"type": "text", "text": text_input}],
+            },
         )
-        return response.data[0].embedding
+        resp.raise_for_status()
+        data = resp.json()
+        return data["data"]["embedding"]
     except Exception as e:
         logger.error(f"Embedding generation failed: {e}")
         raise
