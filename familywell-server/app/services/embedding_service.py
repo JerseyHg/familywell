@@ -4,6 +4,11 @@ Embedding Service
 - 调用豆包 embedding-vision API 生成向量
 - 将 AI 识别结果转为自然语言文本 → embedding → 存入 record_embedding
 - 支持按用户检索 top-K 相似片段
+
+✅ 新增：
+- raw_text 全文 OCR 分段 embedding（每段 ~500 字）
+- findings / diagnosis / recommendations 单独 embedding
+- visit 类型（MR报告、出院小结等）完整文本存储
 """
 import json
 import logging
@@ -24,6 +29,10 @@ settings = get_settings()
 # httpx 异步客户端（复用连接池）
 _http_client = httpx.AsyncClient(timeout=30.0)
 
+# raw_text 分段大小（字符数），太长的文本分段 embedding 效果更好
+CHUNK_SIZE = 500
+CHUNK_OVERLAP = 50
+
 
 # ════════════════════════════════════════
 # 1. 生成 Embedding 向量
@@ -32,10 +41,6 @@ _http_client = httpx.AsyncClient(timeout=30.0)
 async def generate_embedding(text_input: str) -> list[float]:
     """
     调用豆包 embedding-vision multimodal API，返回 2048 维向量。
-
-    接口格式：POST /embeddings/multimodal
-    请求体：{"model": "...", "input": [{"type": "text", "text": "..."}]}
-    响应体：{"data": {"embedding": [...]}}
     """
     url = f"{settings.DOUBAO_BASE_URL}/embeddings/multimodal"
 
@@ -63,10 +68,47 @@ async def generate_embedding(text_input: str) -> list[float]:
 # 2. AI 识别结果 → 自然语言文本
 # ════════════════════════════════════════
 
+def _chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
+    """
+    将长文本切分成多个片段，每段 ~chunk_size 字符，相邻段有 overlap 字符重叠。
+    尽量在句号、换行处切分，避免截断句子。
+    """
+    if not text or len(text) <= chunk_size:
+        return [text] if text else []
+
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+
+        if end < len(text):
+            # 尝试在句号、换行、分号处切分
+            best_break = -1
+            for sep in ['\n', '。', '；', '，', '.', ';']:
+                pos = text.rfind(sep, start + chunk_size // 2, end)
+                if pos > best_break:
+                    best_break = pos
+
+            if best_break > start:
+                end = best_break + 1  # 包含分隔符
+
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+
+        start = end - overlap if end < len(text) else end
+
+    return chunks
+
+
 def ai_result_to_texts(record: Record) -> list[dict]:
     """
     把一条 record 的 AI 识别结果转化为多条可 embedding 的文本片段。
     每条返回 { content_type, content_text, category, source_date }
+
+    ✅ 新增逻辑：
+    - raw_text 全文分段 embedding
+    - findings / diagnosis / recommendations 单独 embedding
     """
     result = record.ai_raw_result
     if not result:
@@ -78,6 +120,18 @@ def ai_result_to_texts(record: Record) -> list[dict]:
     hospital = result.get("hospital", "")
     date_str = result.get("date", str(record.record_date or ""))
 
+    # ── 文档前缀（每个 embedding 片段都会加上，帮助检索时识别来源） ──
+    prefix = ""
+    prefix_parts = []
+    if date_str:
+        prefix_parts.append(date_str)
+    if hospital:
+        prefix_parts.append(hospital)
+    if title:
+        prefix_parts.append(title)
+    if prefix_parts:
+        prefix = "【" + " · ".join(prefix_parts) + "】"
+
     # ── 整体摘要 ──
     summary_parts = [f"记录类型: {category}"]
     if title:
@@ -86,6 +140,96 @@ def ai_result_to_texts(record: Record) -> list[dict]:
         summary_parts.append(f"医院: {hospital}")
     if date_str:
         summary_parts.append(f"日期: {date_str}")
+
+    # ════════════════════════════════════
+    # ✅ 新增：提取 findings / diagnosis / recommendations
+    # ════════════════════════════════════
+
+    findings = result.get("findings") or ""
+    diagnosis = result.get("diagnosis") or ""
+    recommendations = result.get("recommendations") or ""
+    chief_complaint = result.get("chief_complaint") or ""
+    present_illness = result.get("present_illness") or ""
+    past_history = result.get("past_history") or ""
+    physical_exam = result.get("physical_exam") or ""
+    department = result.get("department") or ""
+    doctor = result.get("doctor") or ""
+
+    if department:
+        summary_parts.append(f"科室: {department}")
+    if doctor:
+        summary_parts.append(f"医生: {doctor}")
+
+    # ── 检查所见 / 影像描述（单独 embedding，这是最关键的内容） ──
+    if findings:
+        summary_parts.append(f"检查所见: {findings[:100]}...")  # 摘要里只放前 100 字
+        for i, chunk in enumerate(_chunk_text(findings)):
+            fragments.append({
+                "content_type": "findings",
+                "content_text": f"{prefix} 检查所见（{i+1}）：{chunk}",
+                "category": category,
+                "source_date": date_str,
+            })
+
+    # ── 诊断结论（单独 embedding） ──
+    if diagnosis:
+        summary_parts.append(f"诊断: {diagnosis[:100]}...")
+        fragments.append({
+            "content_type": "diagnosis",
+            "content_text": f"{prefix} 诊断结论：{diagnosis}",
+            "category": category,
+            "source_date": date_str,
+        })
+
+    # ── 建议 / 医嘱 ──
+    if recommendations:
+        summary_parts.append(f"建议: {recommendations[:100]}...")
+        fragments.append({
+            "content_type": "recommendations",
+            "content_text": f"{prefix} 医嘱/建议：{recommendations}",
+            "category": category,
+            "source_date": date_str,
+        })
+
+    # ── 主诉 / 现病史 / 既往史 / 体格检查（visit 类型） ──
+    if chief_complaint:
+        summary_parts.append(f"主诉: {chief_complaint}")
+        fragments.append({
+            "content_type": "chief_complaint",
+            "content_text": f"{prefix} 主诉：{chief_complaint}",
+            "category": category,
+            "source_date": date_str,
+        })
+
+    if present_illness:
+        for i, chunk in enumerate(_chunk_text(present_illness)):
+            fragments.append({
+                "content_type": "present_illness",
+                "content_text": f"{prefix} 现病史（{i+1}）：{chunk}",
+                "category": category,
+                "source_date": date_str,
+            })
+
+    if past_history:
+        fragments.append({
+            "content_type": "past_history",
+            "content_text": f"{prefix} 既往史：{past_history}",
+            "category": category,
+            "source_date": date_str,
+        })
+
+    if physical_exam:
+        for i, chunk in enumerate(_chunk_text(physical_exam)):
+            fragments.append({
+                "content_type": "physical_exam",
+                "content_text": f"{prefix} 体格检查（{i+1}）：{chunk}",
+                "category": category,
+                "source_date": date_str,
+            })
+
+    # ════════════════════════════════════
+    # 原有的分类处理逻辑（保持不变）
+    # ════════════════════════════════════
 
     if category in ("checkup", "lab"):
         indicators = result.get("indicators", [])
@@ -101,17 +245,15 @@ def ai_result_to_texts(record: Record) -> list[dict]:
             ind_text = f"{name}: {val} {unit}（{abnormal}{ref}）"
             summary_parts.append(ind_text)
 
-            # 每条指标也单独 embedding，方便精确检索
             fragments.append({
                 "content_type": "indicator",
-                "content_text": f"{date_str} 检查结果 — {name}: {val} {unit}，{abnormal}。来自{hospital or '未知医院'}的{title or '检查报告'}。{ref}",
+                "content_text": f"{prefix} 检查结果 — {name}: {val} {unit}，{abnormal}。{ref}",
                 "category": category,
                 "source_date": date_str,
             })
 
     elif category == "prescription":
         meds = result.get("medications", [])
-        doctor = result.get("doctor", "")
         if doctor:
             summary_parts.append(f"开方医生: {doctor}")
         for med in meds:
@@ -124,7 +266,7 @@ def ai_result_to_texts(record: Record) -> list[dict]:
 
             fragments.append({
                 "content_type": "medication",
-                "content_text": f"{date_str} {hospital or ''}处方: {name} {dosage}，用法 {freq}。{f'开具 {qty} 片/粒。' if qty else ''}{f'医生: {doctor}。' if doctor else ''}",
+                "content_text": f"{prefix} 处方: {name} {dosage}，用法 {freq}。{f'开具 {qty} 片/粒。' if qty else ''}{f'医生: {doctor}。' if doctor else ''}",
                 "category": "prescription",
                 "source_date": date_str,
             })
@@ -141,7 +283,7 @@ def ai_result_to_texts(record: Record) -> list[dict]:
 
         fragments.append({
             "content_type": "insurance",
-            "content_text": f"保险信息 — {result.get('provider', '')} {result.get('policy_type', '')}，被保人 {result.get('insured_name', '')}，有效期 {result.get('start_date', '')} 至 {result.get('end_date', '')}，年保费 {result.get('premium', '')} 元，保额 {result.get('coverage', '')} 元。",
+            "content_text": f"{prefix} 保险信息 — {result.get('provider', '')} {result.get('policy_type', '')}，被保人 {result.get('insured_name', '')}，有效期 {result.get('start_date', '')} 至 {result.get('end_date', '')}，年保费 {result.get('premium', '')} 元，保额 {result.get('coverage', '')} 元。",
             "category": "insurance",
             "source_date": date_str,
         })
@@ -174,6 +316,24 @@ def ai_result_to_texts(record: Record) -> list[dict]:
         "category": category,
         "source_date": date_str,
     })
+
+    # ════════════════════════════════════
+    # ✅ 新增：raw_text 全文分段 embedding
+    # ════════════════════════════════════
+
+    raw_text = result.get("raw_text") or ""
+    if raw_text and len(raw_text) > 20:  # 至少有点内容
+        chunks = _chunk_text(raw_text)
+        for i, chunk in enumerate(chunks):
+            fragments.append({
+                "content_type": "raw_text",
+                "content_text": f"{prefix} 原文（{i+1}/{len(chunks)}）：{chunk}",
+                "category": category,
+                "source_date": date_str,
+            })
+        logger.info(
+            f"Record raw_text: {len(raw_text)} chars → {len(chunks)} chunks"
+        )
 
     return fragments
 
@@ -237,16 +397,6 @@ async def search_similar(
 ) -> list[dict]:
     """
     语义检索：query → embedding → pgvector cosine 相似度 → top-K 结果。
-
-    Args:
-        user_id: 当前用户 ID
-        query: 用户的问题 / 搜索词
-        top_k: 返回条数
-        content_types: 过滤类型 ['record_summary', 'indicator', ...]
-        family_user_ids: 管理者可查看全家数据，传入家人的 user_id 列表
-
-    Returns:
-        [{ content_text, content_type, category, source_date, record_id, score }]
     """
     if top_k is None:
         top_k = settings.RAG_TOP_K
@@ -254,8 +404,7 @@ async def search_similar(
     # 生成 query embedding
     query_vec = await generate_embedding(query)
 
-    # 构建 SQL（pgvector 的 <=> 是 cosine distance，越小越相似）
-    # score = 1 - distance 转成相似度
+    # 构建 SQL
     target_ids = family_user_ids if family_user_ids else [user_id]
     id_list = ",".join(str(i) for i in target_ids)
 
