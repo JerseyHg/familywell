@@ -59,7 +59,7 @@ app.add_middleware(
 )
 
 # Register routers
-from app.routers import auth, profile, records, medications, stats, families, reminders, home, chat, search  # noqa
+from app.routers import auth, profile, records, medications, stats, families, reminders, home, chat, search, projects  # noqa
 
 app.include_router(auth.router)
 app.include_router(profile.router)
@@ -71,6 +71,7 @@ app.include_router(reminders.router)
 app.include_router(home.router)
 app.include_router(chat.router)
 app.include_router(search.router)
+app.include_router(projects.router)
 
 
 @app.get("/")

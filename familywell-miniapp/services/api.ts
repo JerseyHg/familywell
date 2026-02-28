@@ -91,21 +91,58 @@ export const recordsApi = {
   getUploadUrl: (data: { file_name: string; content_type: string }) =>
     request({ url: '/records/upload-url', method: 'POST', data }),
 
-  create: (data: { file_key: string; file_type: string; source: string }) =>
+  create: (data: { file_key: string; file_type: string; source: string; project_id?: number }) =>
     request({ url: '/records', method: 'POST', data }),
 
   getStatus: (id: number) =>
     request({ url: `/records/${id}/status` }),
 
-  list: (params: { category?: string; page?: number; size?: number }) => {
+  list: (params: {
+    category?: string;
+    project_id?: number;
+    unassigned?: boolean;
+    page?: number;
+    size?: number;
+  } = {}) => {
     const query = Object.entries(params)
-      .filter(([_, v]) => v !== undefined)
+      .filter(([_, v]) => v !== undefined && v !== false)
       .map(([k, v]) => `${k}=${v}`)
       .join('&')
-    return request({ url: `/records?${query}` })
+    return request({ url: `/records${query ? '?' + query : ''}` })
   },
 
   detail: (id: number) => request({ url: `/records/${id}` }),
+}
+
+// ─── Projects (归档项目) ───
+export const projectsApi = {
+  create: (data: {
+    name: string;
+    description?: string;
+    icon?: string;
+    start_date?: string;
+    end_date?: string;
+    template?: string;
+  }) => request({ url: '/projects', method: 'POST', data }),
+
+  list: (status?: string) => {
+    const q = status ? `?status=${status}` : ''
+    return request({ url: `/projects${q}` })
+  },
+
+  detail: (id: number) => request({ url: `/projects/${id}` }),
+
+  update: (id: number, data: any) =>
+    request({ url: `/projects/${id}`, method: 'PUT', data }),
+
+  delete: (id: number) =>
+    request({ url: `/projects/${id}`, method: 'DELETE' }),
+
+  assignRecords: (projectId: number, recordIds: number[]) =>
+    request({ url: `/projects/${projectId}/records`, method: 'POST', data: { record_ids: recordIds } }),
+
+  removeRecords: (projectId: number, recordIds: number[]) =>
+    request({ url: `/projects/${projectId}/records`, method: 'DELETE', data: { record_ids: recordIds } }),
 }
 
 // ─── Medications ───
@@ -202,40 +239,32 @@ export const chatApi = {
       onError?: (err: any) => void
     },
   ) => {
-    const token = wx.getStorageSync('token') || ''
-
+    const token = getToken()
     const task = wx.request({
       url: `${BASE_URL}/chat/stream`,
       method: 'POST',
-      data,
-      header: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'text/event-stream',
-      },
       enableChunkedTransfer: true,
-      responseType: 'text',
-      success(res: any) {
-        // 模拟器或不支持 chunkedTransfer 时，完整响应走这里
-        if (!chunkedReceived && res.data) {
+      header: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      data,
+      success(res) {
+        // fallback: 如果 onChunkReceived 不触发，尝试从完整响应解析
+        if (res.statusCode >= 200 && res.statusCode < 300) {
           const text = typeof res.data === 'string' ? res.data : JSON.stringify(res.data)
-          const parts = text.split('\n\n')
-          for (const part of parts) {
-            const lines = part.split('\n')
-            for (const line of lines) {
-              if (!line.startsWith('data: ')) continue
-              const jsonStr = line.slice(6)
-              if (!jsonStr.trim()) continue
-              try {
-                const payload = JSON.parse(jsonStr)
-                switch (payload.type) {
-                  case 'charts': callbacks.onCharts?.(payload.charts || []); break
-                  case 'sources': callbacks.onSources?.(payload.sources || []); break
-                  case 'text': callbacks.onText?.(payload.content || ''); break
-                  case 'done': callbacks.onDone?.(payload.session_id || ''); break
-                }
-              } catch (_) {}
-            }
+          const lines = text.split('\n')
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue
+            try {
+              const payload = JSON.parse(line.slice(6))
+              switch (payload.type) {
+                case 'charts': callbacks.onCharts?.(payload.charts || []); break
+                case 'sources': callbacks.onSources?.(payload.sources || []); break
+                case 'text': callbacks.onText?.(payload.content || ''); break
+                case 'done': callbacks.onDone?.(payload.session_id || ''); break
+              }
+            } catch (_) {}
           }
         }
       },

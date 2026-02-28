@@ -13,11 +13,17 @@ class Record(Base):
         Index("idx_user_category", "user_id", "category"),
         Index("idx_user_created", "user_id", "created_at"),
         Index("idx_ai_status", "ai_status"),
+        Index("idx_user_project", "user_id", "project_id"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("user.id"), nullable=False
+    )
+
+    # 项目归属（可选）
+    project_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("project.id", ondelete="SET NULL"), nullable=True
     )
 
     # Classification
@@ -60,6 +66,7 @@ class Record(Base):
     )
 
     user: Mapped["User"] = relationship(back_populates="records")
+    project: Mapped["Project"] = relationship(back_populates="records")
     health_indicators: Mapped[list["HealthIndicator"]] = relationship(
         back_populates="record"
     )

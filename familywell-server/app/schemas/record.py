@@ -17,6 +17,7 @@ class RecordCreate(BaseModel):
     file_type: str = "image"
     source: str = "camera"
     notes: str | None = None
+    project_id: int | None = None
 
 
 class RecordStatusResponse(BaseModel):
@@ -37,6 +38,7 @@ class RecordResponse(BaseModel):
     ai_status: str
     source: str
     notes: str | None
+    project_id: int | None = None
     created_at: datetime
 
     class Config:

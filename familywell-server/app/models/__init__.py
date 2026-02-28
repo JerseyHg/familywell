@@ -1,6 +1,7 @@
 from app.models.user import User, UserProfile
 from app.models.family import Family, FamilyMember
 from app.models.record import Record
+from app.models.project import Project
 from app.models.health_indicator import HealthIndicator
 from app.models.nutrition import NutritionLog
 from app.models.medication import Medication, MedicationTask
@@ -12,6 +13,7 @@ __all__ = [
     "User", "UserProfile",
     "Family", "FamilyMember",
     "Record",
+    "Project",
     "HealthIndicator",
     "NutritionLog",
     "Medication", "MedicationTask",

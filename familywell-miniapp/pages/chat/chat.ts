@@ -45,7 +45,7 @@ Page({
   _throttleTimer: null as any,
 
   onShow() {
-    this.getTabBar()?.setData({ active: 1 })
+    this.getTabBar()?.setData({ active: 2 })
 
     const app = getApp()
     const initQ = app.globalData?.chatInitQuestion

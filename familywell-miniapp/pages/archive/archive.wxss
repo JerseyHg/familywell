@@ -1,0 +1,172 @@
+page { background: var(--bg); }
+
+.safe-top { height: calc(44px + env(safe-area-inset-top)); }
+
+.page-header { padding: 16rpx 48rpx 8rpx; }
+.page-title { display: block; font-size: 48rpx; font-weight: 800; color: var(--text); }
+.page-sub { display: block; font-size: 26rpx; color: var(--sub); margin-top: 4rpx; }
+
+/* ── View Tabs ── */
+.view-tabs {
+  display: flex; gap: 8rpx;
+  margin: 24rpx 48rpx 20rpx;
+  background: var(--border);
+  border-radius: 24rpx; padding: 4rpx;
+}
+.vtab {
+  flex: 1; text-align: center;
+  padding: 16rpx 0; border-radius: 20rpx;
+  font-size: 26rpx; font-weight: 600;
+  color: var(--sub); transition: all 0.2s;
+}
+.vtab.active {
+  background: var(--card); color: var(--primary);
+  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.06);
+}
+
+/* ── Create Project Button ── */
+.create-project-btn {
+  margin: 8rpx 48rpx 24rpx;
+  display: flex; align-items: center; justify-content: center;
+  gap: 12rpx; padding: 24rpx;
+  border: 2rpx dashed var(--primary);
+  border-radius: 32rpx;
+  background: var(--primary-light);
+}
+.cpb-icon { font-size: 32rpx; color: var(--primary); font-weight: 700; }
+.cpb-text { font-size: 28rpx; color: var(--primary); font-weight: 600; }
+
+/* ── Section Label ── */
+.section-label {
+  padding: 24rpx 48rpx 12rpx;
+  font-size: 24rpx; font-weight: 600; color: var(--sub); letter-spacing: 2rpx;
+}
+
+/* ── Project Cards ── */
+.project-list { padding: 0 48rpx; }
+.project-card {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--card); border-radius: 32rpx;
+  padding: 28rpx 32rpx; margin-bottom: 16rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+}
+.project-card.archived { opacity: 0.6; }
+.pc-left { display: flex; align-items: center; gap: 24rpx; flex: 1; }
+.pc-icon { font-size: 44rpx; }
+.pc-info { flex: 1; }
+.pc-name { display: block; font-size: 30rpx; font-weight: 600; color: var(--text); }
+.pc-meta { display: block; font-size: 22rpx; color: var(--muted); margin-top: 4rpx; }
+.pc-arrow { font-size: 36rpx; color: var(--muted); }
+
+/* ── Record List ── */
+.record-list { padding: 0 48rpx; }
+.record-item {
+  display: flex; align-items: center; gap: 24rpx;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid var(--border);
+}
+.record-item:last-child { border-bottom: none; }
+.ri-icon { font-size: 40rpx; flex-shrink: 0; }
+.ri-info { flex: 1; }
+.ri-title { display: block; font-size: 28rpx; font-weight: 500; color: var(--text); }
+.ri-date { display: block; font-size: 22rpx; color: var(--muted); margin-top: 2rpx; }
+.ri-tag {
+  padding: 4rpx 16rpx; border-radius: 12rpx;
+  background: var(--primary-light); color: var(--primary);
+  font-size: 20rpx; font-weight: 600; flex-shrink: 0;
+}
+
+/* ── Category Scroll ── */
+.cat-scroll {
+  white-space: nowrap;
+  padding: 8rpx 48rpx 20rpx;
+}
+.cat-chip {
+  display: inline-block;
+  padding: 14rpx 28rpx; margin-right: 16rpx;
+  border-radius: 28rpx; font-size: 26rpx;
+  background: var(--card); color: var(--sub);
+  border: 1rpx solid var(--border);
+  font-weight: 500;
+}
+.cat-chip.active {
+  background: var(--primary); color: #fff;
+  border-color: var(--primary);
+}
+
+/* ── Empty State ── */
+.empty-hint {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 120rpx 0; gap: 16rpx;
+}
+.empty-icon { font-size: 80rpx; }
+.empty-text { font-size: 28rpx; color: var(--muted); }
+
+/* ── Create Modal ── */
+.modal-mask {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.6);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.create-modal {
+  width: 100%; background: var(--card);
+  border-radius: 40rpx 40rpx 0 0;
+  padding: 40rpx 48rpx calc(40rpx + env(safe-area-inset-bottom));
+  max-height: 85vh; overflow-y: auto;
+}
+.cm-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 32rpx;
+}
+.cm-title { font-size: 36rpx; font-weight: 700; color: var(--text); }
+.cm-close {
+  width: 56rpx; height: 56rpx; border-radius: 28rpx;
+  background: var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26rpx; color: var(--sub);
+}
+.cm-section { margin-bottom: 28rpx; }
+.cm-label { display: block; font-size: 24rpx; font-weight: 600; color: var(--sub); margin-bottom: 12rpx; }
+.cm-input {
+  width: 100%; padding: 20rpx 24rpx;
+  background: var(--bg); border-radius: 20rpx;
+  font-size: 28rpx; color: var(--text);
+  box-sizing: border-box;
+}
+
+/* Template Grid */
+.template-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16rpx;
+}
+.tpl-item {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8rpx; padding: 20rpx 8rpx;
+  border-radius: 24rpx; border: 2rpx solid var(--border);
+  background: var(--card); transition: all 0.2s;
+}
+.tpl-item.active {
+  border-color: var(--primary); background: var(--primary-light);
+}
+.tpl-icon { font-size: 40rpx; }
+.tpl-name { font-size: 20rpx; color: var(--text); font-weight: 500; text-align: center; }
+
+/* Date Row */
+.cm-date-row {
+  display: flex; align-items: center; gap: 16rpx;
+}
+.cm-date-picker {
+  flex: 1; padding: 20rpx 24rpx;
+  background: var(--bg); border-radius: 20rpx;
+  font-size: 26rpx; color: var(--text);
+  text-align: center;
+}
+.cm-date-sep { font-size: 26rpx; color: var(--muted); }
+
+/* Submit */
+.cm-submit {
+  width: 100%; margin-top: 20rpx;
+  padding: 28rpx; border-radius: 32rpx;
+  background: var(--primary); color: #fff;
+  font-size: 30rpx; font-weight: 700;
+  border: none;
+}

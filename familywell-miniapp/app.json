@@ -1,6 +1,7 @@
 {
   "pages": [
     "pages/home/home",
+    "pages/archive/archive",
     "pages/chat/chat",
     "pages/settings/settings",
     "pages/login/login"
@@ -21,6 +22,7 @@
     "borderStyle": "white",
     "list": [
       { "pagePath": "pages/home/home", "text": "首页" },
+      { "pagePath": "pages/archive/archive", "text": "归档" },
       { "pagePath": "pages/chat/chat", "text": "助手" },
       { "pagePath": "pages/settings/settings", "text": "设置" }
     ]

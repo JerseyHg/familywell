@@ -43,6 +43,7 @@ async def create_record(
         file_type=req.file_type,
         source=req.source,
         notes=req.notes,
+        project_id=req.project_id,
         category="other",  # Will be updated by AI
         ai_status="pending",
     )
@@ -83,18 +84,27 @@ async def get_record_status(
 @router.get("", response_model=RecordListResponse)
 async def list_records(
     category: str | None = Query(None),
+    project_id: int | None = Query(None, description="按项目筛选"),
+    unassigned: bool = Query(False, description="只看未归项目的记录"),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=50),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List records with optional category filter."""
+    """List records with optional category / project filter."""
     query = select(Record).where(Record.user_id == user.id)
     count_query = select(func.count(Record.id)).where(Record.user_id == user.id)
 
     if category:
         query = query.where(Record.category == category)
         count_query = count_query.where(Record.category == category)
+
+    if project_id is not None:
+        query = query.where(Record.project_id == project_id)
+        count_query = count_query.where(Record.project_id == project_id)
+    elif unassigned:
+        query = query.where(Record.project_id.is_(None))
+        count_query = count_query.where(Record.project_id.is_(None))
 
     # Total count
     total_result = await db.execute(count_query)
