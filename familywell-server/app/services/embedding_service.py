@@ -106,9 +106,8 @@ def ai_result_to_texts(record: Record) -> list[dict]:
     把一条 record 的 AI 识别结果转化为多条可 embedding 的文本片段。
     每条返回 { content_type, content_text, category, source_date }
 
-    ✅ 新增逻辑：
-    - raw_text 全文分段 embedding
-    - findings / diagnosis / recommendations 单独 embedding
+    ✅ 语音记录走快速路径：直接用 raw_text 做 embedding
+    ✅ 拍照上传走完整解析：结构化字段 + raw_text 分段
     """
     result = record.ai_raw_result
     if not result:
@@ -117,13 +116,37 @@ def ai_result_to_texts(record: Record) -> list[dict]:
         import json
         result = json.loads(result)
 
-    fragments = []
     category = result.get("category", "other")
     title = result.get("title", "")
-    hospital = result.get("hospital", "")
     date_str = result.get("date", str(record.record_date or ""))
+    raw_text = result.get("raw_text") or ""
 
-    # ── 文档前缀（每个 embedding 片段都会加上，帮助检索时识别来源） ──
+    # ════════════════════════════════════
+    # ★ 快速路径：语音记录直接用 raw_text
+    # 语音记录的 raw_text 已经是完整自然语言，不需要拼字段
+    # ════════════════════════════════════
+    if raw_text and getattr(record, "source", None) == "voice":
+        prefix = f"【{date_str} · {title}】" if date_str or title else ""
+        full_text = prefix + raw_text
+        chunks = _chunk_text(full_text)
+        return [
+            {
+                "content_type": "record_summary",
+                "content_text": chunk,
+                "category": category,
+                "source_date": date_str,
+            }
+            for chunk in chunks
+        ]
+
+    # ════════════════════════════════════
+    # 拍照上传的完整解析路径
+    # ════════════════════════════════════
+
+    fragments = []
+    hospital = result.get("hospital", "")
+
+    # ── 文档前缀 ──
     prefix = ""
     prefix_parts = []
     if date_str:
@@ -144,10 +167,7 @@ def ai_result_to_texts(record: Record) -> list[dict]:
     if date_str:
         summary_parts.append(f"日期: {date_str}")
 
-    # ════════════════════════════════════
-    # ✅ 新增：提取 findings / diagnosis / recommendations
-    # ════════════════════════════════════
-
+    # ── 提取 findings / diagnosis / recommendations ──
     findings = result.get("findings") or ""
     diagnosis = result.get("diagnosis") or ""
     recommendations = result.get("recommendations") or ""
@@ -163,77 +183,27 @@ def ai_result_to_texts(record: Record) -> list[dict]:
     if doctor:
         summary_parts.append(f"医生: {doctor}")
 
-    # ── 检查所见 / 影像描述（单独 embedding，这是最关键的内容） ──
-    if findings:
-        summary_parts.append(f"检查所见: {findings[:100]}...")  # 摘要里只放前 100 字
-        for i, chunk in enumerate(_chunk_text(findings)):
+    # 医学文本字段单独 embedding
+    medical_fields = [
+        ("chief_complaint", "主诉", chief_complaint),
+        ("present_illness", "现病史", present_illness),
+        ("past_history", "既往史", past_history),
+        ("physical_exam", "体格检查", physical_exam),
+        ("findings", "检查所见", findings),
+        ("diagnosis", "诊断结论", diagnosis),
+        ("recommendations", "建议/医嘱", recommendations),
+    ]
+    for field_key, field_label, field_text in medical_fields:
+        if field_text and len(field_text) > 5:
+            summary_parts.append(f"{field_label}: {field_text[:200]}")
             fragments.append({
-                "content_type": "findings",
-                "content_text": f"{prefix} 检查所见（{i+1}）：{chunk}",
+                "content_type": field_key,
+                "content_text": f"{prefix} {field_label}：{field_text}",
                 "category": category,
                 "source_date": date_str,
             })
 
-    # ── 诊断结论（单独 embedding） ──
-    if diagnosis:
-        summary_parts.append(f"诊断: {diagnosis[:100]}...")
-        fragments.append({
-            "content_type": "diagnosis",
-            "content_text": f"{prefix} 诊断结论：{diagnosis}",
-            "category": category,
-            "source_date": date_str,
-        })
-
-    # ── 建议 / 医嘱 ──
-    if recommendations:
-        summary_parts.append(f"建议: {recommendations[:100]}...")
-        fragments.append({
-            "content_type": "recommendations",
-            "content_text": f"{prefix} 医嘱/建议：{recommendations}",
-            "category": category,
-            "source_date": date_str,
-        })
-
-    # ── 主诉 / 现病史 / 既往史 / 体格检查（visit 类型） ──
-    if chief_complaint:
-        summary_parts.append(f"主诉: {chief_complaint}")
-        fragments.append({
-            "content_type": "chief_complaint",
-            "content_text": f"{prefix} 主诉：{chief_complaint}",
-            "category": category,
-            "source_date": date_str,
-        })
-
-    if present_illness:
-        for i, chunk in enumerate(_chunk_text(present_illness)):
-            fragments.append({
-                "content_type": "present_illness",
-                "content_text": f"{prefix} 现病史（{i+1}）：{chunk}",
-                "category": category,
-                "source_date": date_str,
-            })
-
-    if past_history:
-        fragments.append({
-            "content_type": "past_history",
-            "content_text": f"{prefix} 既往史：{past_history}",
-            "category": category,
-            "source_date": date_str,
-        })
-
-    if physical_exam:
-        for i, chunk in enumerate(_chunk_text(physical_exam)):
-            fragments.append({
-                "content_type": "physical_exam",
-                "content_text": f"{prefix} 体格检查（{i+1}）：{chunk}",
-                "category": category,
-                "source_date": date_str,
-            })
-
-    # ════════════════════════════════════
-    # 原有的分类处理逻辑（保持不变）
-    # ════════════════════════════════════
-
+    # ── 分类处理 ──
     if category in ("checkup", "lab"):
         indicators = result.get("indicators", [])
         for ind in indicators:
@@ -293,7 +263,10 @@ def ai_result_to_texts(record: Record) -> list[dict]:
 
     elif category == "food":
         items = result.get("food_items", [])
-        item_str = "、".join([f"{i.get('name', '')}{i.get('amount', '')}" for i in items]) if items else ""
+        item_str = "、".join([
+            i if isinstance(i, str) else f"{i.get('name', '')}{i.get('amount', '')}"
+            for i in items
+        ]) if items else ""
         meal = result.get("meal_type", "")
         cal = result.get("calories", "")
         summary_parts.append(f"餐别: {meal}")
@@ -320,12 +293,8 @@ def ai_result_to_texts(record: Record) -> list[dict]:
         "source_date": date_str,
     })
 
-    # ════════════════════════════════════
-    # ✅ 新增：raw_text 全文分段 embedding
-    # ════════════════════════════════════
-
-    raw_text = result.get("raw_text") or ""
-    if raw_text and len(raw_text) > 20:  # 至少有点内容
+    # ── raw_text 全文分段 embedding（拍照上传的 OCR 全文） ──
+    if raw_text and len(raw_text) > 20:
         chunks = _chunk_text(raw_text)
         for i, chunk in enumerate(chunks):
             fragments.append({
