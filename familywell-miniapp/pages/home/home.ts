@@ -1,5 +1,5 @@
 import { homeApi, medsApi } from '../../services/api'
-import { chooseAndUpload, pollAIStatus } from '../../services/upload'
+import { batchUpload, pollBatchAIStatus } from '../../services/upload'
 
 Page({
   data: {
@@ -28,7 +28,6 @@ Page({
   },
 
   onShow() {
-    // 未登录则跳转登录页
     const token = wx.getStorageSync('token')
     if (!token) {
       wx.redirectTo({ url: '/pages/login/login' })
@@ -61,14 +60,14 @@ Page({
   // ── Actions ──
 
   onUpload() {
-    chooseAndUpload().then(({ recordId }) => {
-      pollAIStatus(
-        recordId,
+    batchUpload().then(({ recordIds }) => {
+      pollBatchAIStatus(
+        recordIds,
         () => {
-          wx.showToast({ title: '识别完成', icon: 'success' })
+          wx.showToast({ title: '全部识别完成', icon: 'success' })
           this.loadHomeData()
         },
-        () => wx.showToast({ title: '识别失败', icon: 'none' }),
+        (err) => console.warn('Some records failed:', err),
       )
     }).catch(() => {})
   },
@@ -86,7 +85,6 @@ Page({
     wx.switchTab({
       url: '/pages/chat/chat',
       success: () => {
-        // 通过全局变量传递初始问题
         getApp().globalData.chatInitQuestion = text
       },
     })

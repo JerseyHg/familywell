@@ -102,7 +102,9 @@ page { background: var(--bg); }
 .empty-icon { font-size: 80rpx; }
 .empty-text { font-size: 28rpx; color: var(--muted); }
 
-/* ── Create Modal ── */
+/* ═══════════════════════════════
+   Create Modal (底部弹窗)
+   ═══════════════════════════════ */
 .modal-mask {
   position: fixed; inset: 0; z-index: 1000;
   background: rgba(0,0,0,0.6);
@@ -111,9 +113,17 @@ page { background: var(--bg); }
 .create-modal {
   width: 100%; background: var(--card);
   border-radius: 40rpx 40rpx 0 0;
-  padding: 40rpx 48rpx calc(40rpx + env(safe-area-inset-bottom));
-  max-height: 85vh; overflow-y: auto;
+  max-height: 80vh;
+  overflow: hidden;
 }
+
+/* 内部可滚动 */
+.cm-scroll {
+  height: 80vh;
+  padding: 40rpx 48rpx calc(40rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
 .cm-header {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 32rpx;
@@ -125,13 +135,21 @@ page { background: var(--bg); }
   display: flex; align-items: center; justify-content: center;
   font-size: 26rpx; color: var(--sub);
 }
-.cm-section { margin-bottom: 28rpx; }
-.cm-label { display: block; font-size: 24rpx; font-weight: 600; color: var(--sub); margin-bottom: 12rpx; }
+
+.cm-section { margin-bottom: 32rpx; }
+.cm-label {
+  display: block; font-size: 26rpx; font-weight: 600;
+  color: var(--sub); margin-bottom: 16rpx;
+}
+
+/* 输入框 - 加高 */
 .cm-input {
-  width: 100%; padding: 20rpx 24rpx;
+  width: 100%; height: 88rpx;
+  padding: 0 28rpx;
   background: var(--bg); border-radius: 20rpx;
-  font-size: 28rpx; color: var(--text);
+  font-size: 30rpx; color: var(--text);
   box-sizing: border-box;
+  line-height: 88rpx;
 }
 
 /* Template Grid */
@@ -140,7 +158,7 @@ page { background: var(--bg); }
 }
 .tpl-item {
   display: flex; flex-direction: column; align-items: center;
-  gap: 8rpx; padding: 20rpx 8rpx;
+  gap: 8rpx; padding: 24rpx 8rpx;
   border-radius: 24rpx; border: 2rpx solid var(--border);
   background: var(--card); transition: all 0.2s;
 }
@@ -155,18 +173,20 @@ page { background: var(--bg); }
   display: flex; align-items: center; gap: 16rpx;
 }
 .cm-date-picker {
-  flex: 1; padding: 20rpx 24rpx;
+  flex: 1; height: 88rpx; line-height: 88rpx;
+  padding: 0 24rpx;
   background: var(--bg); border-radius: 20rpx;
-  font-size: 26rpx; color: var(--text);
+  font-size: 28rpx; color: var(--text);
   text-align: center;
 }
 .cm-date-sep { font-size: 26rpx; color: var(--muted); }
 
-/* Submit */
+/* Submit Button */
 .cm-submit {
-  width: 100%; margin-top: 20rpx;
-  padding: 28rpx; border-radius: 32rpx;
+  width: 100%; margin-top: 16rpx;
+  height: 96rpx; line-height: 96rpx;
+  border-radius: 32rpx;
   background: var(--primary); color: #fff;
-  font-size: 30rpx; font-weight: 700;
-  border: none;
+  font-size: 32rpx; font-weight: 700;
+  border: none; padding: 0;
 }

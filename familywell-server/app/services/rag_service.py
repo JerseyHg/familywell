@@ -495,21 +495,20 @@ def _sse_line(data: dict) -> str:
 async def quick_health_summary(
     db: AsyncSession, user_id: int
 ) -> str:
-    """为首页生成 AI 健康概要，基于最新向量数据。"""
-    query = "这个人最近的健康状况总结，包括用药、指标变化、需要注意的事项"
+    """为首页生成温馨健康小贴士，简短积极。"""
+    query = "这个人最近的生活习惯、饮食、用药情况"
 
     retrieved = await embedding_service.search_similar(
         db=db,
         user_id=user_id,
         query=query,
-        top_k=5,
+        top_k=3,
     )
 
     if not retrieved:
         return ""
 
     context = "\n".join([r["content_text"] for r in retrieved])
-    realtime = await get_realtime_context(db, user_id)
 
     try:
         response = await _client.chat.completions.create(
@@ -517,15 +516,28 @@ async def quick_health_summary(
             messages=[
                 {
                     "role": "system",
-                    "content": "你是家庭健康助手。请根据以下数据，用 2-3 句话概括此人近期健康状况和需要注意的事项。语气温暖简洁。",
+                    "content": (
+                        "你是一个温暖的家庭健康助手。请根据用户近期的健康数据，生成一条简短的健康小贴士。\n\n"
+                        "要求：\n"
+                        "- 最多2句话，不超过50个字\n"
+                        "- 语气温暖阳光，像朋友的关心\n"
+                        "- 给出具体可行的小建议（饮食、运动、作息、情绪等）\n"
+                        "- 绝对不要提及具体疾病名称、手术、肿瘤、异常指标等负面信息\n"
+                        "- 绝对不要让用户感到焦虑或不安\n"
+                        "- 可以结合季节、天气、时间段给建议\n\n"
+                        "好的示例：\n"
+                        "- 今天记得多喝水哦，适当散步15分钟，心情会更好 ☀️\n"
+                        "- 最近蛋白质摄入不错，继续保持均衡饮食 💪\n"
+                        "- 按时吃药的习惯很棒，别忘了今天也要好好休息 🌙"
+                    ),
                 },
                 {
                     "role": "user",
-                    "content": f"健康数据：\n{context}\n\n{realtime}",
+                    "content": f"用户近期数据：\n{context}",
                 },
             ],
-            max_tokens=200,
-            temperature=0.5,
+            max_tokens=100,
+            temperature=0.8,
         )
         return response.choices[0].message.content.strip()
     except Exception as e:

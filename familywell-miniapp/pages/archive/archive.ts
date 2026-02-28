@@ -195,6 +195,8 @@ Page({
     })
   },
 
+  noop() {},
+
   hideCreateModal() {
     this.setData({ showCreateModal: false })
   },

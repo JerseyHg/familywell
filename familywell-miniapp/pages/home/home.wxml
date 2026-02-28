@@ -15,13 +15,10 @@
   </view>
 </view>
 
-<!-- ── AI Proactive Tip ── -->
-<view class="ai-card" wx:if="{{aiTip}}">
-  <view class="ai-avatar">🤖</view>
-  <view class="ai-content">
-    <text class="ai-text">{{aiTip}}</text>
-    <text class="ai-time">基于今日数据 · 刚刚更新</text>
-  </view>
+<!-- ── AI 温馨提示（简短一行） ── -->
+<view class="ai-tip-bar" wx:if="{{aiTip}}">
+  <text class="atb-icon">🌿</text>
+  <text class="atb-text">{{aiTip}}</text>
 </view>
 
 <!-- ── Pending Med Tasks ── -->

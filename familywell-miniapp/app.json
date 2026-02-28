@@ -2,6 +2,7 @@
   "pages": [
     "pages/home/home",
     "pages/archive/archive",
+    "pages/archive/project-detail",
     "pages/chat/chat",
     "pages/settings/settings",
     "pages/login/login"

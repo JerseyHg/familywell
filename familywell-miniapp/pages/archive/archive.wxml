@@ -119,55 +119,59 @@
 
 <!-- ════ 新建项目弹窗 ════ -->
 <view class="modal-mask" wx:if="{{showCreateModal}}" bindtap="hideCreateModal">
-  <view class="create-modal" catchtap="">
-    <view class="cm-header">
-      <text class="cm-title">新建项目</text>
-      <view class="cm-close" bindtap="hideCreateModal">✕</view>
-    </view>
+  <view class="create-modal" catchtap="noop">
+    <scroll-view scroll-y class="cm-scroll">
+      <view class="cm-header">
+        <text class="cm-title">新建项目</text>
+        <view class="cm-close" bindtap="hideCreateModal">✕</view>
+      </view>
 
-    <!-- 模板选择 -->
-    <view class="cm-section">
-      <text class="cm-label">选择模板</text>
-      <view class="template-grid">
-        <view
-          class="tpl-item {{newProject.template === item.key ? 'active' : ''}}"
-          wx:for="{{templates}}"
-          wx:key="key"
-          data-key="{{item.key}}"
-          data-icon="{{item.icon}}"
-          data-name="{{item.name}}"
-          bindtap="onTemplateTap"
-        >
-          <text class="tpl-icon">{{item.icon}}</text>
-          <text class="tpl-name">{{item.name}}</text>
+      <!-- 模板选择 -->
+      <view class="cm-section">
+        <text class="cm-label">选择模板</text>
+        <view class="template-grid">
+          <view
+            class="tpl-item {{newProject.template === item.key ? 'active' : ''}}"
+            wx:for="{{templates}}"
+            wx:key="key"
+            data-key="{{item.key}}"
+            data-icon="{{item.icon}}"
+            data-name="{{item.name}}"
+            catchtap="onTemplateTap"
+          >
+            <text class="tpl-icon">{{item.icon}}</text>
+            <text class="tpl-name">{{item.name}}</text>
+          </view>
         </view>
       </view>
-    </view>
 
-    <view class="cm-section">
-      <text class="cm-label">项目名称</text>
-      <input class="cm-input" placeholder="如：第三周期化疗" value="{{newProject.name}}" bindinput="onProjectNameInput" />
-    </view>
-
-    <view class="cm-section">
-      <text class="cm-label">备注（选填）</text>
-      <input class="cm-input" placeholder="简要描述" value="{{newProject.description}}" bindinput="onProjectDescInput" />
-    </view>
-
-    <view class="cm-section">
-      <text class="cm-label">时间范围（该时段内的记录自动归入）</text>
-      <view class="cm-date-row">
-        <picker mode="date" value="{{newProject.start_date}}" bindchange="onStartDateChange">
-          <view class="cm-date-picker">{{newProject.start_date || '开始日期'}}</view>
-        </picker>
-        <text class="cm-date-sep">至</text>
-        <picker mode="date" value="{{newProject.end_date}}" bindchange="onEndDateChange">
-          <view class="cm-date-picker">{{newProject.end_date || '结束日期'}}</view>
-        </picker>
+      <view class="cm-section">
+        <text class="cm-label">项目名称</text>
+        <input class="cm-input" placeholder="如：第三周期化疗" value="{{newProject.name}}" bindinput="onProjectNameInput" />
       </view>
-    </view>
 
-    <button class="cm-submit" bindtap="onSubmitProject" loading="{{creating}}">创建项目</button>
+      <view class="cm-section">
+        <text class="cm-label">备注（选填）</text>
+        <input class="cm-input" placeholder="简要描述" value="{{newProject.description}}" bindinput="onProjectDescInput" />
+      </view>
+
+      <view class="cm-section">
+        <text class="cm-label">时间范围（该时段内的记录自动归入）</text>
+        <view class="cm-date-row">
+          <picker mode="date" value="{{newProject.start_date}}" bindchange="onStartDateChange">
+            <view class="cm-date-picker">{{newProject.start_date || '开始日期'}}</view>
+          </picker>
+          <text class="cm-date-sep">至</text>
+          <picker mode="date" value="{{newProject.end_date}}" bindchange="onEndDateChange">
+            <view class="cm-date-picker">{{newProject.end_date || '结束日期'}}</view>
+          </picker>
+        </view>
+      </view>
+
+      <button class="cm-submit" catchtap="onSubmitProject" loading="{{creating}}">创建项目</button>
+
+      <view style="height: 60rpx;" />
+    </scroll-view>
   </view>
 </view>
 

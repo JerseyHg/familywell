@@ -1,0 +1,166 @@
+page { background: var(--bg); }
+
+.safe-top { height: calc(44px + env(safe-area-inset-top)); }
+
+/* ── Project Header ── */
+.project-header {
+  margin: 16rpx 48rpx 0;
+  background: var(--card);
+  border-radius: 36rpx;
+  padding: 36rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+}
+.ph-top { display: flex; align-items: flex-start; gap: 24rpx; }
+.ph-icon { font-size: 56rpx; }
+.ph-info { flex: 1; }
+.ph-name { display: block; font-size: 36rpx; font-weight: 700; color: var(--text); }
+.ph-desc { display: block; font-size: 26rpx; color: var(--sub); margin-top: 8rpx; }
+.ph-meta { display: block; font-size: 24rpx; color: var(--muted); margin-top: 8rpx; }
+
+.ph-actions {
+  display: flex; gap: 16rpx; margin-top: 24rpx;
+  padding-top: 24rpx; border-top: 1rpx solid var(--border);
+}
+.action-btn {
+  padding: 12rpx 32rpx; border-radius: 24rpx;
+  background: var(--primary-light); color: var(--primary);
+  font-size: 26rpx; font-weight: 600;
+}
+.action-btn.edit {
+  background: var(--blue-light); color: var(--blue);
+}
+.action-btn.danger {
+  background: var(--accent-light); color: var(--accent);
+}
+
+/* ═══════════════════════════════
+   Category Groups (方案C)
+   ═══════════════════════════════ */
+.cat-group {
+  margin: 24rpx 48rpx 0;
+  background: var(--card);
+  border-radius: 32rpx;
+  overflow: hidden;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+}
+
+.cat-group-header {
+  display: flex; align-items: center; gap: 16rpx;
+  padding: 24rpx 32rpx;
+  background: var(--bg);
+  border-bottom: 1rpx solid var(--border);
+}
+.cg-icon { font-size: 36rpx; }
+.cg-label { font-size: 28rpx; font-weight: 600; color: var(--text); flex: 1; }
+.cg-count {
+  padding: 4rpx 16rpx; border-radius: 16rpx;
+  background: var(--primary-light); color: var(--primary);
+  font-size: 22rpx; font-weight: 600;
+}
+
+.cat-group-list { padding: 0 32rpx; }
+
+.cg-record {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid var(--border);
+}
+.cg-record:last-child { border-bottom: none; }
+
+.cg-rec-main { flex: 1; }
+.cg-rec-title {
+  display: block; font-size: 28rpx; font-weight: 500; color: var(--text);
+}
+.cg-rec-date {
+  display: block; font-size: 22rpx; color: var(--muted); margin-top: 4rpx;
+}
+.cg-rec-remove {
+  font-size: 24rpx; color: var(--muted); padding: 8rpx 16rpx;
+  flex-shrink: 0;
+}
+
+/* ── Empty ── */
+.empty-hint {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 120rpx 0; gap: 16rpx;
+}
+.empty-icon { font-size: 80rpx; }
+.empty-text { font-size: 28rpx; color: var(--muted); }
+
+/* ═══════════════════════════════
+   Edit Modal
+   ═══════════════════════════════ */
+.modal-mask {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.6);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.edit-modal {
+  width: 100%; background: var(--card);
+  border-radius: 40rpx 40rpx 0 0;
+  max-height: 80vh; overflow: hidden;
+}
+.em-scroll {
+  height: 80vh;
+  padding: 40rpx 48rpx calc(40rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+.em-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 32rpx;
+}
+.em-title { font-size: 36rpx; font-weight: 700; color: var(--text); }
+.em-close {
+  width: 56rpx; height: 56rpx; border-radius: 28rpx;
+  background: var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26rpx; color: var(--sub);
+}
+.em-section { margin-bottom: 32rpx; }
+.em-label {
+  display: block; font-size: 26rpx; font-weight: 600;
+  color: var(--sub); margin-bottom: 16rpx;
+}
+.em-input {
+  width: 100%; height: 88rpx;
+  padding: 0 28rpx;
+  background: var(--bg); border-radius: 20rpx;
+  font-size: 30rpx; color: var(--text);
+  box-sizing: border-box; line-height: 88rpx;
+}
+
+/* Icon Grid */
+.icon-grid {
+  display: flex; flex-wrap: wrap; gap: 16rpx;
+}
+.icon-item {
+  width: 80rpx; height: 80rpx;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 40rpx; border-radius: 20rpx;
+  border: 2rpx solid var(--border); background: var(--card);
+}
+.icon-item.active {
+  border-color: var(--primary); background: var(--primary-light);
+}
+
+/* Date Row */
+.em-date-row {
+  display: flex; align-items: center; gap: 16rpx;
+}
+.em-date-picker {
+  flex: 1; height: 88rpx; line-height: 88rpx;
+  padding: 0 24rpx;
+  background: var(--bg); border-radius: 20rpx;
+  font-size: 28rpx; color: var(--text); text-align: center;
+}
+.em-date-sep { font-size: 26rpx; color: var(--muted); }
+
+/* Submit */
+.em-submit {
+  width: 100%; margin-top: 16rpx;
+  height: 96rpx; line-height: 96rpx;
+  border-radius: 32rpx;
+  background: var(--primary); color: #fff;
+  font-size: 32rpx; font-weight: 700;
+  border: none; padding: 0;
+}

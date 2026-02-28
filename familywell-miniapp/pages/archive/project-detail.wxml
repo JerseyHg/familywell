@@ -1,0 +1,102 @@
+<view class="safe-top" />
+
+<!-- ── Project Header ── -->
+<view class="project-header">
+  <view class="ph-top">
+    <text class="ph-icon">{{project.icon || '📁'}}</text>
+    <view class="ph-info">
+      <text class="ph-name">{{project.name}}</text>
+      <text class="ph-desc" wx:if="{{project.description}}">{{project.description}}</text>
+      <text class="ph-meta">{{project.record_count}} 条记录 · {{project.dateRange}}</text>
+    </view>
+  </view>
+  <view class="ph-actions">
+    <view class="action-btn edit" catchtap="onEditProject">
+      <text>编辑</text>
+    </view>
+    <view class="action-btn" wx:if="{{project.status === 'active'}}" catchtap="onEndProject">
+      <text>结束项目</text>
+    </view>
+    <view class="action-btn danger" catchtap="onDeleteProject">
+      <text>删除</text>
+    </view>
+  </view>
+</view>
+
+<!-- ── 按分类展示记录（方案C） ── -->
+<block wx:for="{{categoryGroups}}" wx:key="key">
+  <view class="cat-group" wx:if="{{item.records.length}}">
+    <view class="cat-group-header">
+      <text class="cg-icon">{{item.icon}}</text>
+      <text class="cg-label">{{item.label}}</text>
+      <text class="cg-count">{{item.records.length}}</text>
+    </view>
+    <view class="cat-group-list">
+      <view class="cg-record" wx:for="{{item.records}}" wx:for-item="rec" wx:key="id">
+        <view class="cg-rec-main">
+          <text class="cg-rec-title">{{rec.title || '未命名'}}</text>
+          <text class="cg-rec-date">{{rec.displayDate}}{{rec.hospital ? ' · ' + rec.hospital : ''}}</text>
+        </view>
+        <view class="cg-rec-remove" catchtap="onRemoveRecord" data-id="{{rec.id}}">移出</view>
+      </view>
+    </view>
+  </view>
+</block>
+
+<view class="empty-hint" wx:if="{{!records.length && !loading}}">
+  <text class="empty-icon">📭</text>
+  <text class="empty-text">该项目下暂无记录</text>
+</view>
+
+<!-- ════ 编辑项目弹窗 ════ -->
+<view class="modal-mask" wx:if="{{showEditModal}}" bindtap="hideEditModal">
+  <view class="edit-modal" catchtap="noop">
+    <scroll-view scroll-y class="em-scroll">
+      <view class="em-header">
+        <text class="em-title">编辑项目</text>
+        <view class="em-close" bindtap="hideEditModal">✕</view>
+      </view>
+
+      <view class="em-section">
+        <text class="em-label">项目名称</text>
+        <input class="em-input" value="{{editForm.name}}" bindinput="onEditNameInput" />
+      </view>
+
+      <view class="em-section">
+        <text class="em-label">备注</text>
+        <input class="em-input" placeholder="选填" value="{{editForm.description}}" bindinput="onEditDescInput" />
+      </view>
+
+      <view class="em-section">
+        <text class="em-label">图标</text>
+        <view class="icon-grid">
+          <view
+            class="icon-item {{editForm.icon === item ? 'active' : ''}}"
+            wx:for="{{iconOptions}}"
+            wx:key="*this"
+            data-icon="{{item}}"
+            catchtap="onEditIconTap"
+          >{{item}}</view>
+        </view>
+      </view>
+
+      <view class="em-section">
+        <text class="em-label">时间范围</text>
+        <view class="em-date-row">
+          <picker mode="date" value="{{editForm.start_date}}" bindchange="onEditStartDate">
+            <view class="em-date-picker">{{editForm.start_date || '开始日期'}}</view>
+          </picker>
+          <text class="em-date-sep">至</text>
+          <picker mode="date" value="{{editForm.end_date}}" bindchange="onEditEndDate">
+            <view class="em-date-picker">{{editForm.end_date || '结束日期'}}</view>
+          </picker>
+        </view>
+      </view>
+
+      <button class="em-submit" catchtap="onSubmitEdit" loading="{{saving}}">保存修改</button>
+      <view style="height: 60rpx;" />
+    </scroll-view>
+  </view>
+</view>
+
+<view class="safe-bottom" />
