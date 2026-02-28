@@ -263,3 +263,28 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 }
 .send-btn.active { background: var(--primary); }
 .send-arrow { color: #fff; font-size: 32rpx; font-weight: 700; }
+
+/* ── Pie Chart ── */
+.pie-wrapper {
+  display: flex; align-items: center; justify-content: center;
+  position: relative; margin: 16rpx 0 24rpx;
+}
+.pie-chart {
+  width: 200rpx; height: 200rpx; border-radius: 50%;
+  background: conic-gradient(#2D8B6F 0% 33%, #F5A623 33% 55%, #E85D3A 55% 100%);
+}
+.pie-center {
+  position: absolute;
+  width: 120rpx; height: 120rpx; border-radius: 50%;
+  background: var(--card);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.pie-cal { font-size: 32rpx; font-weight: 700; color: var(--text); }
+.pie-cal-unit { font-size: 18rpx; color: var(--muted); }
+.pie-legend { display: flex; justify-content: center; gap: 32rpx; margin-bottom: 16rpx; }
+.pie-legend-item { display: flex; align-items: center; gap: 8rpx; }
+.pie-legend-dot { width: 16rpx; height: 16rpx; border-radius: 4rpx; }
+.pie-legend-name { font-size: 22rpx; color: var(--sub); }
+.pie-legend-val { font-size: 22rpx; font-weight: 600; color: var(--text); }
+.pie-footer { text-align: center; }
+.pf-item { display: inline-block; font-size: 22rpx; color: var(--sub); margin: 0 16rpx; }

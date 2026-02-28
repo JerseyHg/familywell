@@ -265,7 +265,7 @@ async def generate_charts(
 # ════════════════════════════════════════
 
 async def _chart_nutrition(db: AsyncSession, user_id: int, days: int) -> dict | None:
-    """营养摄入堆叠柱状图。"""
+    """营养摄入饼图 — 显示三大营养素占比。"""
     since = date.today() - timedelta(days=days)
     result = await db.execute(
         select(NutritionLog)
@@ -276,45 +276,37 @@ async def _chart_nutrition(db: AsyncSession, user_id: int, days: int) -> dict | 
     if not logs:
         return None
 
-    daily = {}
-    for log in logs:
-        d = str(log.logged_at)
-        if d not in daily:
-            daily[d] = {"protein": 0, "fat": 0, "carb": 0, "calories": 0, "meals": 0}
-        daily[d]["protein"] += log.protein_g or 0
-        daily[d]["fat"] += log.fat_g or 0
-        daily[d]["carb"] += log.carb_g or 0
-        daily[d]["calories"] += log.calories or 0
-        daily[d]["meals"] += 1
+    total_protein = sum(float(log.protein_g or 0) for log in logs)
+    total_fat = sum(float(log.fat_g or 0) for log in logs)
+    total_carb = sum(float(log.carb_g or 0) for log in logs)
+    total_calories = sum(float(log.calories or 0) for log in logs)
+    total_meals = len(logs)
 
-    data = []
-    for d, v in sorted(daily.items()):
-        data.append({
-            "label": d[5:],
-            "蛋白质": round(v["protein"]),
-            "脂肪": round(v["fat"]),
-            "碳水": round(v["carb"]),
-        })
+    total_g = total_protein + total_fat + total_carb
+    if total_g == 0:
+        return None
 
-    total_days = len(daily)
-    avg_protein = round(sum(v["protein"] for v in daily.values()) / total_days) if total_days else 0
-    avg_fat = round(sum(v["fat"] for v in daily.values()) / total_days) if total_days else 0
-    avg_carb = round(sum(v["carb"] for v in daily.values()) / total_days) if total_days else 0
-    total_meals = sum(v["meals"] for v in daily.values())
+    days_count = len(set(str(log.logged_at) for log in logs))
+
+    data = [
+        {"name": "蛋白质", "value": round(total_protein), "color": "#2D8B6F"},
+        {"name": "脂肪", "value": round(total_fat), "color": "#F5A623"},
+        {"name": "碳水", "value": round(total_carb), "color": "#E85D3A"},
+    ]
 
     return {
-        "type": "bar_stack",
-        "title": f"近{days}天营养摄入 (g/天)",
+        "type": "pie",
+        "title": f"近{days}天营养摄入占比",
         "icon": "🍽️",
         "data": data,
-        "keys": ["蛋白质", "脂肪", "碳水"],
-        "colors": ["#2D8B6F", "#F5A623", "#E85D3A99"],
         "summary": {
-            "avg_protein": avg_protein,
-            "avg_fat": avg_fat,
-            "avg_carb": avg_carb,
+            "total_calories": round(total_calories),
+            "avg_calories": round(total_calories / days_count) if days_count else 0,
             "total_meals": total_meals,
-            "days": total_days,
+            "days": days_count,
+            "total_protein": round(total_protein),
+            "total_fat": round(total_fat),
+            "total_carb": round(total_carb),
         },
     }
 

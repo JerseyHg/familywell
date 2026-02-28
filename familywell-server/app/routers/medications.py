@@ -303,6 +303,20 @@ type=symptom 时:
         response_data["message"] = f"已记录：{summary}"
 
     await db.flush()
+
+    # 3. 为新建的 Record 生成 embedding（让 RAG 能检索到）
+    if record_type != "medication":
+        try:
+            from app.services import embedding_service
+            # record 变量在各分支中已赋值
+            await db.commit()  # 先提交，embedding_service 会开新 session
+            await embedding_service.embed_record(record.id)
+        except Exception as emb_err:
+            import logging
+            logging.getLogger(__name__).warning(f"Embedding failed for voice record: {emb_err}")
+    else:
+        await db.commit()
+
     return response_data
 
 
