@@ -1,6 +1,6 @@
 from datetime import datetime, date
 from sqlalchemy import (
-    BigInteger, String, Boolean, DateTime, Date, Enum, DECIMAL, JSON,
+    BigInteger, String, Boolean, DateTime, Date, DECIMAL, JSON,
     ForeignKey, Index,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -34,10 +34,10 @@ class UserProfile(Base):
         BigInteger, ForeignKey("user.id"), unique=True, nullable=False
     )
     real_name: Mapped[str | None] = mapped_column(String(50))
-    gender: Mapped[str | None] = mapped_column(Enum("male", "female", "other"))
+    gender: Mapped[str | None] = mapped_column(String(10))
     birthday: Mapped[date | None] = mapped_column(Date)
     blood_type: Mapped[str | None] = mapped_column(
-        Enum("A", "B", "AB", "O", "unknown")
+        String(10)
     )
     height_cm: Mapped[float | None] = mapped_column(DECIMAL(5, 1))
     weight_kg: Mapped[float | None] = mapped_column(DECIMAL(5, 1))

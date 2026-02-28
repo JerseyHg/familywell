@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import BigInteger, String, DateTime, Enum, ForeignKey, UniqueConstraint
+from sqlalchemy import BigInteger, String, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -29,7 +29,7 @@ class FamilyMember(Base):
     user_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("user.id"), nullable=False
     )
-    role: Mapped[str] = mapped_column(Enum("admin", "member"), default="member")
+    role: Mapped[str] = mapped_column(String(20), default="member")
     joined_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     family: Mapped["Family"] = relationship(back_populates="members")

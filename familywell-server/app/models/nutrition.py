@@ -1,5 +1,5 @@
 from datetime import datetime, date
-from sqlalchemy import BigInteger, DateTime, Date, DECIMAL, Enum, JSON, ForeignKey, Index
+from sqlalchemy import BigInteger, DateTime, Date, DECIMAL, String, JSON, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -17,7 +17,7 @@ class NutritionLog(Base):
     )
 
     meal_type: Mapped[str | None] = mapped_column(
-        Enum("breakfast", "lunch", "dinner", "snack")
+        String(20)
     )
     food_items: Mapped[dict | None] = mapped_column(JSON)
 

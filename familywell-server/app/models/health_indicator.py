@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlalchemy import (
-    BigInteger, String, Boolean, DateTime, DECIMAL, Enum,
+    BigInteger, String, Boolean, DateTime, DECIMAL,
     ForeignKey, Index,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -31,7 +31,7 @@ class HealthIndicator(Base):
 
     measured_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     source: Mapped[str] = mapped_column(
-        Enum("ai_extract", "manual"), default="ai_extract"
+        String(20), default="ai_extract"
     )
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

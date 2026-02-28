@@ -9,11 +9,29 @@ services:
       - "127.0.0.1:8004:8000"
     env_file:
       - .env
+    depends_on:
+      redis:
+        condition: service_started
     volumes:
       - ./app:/app/app
     networks:
-      - shared-net
+      - shared-net       # 连 shared-postgres
+      - familywell       # 内部连 redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: familywell-redis
+    restart: always
+    volumes:
+      - redis_data:/data
+    networks:
+      - familywell
+
+volumes:
+  redis_data:
 
 networks:
   shared-net:
-    external: true
+    external: true       # 复用已有的 shared-net
+  familywell:
+    driver: bridge

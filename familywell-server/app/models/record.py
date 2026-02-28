@@ -1,6 +1,6 @@
 from datetime import datetime, date
 from sqlalchemy import (
-    BigInteger, String, Text, DateTime, Date, Enum, JSON,
+    BigInteger, String, Text, DateTime, Date, JSON,
     ForeignKey, Index,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -22,10 +22,7 @@ class Record(Base):
 
     # Classification
     category: Mapped[str] = mapped_column(
-        Enum(
-            "checkup", "lab", "prescription", "insurance",
-            "visit", "food", "bp_reading", "weight", "other",
-        ),
+        String(30),
         nullable=False,
         default="other",
     )
@@ -38,13 +35,13 @@ class Record(Base):
     # File
     file_key: Mapped[str | None] = mapped_column(String(500))
     file_type: Mapped[str] = mapped_column(
-        Enum("image", "pdf"), default="image"
+        String(10), default="image"
     )
     thumbnail_key: Mapped[str | None] = mapped_column(String(500))
 
     # AI processing
     ai_status: Mapped[str] = mapped_column(
-        Enum("pending", "processing", "completed", "failed"),
+        String(20),
         default="pending",
     )
     ai_raw_result: Mapped[dict | None] = mapped_column(JSON)
@@ -53,7 +50,7 @@ class Record(Base):
 
     # Meta
     source: Mapped[str] = mapped_column(
-        Enum("camera", "album", "manual"), default="camera"
+        String(20), default="camera"
     )
     notes: Mapped[str | None] = mapped_column(Text)
 

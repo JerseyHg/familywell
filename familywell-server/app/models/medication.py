@@ -1,6 +1,6 @@
 from datetime import datetime, date, time
 from sqlalchemy import (
-    BigInteger, String, Boolean, Integer, DateTime, Date, Time, Enum, JSON,
+    BigInteger, String, Boolean, Integer, DateTime, Date, Time, JSON,
     ForeignKey, Index, UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -58,7 +58,7 @@ class MedicationTask(Base):
     scheduled_time: Mapped[time] = mapped_column(Time, nullable=False)
 
     status: Mapped[str] = mapped_column(
-        Enum("pending", "done", "missed"), default="pending"
+        String(20), default="pending"
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
 

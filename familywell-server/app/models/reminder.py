@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlalchemy import (
-    BigInteger, String, Text, Boolean, Integer, DateTime, Enum, JSON,
+    BigInteger, String, Text, Boolean, Integer, DateTime, JSON,
     ForeignKey, Index,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -19,17 +19,14 @@ class Reminder(Base):
     )
 
     type: Mapped[str] = mapped_column(
-        Enum(
-            "medication", "insurance_expiry", "checkup_due",
-            "visit_upcoming", "med_low_stock", "custom",
-        ),
+        String(30),
         nullable=False,
     )
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
 
     priority: Mapped[str] = mapped_column(
-        Enum("urgent", "normal"), default="normal"
+        String(20), default="normal"
     )
 
     related_id: Mapped[int | None] = mapped_column(BigInteger)
