@@ -239,10 +239,24 @@ type=symptom 时:
 
     elif record_type == "food":
         # ── 饮食 ──
+        food_items = data.get("food_items", [])
+        calories = data.get("calories")
+        raw_text = f"饮食记录：{summary}。食物：{'、'.join(food_items) if food_items else '未知'}。"
+        if calories:
+            raw_text += f"估算热量约{calories}千卡。"
+        if data.get("protein_g"):
+            raw_text += f"蛋白质{data['protein_g']}g，脂肪{data.get('fat_g',0)}g，碳水{data.get('carb_g',0)}g。"
+
         record = Record(
             user_id=user.id, category="food", title=summary,
             record_date=today, ai_status="completed", source="voice",
-            ai_raw_result=data,
+            ai_raw_result={
+                "category": "food",
+                "title": summary,
+                "raw_text": raw_text,
+                "date": today.isoformat(),
+                **data,
+            },
         )
         db.add(record)
         await db.flush()
@@ -267,10 +281,21 @@ type=symptom 时:
 
     elif record_type == "vitals":
         # ── 指标 ──
+        indicators = data.get("indicators", [])
+        raw_text = f"健康指标记录：{summary}。"
+        for ind in indicators:
+            raw_text += f"{ind.get('type','指标')}: {ind.get('value')}{ind.get('unit','')}。"
+
         record = Record(
             user_id=user.id, category="bp_reading", title=summary,
             record_date=today, ai_status="completed", source="voice",
-            ai_raw_result=data,
+            ai_raw_result={
+                "category": "bp_reading",
+                "title": summary,
+                "raw_text": raw_text,
+                "date": today.isoformat(),
+                **data,
+            },
         )
         db.add(record)
         await db.flush()
@@ -292,11 +317,20 @@ type=symptom 时:
 
     else:
         # ── 症状/其他 ──
+        symptoms = data.get("symptoms", [])
+        raw_text = f"症状记录：{summary}。{req.text}"
+
         record = Record(
             user_id=user.id, category="visit", title=summary,
             record_date=today, ai_status="completed", source="voice",
             notes=req.text,
-            ai_raw_result=data,
+            ai_raw_result={
+                "category": "visit",
+                "title": summary,
+                "raw_text": raw_text,
+                "date": today.isoformat(),
+                **data,
+            },
         )
         db.add(record)
 
