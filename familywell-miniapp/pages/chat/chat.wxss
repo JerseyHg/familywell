@@ -8,7 +8,7 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
   display: flex;
   flex-direction: column;
   height: 100vh;
-  /* ✅ 修复：为底部自定义 TabBar 留出空间 */
+  /* ✅ 为底部自定义 TabBar 留出空间（约 50px + 安全区） */
   padding-bottom: calc(env(safe-area-inset-bottom) + 100rpx);
   box-sizing: border-box;
 }
@@ -34,6 +34,8 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 .message-area {
   flex: 1;
   padding: 20rpx 32rpx;
+  /* ✅ 修复：底部留出足够空间，防止最后一条消息被 input-bar 遮挡 */
+  padding-bottom: 40rpx;
   overflow-y: auto;
 }
 .scroll-bottom { height: 20rpx; }
@@ -49,15 +51,24 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 }
 .welcome-title { display: block; font-size: 32rpx; font-weight: 700; color: var(--text); }
 .welcome-desc { display: block; font-size: 24rpx; color: var(--sub); margin-top: 8rpx; line-height: 1.6; }
-.welcome-prompts { display: flex; flex-direction: column; gap: 16rpx; margin-top: 40rpx; }
+
+/* ── Welcome Prompts（支持 2x4 网格） ── */
+.welcome-prompts {
+  display: flex; flex-wrap: wrap; gap: 16rpx;
+  margin-top: 40rpx;
+}
 .welcome-prompt {
   display: flex; align-items: center; gap: 16rpx;
-  padding: 24rpx 32rpx; border-radius: 32rpx;
+  /* ✅ 两列网格：每项占约一半宽度 */
+  width: calc(50% - 8rpx);
+  padding: 24rpx 24rpx;
+  border-radius: 32rpx;
   background: var(--card); border: 1rpx solid var(--border);
   box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
+  box-sizing: border-box;
 }
-.wp-icon { font-size: 36rpx; }
-.wp-text { font-size: 28rpx; font-weight: 500; color: var(--text); }
+.wp-icon { font-size: 32rpx; flex-shrink: 0; }
+.wp-text { font-size: 24rpx; font-weight: 500; color: var(--text); line-height: 1.4; }
 
 /* ── Message Rows ── */
 .msg-row { margin-bottom: 16rpx; }
@@ -209,20 +220,13 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 }
 
 /* ── Input Bar ── */
-/* ✅ 修复：确保 input-bar 在自定义 TabBar 之上可见 */
+/* ✅ 修复：不再用 position:fixed，保持在 flex 布局中，不会遮挡消息 */
 .input-bar {
   display: flex; align-items: center; gap: 16rpx;
-  padding: 16rpx 32rpx calc(16rpx + env(safe-area-inset-bottom));
+  padding: 16rpx 32rpx 16rpx;
   background: var(--card);
   border-top: 1rpx solid var(--border);
   flex-shrink: 0;
-  /* ✅ 关键修复：用 position fixed 确保始终在 TabBar 上方显示 */
-  position: fixed;
-  left: 0;
-  right: 0;
-  /* 自定义 TabBar 高度大约 100rpx，input-bar 需要在它上方 */
-  bottom: calc(env(safe-area-inset-bottom) + 100rpx);
-  z-index: 100;
 }
 .input-wrap {
   flex: 1;

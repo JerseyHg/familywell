@@ -6,12 +6,18 @@ RAG Service
 支持两种模式：
 - chat()        : 同步，等全部生成完一次性返回（fallback / 首页摘要用）
 - chat_stream() : 流式，SSE 逐字推送，图表先行（主力模式）
+
+✅ 新增：
+- Redis 热点缓存：高频模板问题（如"过去7天饮食情况"）缓存回答，减少 LLM 调用
+- 更友善的 SYSTEM_PROMPT：非健康话题温暖拒绝并引导
 """
 import json
+import hashlib
 import logging
 from datetime import datetime, date, timedelta
 from typing import AsyncGenerator
 
+import redis.asyncio as aioredis
 from openai import AsyncOpenAI
 from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,22 +39,96 @@ _client = AsyncOpenAI(
     base_url=settings.DOUBAO_BASE_URL,
 )
 
-SYSTEM_PROMPT = """你是 FamilyWell 的 AI 家庭健康助手。
+# ════════════════════════════════════════
+# Redis 连接（热点缓存用）
+# ════════════════════════════════════════
 
-你的职责：
-1. 基于用户和家人的真实健康档案数据来回答问题
+_redis: aioredis.Redis | None = None
+
+async def get_redis() -> aioredis.Redis:
+    """获取 Redis 连接（懒初始化）。"""
+    global _redis
+    if _redis is None:
+        _redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    return _redis
+
+# 热点问题缓存 TTL（秒）：数据每天都在变化，缓存 2 小时
+HOT_CACHE_TTL = 2 * 60 * 60
+
+# ✅ 模板问题列表（和前端 homePrompts 对应）
+# 这些问题会优先检查 Redis 缓存
+HOT_QUESTIONS = {
+    "过去7天饮食情况",
+    "这周药吃齐了吗",
+    "血压最近趋势怎样",
+    "最近身体怎么样",
+    "PSA 变化趋势",
+    "保险什么时候到期",
+    "有什么需要注意的",
+    "下次该做什么检查",
+}
+
+
+def _cache_key(user_id: int, question: str) -> str:
+    """生成 Redis 缓存 key。"""
+    q_hash = hashlib.md5(question.encode()).hexdigest()[:8]
+    return f"fw:chat:{user_id}:{q_hash}"
+
+
+async def get_cached_answer(user_id: int, question: str) -> dict | None:
+    """尝试从 Redis 读取缓存的回答。"""
+    try:
+        r = await get_redis()
+        data = await r.get(_cache_key(user_id, question))
+        if data:
+            logger.info(f"Cache HIT for user={user_id} q='{question}'")
+            return json.loads(data)
+    except Exception as e:
+        logger.warning(f"Redis get failed: {e}")
+    return None
+
+
+async def set_cached_answer(user_id: int, question: str, answer: dict):
+    """将回答写入 Redis 缓存。"""
+    try:
+        r = await get_redis()
+        await r.setex(
+            _cache_key(user_id, question),
+            HOT_CACHE_TTL,
+            json.dumps(answer, ensure_ascii=False),
+        )
+        logger.info(f"Cache SET for user={user_id} q='{question}' TTL={HOT_CACHE_TTL}s")
+    except Exception as e:
+        logger.warning(f"Redis set failed: {e}")
+
+
+# ════════════════════════════════════════
+# System Prompt
+# ════════════════════════════════════════
+
+# ✅ 优化：更友善的角色设定
+SYSTEM_PROMPT = """你是 FamilyWell 的 AI 家庭健康助手，名字叫"小康"。
+
+你的核心职责：
+1. 基于用户和家人的真实健康档案数据来回答健康相关问题
 2. 当数据不足时诚实说明，不编造
 3. 给出的建议需标注数据来源（如"根据2月24日的PSA检查报告"）
 4. 涉及疾病诊断时提醒用户咨询医生
 5. 语气温暖专业，像一位懂医学的家人
 
-你可以：
+你可以做的事：
 - 解读检查指标趋势
 - 汇总用药情况
 - 分析营养摄入
 - 提供保险到期提醒
 - 对比历史报告变化
 - 回答"他/她最近怎么样"这类综合问题
+- 解答通用的健康知识、养生、运动、饮食搭配等问题
+
+对于非健康相关的问题（比如推荐歌曲、写代码、聊明星等）：
+- 不要生硬地拒绝，用温暖友好的语气简短回应
+- 然后自然地引导回健康话题，比如："哈哈这个我不太擅长～不过说到放松，最近的睡眠质量怎么样？需要我帮你看看吗？"
+- 可以适当展现一点幽默感
 
 下面是从用户健康档案中检索到的相关信息：
 
@@ -251,6 +331,16 @@ async def chat(
     family_user_ids: list[int] | None = None,
 ) -> dict:
     """同步 RAG：等全部生成完一次性返回。"""
+
+    # ✅ 热点缓存：检查 Redis
+    if question in HOT_QUESTIONS:
+        cached = await get_cached_answer(user_id, question)
+        if cached:
+            # 缓存命中，直接返回（仍然保存到 chat_history）
+            await save_chat_history(db, user_id, session_id, question, cached["answer"], cached.get("sources", []))
+            cached["session_id"] = session_id
+            return cached
+
     ctx = await prepare_context(db, user_id, session_id, question, family_user_ids)
 
     try:
@@ -269,12 +359,22 @@ async def chat(
 
     await save_chat_history(db, user_id, session_id, question, answer, ctx["sources"], token_count)
 
-    return {
+    result = {
         "answer": answer,
         "charts": ctx["charts"],
         "sources": ctx["sources"],
         "session_id": session_id,
     }
+
+    # ✅ 热点缓存：写入 Redis
+    if question in HOT_QUESTIONS:
+        await set_cached_answer(user_id, question, {
+            "answer": answer,
+            "charts": ctx["charts"],
+            "sources": ctx["sources"],
+        })
+
+    return result
 
 
 # ════════════════════════════════════════
@@ -297,6 +397,33 @@ async def chat_stream(
     3. type=text    → AI 回答文字（豆包流式返回，逐块推送）
     4. type=done    → 结束信号 + session_id
     """
+
+    # ✅ 热点缓存：命中时直接以"伪流式"推送缓存内容
+    if question in HOT_QUESTIONS:
+        cached = await get_cached_answer(user_id, question)
+        if cached:
+            logger.info(f"Streaming from cache for user={user_id}")
+
+            # 推图表
+            if cached.get("charts"):
+                yield _sse_line({"type": "charts", "charts": cached["charts"]})
+
+            # 推来源
+            if cached.get("sources"):
+                yield _sse_line({"type": "sources", "sources": cached["sources"]})
+
+            # 一次性推文本（缓存不需要逐字）
+            yield _sse_line({"type": "text", "content": cached["answer"]})
+
+            # 保存历史
+            await save_chat_history(
+                db, user_id, session_id, question,
+                cached["answer"], cached.get("sources", []),
+            )
+
+            yield _sse_line({"type": "done", "session_id": session_id})
+            return
+
     # ── 1. 准备上下文（向量检索 + DB 查询 + 图表生成，<200ms） ──
     ctx = await prepare_context(db, user_id, session_id, question, family_user_ids)
 
@@ -340,6 +467,14 @@ async def chat_stream(
     await save_chat_history(
         db, user_id, session_id, question, full_answer, ctx["sources"], token_count,
     )
+
+    # ✅ 热点缓存：写入 Redis（流式完成后）
+    if question in HOT_QUESTIONS and full_answer:
+        await set_cached_answer(user_id, question, {
+            "answer": full_answer,
+            "charts": ctx["charts"],
+            "sources": [s for s in ctx["sources"]],
+        })
 
     # ── 6. 推结束信号 ──
     yield _sse_line({"type": "done", "session_id": session_id})

@@ -15,16 +15,25 @@ Page({
     sessionId: '',
     scrollToView: '',
 
+    // ✅ 优化：更丰富的欢迎页模板问题（2x4 网格）
     homePrompts: [
       { icon: '🍽️', text: '过去7天饮食情况' },
-      { icon: '💉', text: '血压最近趋势怎样' },
       { icon: '💊', text: '这周药吃齐了吗' },
+      { icon: '💉', text: '血压最近趋势怎样' },
       { icon: '📋', text: '最近身体怎么样' },
+      { icon: '📈', text: 'PSA 变化趋势' },
+      { icon: '🛡️', text: '保险什么时候到期' },
+      { icon: '⚠️', text: '有什么需要注意的' },
+      { icon: '🏥', text: '下次该做什么检查' },
     ],
+
+    // ✅ 优化：更丰富的追问提示词（根据对话上下文动态更新）
     followupPrompts: [
       { icon: '📈', text: 'PSA 变化趋势' },
       { icon: '🏥', text: '下次该做什么检查' },
       { icon: '🛡️', text: '保险什么时候到期' },
+      { icon: '💊', text: '用药依从性怎么样' },
+      { icon: '🍽️', text: '最近营养均衡吗' },
     ],
   },
 
@@ -130,6 +139,9 @@ Page({
           })
           this._scrollToBottom()
           this._streamTask = null
+
+          // ✅ 根据对话内容动态更新追问提示词
+          this._updateFollowupPrompts(question)
         },
 
         // ── 错误处理：降级到同步模式 ──
@@ -140,6 +152,59 @@ Page({
         },
       },
     )
+  },
+
+  /**
+   * ✅ 根据用户最后一个问题，动态切换追问提示词
+   */
+  _updateFollowupPrompts(lastQuestion: string) {
+    const q = lastQuestion.toLowerCase()
+
+    // 根据上一个话题推荐相关追问
+    let prompts = []
+
+    if (q.includes('药') || q.includes('服药') || q.includes('用药')) {
+      prompts = [
+        { icon: '📅', text: '本周哪天漏服了' },
+        { icon: '💊', text: '药还剩多少需要补' },
+        { icon: '📋', text: '最近身体怎么样' },
+      ]
+    } else if (q.includes('饮食') || q.includes('营养') || q.includes('吃')) {
+      prompts = [
+        { icon: '🥩', text: '蛋白质摄入够吗' },
+        { icon: '📊', text: '和上周对比怎么样' },
+        { icon: '💊', text: '这周药吃齐了吗' },
+      ]
+    } else if (q.includes('血压')) {
+      prompts = [
+        { icon: '📈', text: '近一个月血压趋势' },
+        { icon: '💊', text: '降压药吃齐了吗' },
+        { icon: '🏥', text: '需要去医院复查吗' },
+      ]
+    } else if (q.includes('psa') || q.includes('前列腺')) {
+      prompts = [
+        { icon: '📈', text: 'PSA 和上次比变化大吗' },
+        { icon: '🏥', text: '下次该做什么检查' },
+        { icon: '📋', text: '最近身体怎么样' },
+      ]
+    } else if (q.includes('保险') || q.includes('保单')) {
+      prompts = [
+        { icon: '💰', text: '保费什么时候交' },
+        { icon: '📋', text: '保险都覆盖什么' },
+        { icon: '📋', text: '最近身体怎么样' },
+      ]
+    } else {
+      // 默认追问
+      prompts = [
+        { icon: '📈', text: 'PSA 变化趋势' },
+        { icon: '💊', text: '这周药吃齐了吗' },
+        { icon: '🍽️', text: '最近营养均衡吗' },
+        { icon: '🛡️', text: '保险什么时候到期' },
+        { icon: '⚠️', text: '有什么需要注意的' },
+      ]
+    }
+
+    this.setData({ followupPrompts: prompts })
   },
 
   /**
