@@ -6,56 +6,32 @@ services:
     container_name: familywell-api
     restart: always
     ports:
-      - "127.0.0.1:8004:8000"    # 只监听本地，由宿主机 Nginx 反代
+      - "127.0.0.1:8004:8000"
     env_file:
       - .env
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_started
     volumes:
       - ./app:/app/app
     networks:
-      - familywell
-
-  postgres:
-    image: pgvector/pgvector:pg16
-    container_name: familywell-postgres
-    restart: always
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-familywell}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-familywell123}
-      POSTGRES_DB: familywell
-    ports:
-      - "127.0.0.1:5432:5432"    # 只监听本地
-    volumes:
-      - pg_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U familywell"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - familywell
+      - shared-net       # 连 shared-postgres
+      - familywell       # 内部连 redis
 
   redis:
     image: redis:7-alpine
     container_name: familywell-redis
     restart: always
-    ports:
-      - "127.0.0.1:6379:6379"    # 只监听本地
     volumes:
       - redis_data:/data
     networks:
       - familywell
 
-# 不再需要 Nginx 容器，复用宿主机已有的 Nginx
-
 volumes:
-  pg_data:
   redis_data:
 
 networks:
+  shared-net:
+    external: true       # 复用已有的 shared-net
   familywell:
     driver: bridge
