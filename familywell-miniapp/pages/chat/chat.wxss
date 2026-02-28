@@ -8,9 +8,12 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
   display: flex;
   flex-direction: column;
   height: 100vh;
-  /* ✅ 为底部自定义 TabBar 留出空间（约 50px + 安全区） */
+  /* ✅ 为底部自定义 TabBar 留出空间 */
   padding-bottom: calc(env(safe-area-inset-bottom) + 100rpx);
   box-sizing: border-box;
+  /* ✅ 防止子元素溢出 */
+  overflow: hidden;
+  width: 100vw;
 }
 
 /* ── Header ── */
@@ -31,14 +34,64 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 }
 
 /* ── Message Area ── */
+/* ✅ 修复：scroll-view 不加左右 padding（会导致内容溢出），
+   改为在子元素 .msg-row 上加 padding */
 .message-area {
   flex: 1;
-  padding: 20rpx 32rpx;
-  /* ✅ 修复：底部留出足够空间，防止最后一条消息被 input-bar 遮挡 */
-  padding-bottom: 40rpx;
+  padding: 20rpx 0;
   overflow-y: auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 .scroll-bottom { height: 20rpx; }
+
+/* ── Message Rows ── */
+/* ✅ 修复：padding 加在每行上，而不是 scroll-view 上，避免溢出 */
+.msg-row {
+  margin-bottom: 16rpx;
+  padding: 0 32rpx;
+  box-sizing: border-box;
+  width: 100%;
+}
+.msg-row.user { display: flex; justify-content: flex-end; }
+
+/* ── User Bubble ── */
+.user-bubble {
+  max-width: 75%;
+  background: var(--primary);
+  color: #fff;
+  padding: 20rpx 32rpx;
+  border-radius: 32rpx 8rpx 32rpx 32rpx;
+  font-size: 28rpx;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+/* ── AI Bubble ── */
+.ai-row { display: flex; gap: 16rpx; align-items: flex-start; }
+.ai-avatar-sm {
+  width: 56rpx; height: 56rpx; border-radius: 28rpx;
+  background: linear-gradient(135deg, #2D8B6F, #4DB892);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24rpx; flex-shrink: 0;
+}
+.ai-bubble-group {
+  /* ✅ 修复：限制最大宽度，防止溢出 */
+  max-width: calc(100% - 72rpx);
+  min-width: 0;
+  display: flex; flex-direction: column; gap: 12rpx;
+}
+.ai-bubble {
+  background: var(--card);
+  padding: 24rpx 32rpx;
+  border-radius: 8rpx 32rpx 32rpx 32rpx;
+  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.06);
+}
+.ai-bubble-text {
+  font-size: 27rpx; line-height: 1.7; color: var(--text);
+  white-space: pre-line;
+  word-break: break-word;
+}
 
 /* ── Welcome ── */
 .welcome { text-align: center; padding: 60rpx 40rpx; }
@@ -52,14 +105,13 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 .welcome-title { display: block; font-size: 32rpx; font-weight: 700; color: var(--text); }
 .welcome-desc { display: block; font-size: 24rpx; color: var(--sub); margin-top: 8rpx; line-height: 1.6; }
 
-/* ── Welcome Prompts（支持 2x4 网格） ── */
+/* ── Welcome Prompts（2x4 网格） ── */
 .welcome-prompts {
   display: flex; flex-wrap: wrap; gap: 16rpx;
   margin-top: 40rpx;
 }
 .welcome-prompt {
   display: flex; align-items: center; gap: 16rpx;
-  /* ✅ 两列网格：每项占约一半宽度 */
   width: calc(50% - 8rpx);
   padding: 24rpx 24rpx;
   border-radius: 32rpx;
@@ -69,42 +121,6 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 }
 .wp-icon { font-size: 32rpx; flex-shrink: 0; }
 .wp-text { font-size: 24rpx; font-weight: 500; color: var(--text); line-height: 1.4; }
-
-/* ── Message Rows ── */
-.msg-row { margin-bottom: 16rpx; }
-.msg-row.user { display: flex; justify-content: flex-end; }
-
-/* ── User Bubble ── */
-.user-bubble {
-  max-width: 75%;
-  background: var(--primary);
-  color: #fff;
-  padding: 20rpx 32rpx;
-  border-radius: 32rpx 8rpx 32rpx 32rpx;
-  font-size: 28rpx;
-  line-height: 1.6;
-  word-break: break-all;
-}
-
-/* ── AI Bubble ── */
-.ai-row { display: flex; gap: 16rpx; align-items: flex-start; }
-.ai-avatar-sm {
-  width: 56rpx; height: 56rpx; border-radius: 28rpx;
-  background: linear-gradient(135deg, #2D8B6F, #4DB892);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 24rpx; flex-shrink: 0;
-}
-.ai-bubble-group { max-width: 82%; display: flex; flex-direction: column; gap: 12rpx; }
-.ai-bubble {
-  background: var(--card);
-  padding: 24rpx 32rpx;
-  border-radius: 8rpx 32rpx 32rpx 32rpx;
-  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.06);
-}
-.ai-bubble-text {
-  font-size: 27rpx; line-height: 1.7; color: var(--text);
-  white-space: pre-line;
-}
 
 /* ── Typing ── */
 .typing-bubble { padding: 24rpx 36rpx; }
@@ -208,7 +224,7 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 .tip-text { font-size: 22rpx; color: var(--sub); line-height: 1.5; }
 
 /* ── Follow-up Prompts ── */
-.followup-area { padding: 12rpx 0; }
+.followup-area { padding: 12rpx 32rpx; }
 .followup-scroll { white-space: nowrap; }
 .followup-chip {
   display: inline-flex; align-items: center; gap: 8rpx;
@@ -220,16 +236,18 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 }
 
 /* ── Input Bar ── */
-/* ✅ 修复：不再用 position:fixed，保持在 flex 布局中，不会遮挡消息 */
 .input-bar {
   display: flex; align-items: center; gap: 16rpx;
   padding: 16rpx 32rpx 16rpx;
   background: var(--card);
   border-top: 1rpx solid var(--border);
   flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 .input-wrap {
   flex: 1;
+  min-width: 0;
   background: var(--bg);
   border-radius: 44rpx;
   padding: 20rpx 32rpx;
