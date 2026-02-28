@@ -1,0 +1,50 @@
+<view class="login-page">
+  <view class="logo-area">
+    <text class="logo-icon">🏥</text>
+    <text class="app-name">FamilyWell</text>
+    <text class="app-desc">拍照即归档，AI 帮你管</text>
+  </view>
+
+  <!-- Tab switch -->
+  <view class="tab-bar">
+    <view class="tab {{mode === 'login' ? 'active' : ''}}" bindtap="switchMode" data-mode="login">登录</view>
+    <view class="tab {{mode === 'register' ? 'active' : ''}}" bindtap="switchMode" data-mode="register">注册</view>
+  </view>
+
+  <view class="form-area">
+    <view class="input-group">
+      <text class="input-label">用户名</text>
+      <input
+        class="input-field"
+        placeholder="请输入用户名"
+        value="{{username}}"
+        bindinput="onUsernameInput"
+      />
+    </view>
+
+    <view class="input-group">
+      <text class="input-label">密码</text>
+      <input
+        class="input-field"
+        placeholder="请输入密码"
+        password="{{true}}"
+        value="{{password}}"
+        bindinput="onPasswordInput"
+      />
+    </view>
+
+    <view class="input-group" wx:if="{{mode === 'register'}}">
+      <text class="input-label">昵称</text>
+      <input
+        class="input-field"
+        placeholder="给自己取个名字"
+        value="{{nickname}}"
+        bindinput="onNicknameInput"
+      />
+    </view>
+
+    <button class="submit-btn" bindtap="onSubmit" loading="{{loading}}">
+      {{mode === 'login' ? '登 录' : '注 册'}}
+    </button>
+  </view>
+</view>

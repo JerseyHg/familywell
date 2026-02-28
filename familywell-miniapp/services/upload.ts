@@ -56,18 +56,26 @@ export function chooseAndUpload(): Promise<{ recordId: number }> {
 
 function uploadToCOS(filePath: string, uploadUrl: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    wx.uploadFile({
-      url: uploadUrl,
+    const fs = wx.getFileSystemManager()
+    fs.readFile({
       filePath,
-      name: 'file',
-      method: 'PUT',
-      header: { 'Content-Type': 'image/jpeg' },
       success: (res) => {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve()
-        } else {
-          reject(new Error(`COS upload failed: ${res.statusCode}`))
-        }
+        wx.request({
+          url: uploadUrl,
+          method: 'PUT',
+          header: {
+            'Content-Type': 'image/jpeg',
+          },
+          data: res.data,
+          success: (resp) => {
+            if (resp.statusCode >= 200 && resp.statusCode < 300) {
+              resolve()
+            } else {
+              reject(new Error(`COS upload failed: ${resp.statusCode}`))
+            }
+          },
+          fail: reject,
+        })
       },
       fail: reject,
     })

@@ -2,7 +2,8 @@
   "pages": [
     "pages/home/home",
     "pages/chat/chat",
-    "pages/settings/settings"
+    "pages/settings/settings",
+    "pages/login/login"
   ],
   "window": {
     "navigationBarBackgroundColor": "#F6F7F5",

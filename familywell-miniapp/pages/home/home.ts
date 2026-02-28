@@ -28,6 +28,13 @@ Page({
   },
 
   onShow() {
+    // 未登录则跳转登录页
+    const token = wx.getStorageSync('token')
+    if (!token) {
+      wx.redirectTo({ url: '/pages/login/login' })
+      return
+    }
+
     this.getTabBar()?.setData({ active: 0 })
     this.loadHomeData()
   },

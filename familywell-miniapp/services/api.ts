@@ -215,16 +215,41 @@ export const chatApi = {
       },
       enableChunkedTransfer: true,
       responseType: 'text',
-      success() { /* 流式不走这里 */ },
+      success(res: any) {
+        // 模拟器或不支持 chunkedTransfer 时，完整响应走这里
+        if (!chunkedReceived && res.data) {
+          const text = typeof res.data === 'string' ? res.data : JSON.stringify(res.data)
+          const parts = text.split('\n\n')
+          for (const part of parts) {
+            const lines = part.split('\n')
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue
+              const jsonStr = line.slice(6)
+              if (!jsonStr.trim()) continue
+              try {
+                const payload = JSON.parse(jsonStr)
+                switch (payload.type) {
+                  case 'charts': callbacks.onCharts?.(payload.charts || []); break
+                  case 'sources': callbacks.onSources?.(payload.sources || []); break
+                  case 'text': callbacks.onText?.(payload.content || ''); break
+                  case 'done': callbacks.onDone?.(payload.session_id || ''); break
+                }
+              } catch (_) {}
+            }
+          }
+        }
+      },
       fail(err) {
         callbacks.onError?.(err)
       },
     })
+    let chunkedReceived = false
 
     // 用于处理跨 chunk 的不完整行
     let buffer = ''
 
     task.onChunkReceived?.((res: { data: ArrayBuffer }) => {
+      chunkedReceived = true
       try {
         // ArrayBuffer → string
         const bytes = new Uint8Array(res.data)
