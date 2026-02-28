@@ -1,4 +1,4 @@
-import { homeApi, medsApi } from '../../services/api'
+import { homeApi, medsApi, profileApi } from '../../services/api'
 import { batchUpload, pollBatchAIStatus } from '../../services/upload'
 
 Page({
@@ -15,6 +15,11 @@ Page({
       { icon: '📋', text: '最近身体怎么样' },
     ],
     greeting: '',
+
+    // 语音弹窗
+    showVoiceModal: false,
+    voiceText: '',
+    voiceSubmitting: false,
   },
 
   onLoad() {
@@ -35,11 +40,24 @@ Page({
     }
 
     this.getTabBar()?.setData({ active: 0 })
+    this.checkOnboarding()
     this.loadHomeData()
   },
 
   onPullDownRefresh() {
     this.loadHomeData().then(() => wx.stopPullDownRefresh())
+  },
+
+  /** 检查是否完成引导，未完成则跳转 */
+  async checkOnboarding() {
+    try {
+      const profile: any = await profileApi.get()
+      if (profile && !profile.onboarding_completed) {
+        wx.redirectTo({ url: '/pages/onboarding/onboarding' })
+      }
+    } catch (e) {
+      console.warn('Profile check failed:', e)
+    }
   },
 
   async loadHomeData() {
@@ -64,10 +82,10 @@ Page({
       pollBatchAIStatus(
         recordIds,
         () => {
-          wx.showToast({ title: '全部识别完成', icon: 'success' })
+          wx.showToast({ title: '识别完成', icon: 'success' })
           this.loadHomeData()
         },
-        (err) => console.warn('Some records failed:', err),
+        () => wx.showToast({ title: '部分识别失败', icon: 'none' }),
       )
     }).catch(() => {})
   },
@@ -88,5 +106,50 @@ Page({
         getApp().globalData.chatInitQuestion = text
       },
     })
+  },
+
+  // ── 语音记录 ──
+
+  noop() {},
+
+  onVoiceAdd() {
+    this.setData({ showVoiceModal: true, voiceText: '' })
+  },
+
+  hideVoiceModal() {
+    this.setData({ showVoiceModal: false })
+  },
+
+  onVoiceTextInput(e: any) {
+    this.setData({ voiceText: e.detail.value })
+  },
+
+  async onSubmitVoice() {
+    const text = this.data.voiceText.trim()
+    if (!text) {
+      wx.showToast({ title: '请输入内容', icon: 'none' })
+      return
+    }
+
+    this.setData({ voiceSubmitting: true })
+    try {
+      const res: any = await medsApi.voiceAdd(text)
+      this.setData({ voiceSubmitting: false, showVoiceModal: false })
+
+      const count = res.medications?.length || 0
+      const names = (res.medications || []).map((m: any) => m.name).join('、')
+
+      wx.showModal({
+        title: `已添加 ${count} 个药物`,
+        content: names ? `${names}\n今天的服药提醒已生成` : '未识别到药物信息',
+        showCancel: false,
+      })
+
+      // 刷新首页数据
+      this.loadHomeData()
+    } catch (e) {
+      this.setData({ voiceSubmitting: false })
+      console.error('Voice add failed:', e)
+    }
   },
 })

@@ -1,0 +1,192 @@
+<view class="ob-page">
+  <view class="safe-top" />
+
+  <!-- ── Progress (引导模式显示) ── -->
+  <view class="ob-progress" wx:if="{{mode === 'onboard'}}">
+    <view class="ob-bar">
+      <view class="ob-fill" style="width: {{step / 4 * 100}}%;" />
+    </view>
+    <text class="ob-step-label">{{step}} / 4</text>
+  </view>
+
+  <!-- ── 编辑模式顶栏 ── -->
+  <view class="edit-header" wx:if="{{mode === 'edit'}}">
+    <view class="eh-back" bindtap="onBack">‹ 返回</view>
+    <text class="eh-title">{{step === 1 ? '编辑个人资料' : step === 2 ? '编辑健康状况' : step === 3 ? '管理用药' : '编辑紧急联系人'}}</text>
+    <view class="eh-placeholder" />
+  </view>
+
+  <!-- ════════════════════════════════
+       Step 1: 基本信息
+       ════════════════════════════════ -->
+  <view class="ob-step" wx:if="{{step === 1}}">
+    <text class="ob-title" wx:if="{{mode === 'onboard'}}">👋 先认识一下你</text>
+    <text class="ob-desc" wx:if="{{mode === 'onboard'}}">基本信息帮助我们提供更精准的健康建议</text>
+
+    <view class="ob-field">
+      <text class="ob-label">姓名</text>
+      <input class="ob-input" placeholder="你的真实姓名" value="{{form.real_name}}" bindinput="onInput" data-key="real_name" />
+    </view>
+
+    <view class="ob-field">
+      <text class="ob-label">性别</text>
+      <view class="ob-gender-row">
+        <view class="ob-gender {{form.gender === 'male' ? 'active' : ''}}" bindtap="onGender" data-val="male">
+          <text class="og-icon">👨</text><text class="og-text">男</text>
+        </view>
+        <view class="ob-gender {{form.gender === 'female' ? 'active' : ''}}" bindtap="onGender" data-val="female">
+          <text class="og-icon">👩</text><text class="og-text">女</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="ob-field">
+      <text class="ob-label">出生日期</text>
+      <picker mode="date" value="{{form.birthday}}" start="1920-01-01" end="2026-01-01" bindchange="onBirthday">
+        <view class="ob-picker">{{form.birthday || '请选择'}}</view>
+      </picker>
+    </view>
+
+    <view class="ob-field">
+      <text class="ob-label">血型（选填）</text>
+      <view class="ob-tag-row">
+        <view class="ob-tag {{form.blood_type === item ? 'active' : ''}}" wx:for="{{bloodTypes}}" wx:key="*this" bindtap="onBloodType" data-val="{{item}}">{{item}}</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ════════════════════════════════
+       Step 2: 既往病史 + 过敏
+       ════════════════════════════════ -->
+  <view class="ob-step" wx:if="{{step === 2}}">
+    <text class="ob-title" wx:if="{{mode === 'onboard'}}">📋 健康状况</text>
+    <text class="ob-desc" wx:if="{{mode === 'onboard'}}">选择你有的情况，没有可以直接跳过</text>
+
+    <view class="ob-field">
+      <text class="ob-label">既往病史</text>
+      <view class="ob-tag-grid">
+        <view class="ob-tag {{diseaseMap[item] ? 'active' : ''}}" wx:for="{{diseaseOptions}}" wx:key="*this" bindtap="onToggleDisease" data-val="{{item}}">{{item}}</view>
+      </view>
+      <input class="ob-input small" placeholder="其他疾病，用逗号分隔" value="{{customDisease}}" bindinput="onCustomDisease" />
+    </view>
+
+    <view class="ob-field">
+      <text class="ob-label">过敏史</text>
+      <view class="ob-tag-grid">
+        <view class="ob-tag {{allergyMap[item] ? 'active' : ''}}" wx:for="{{allergyOptions}}" wx:key="*this" bindtap="onToggleAllergy" data-val="{{item}}">{{item}}</view>
+      </view>
+      <input class="ob-input small" placeholder="其他过敏，用逗号分隔" value="{{customAllergy}}" bindinput="onCustomAllergy" />
+    </view>
+  </view>
+
+  <!-- ════════════════════════════════
+       Step 3: 当前用药
+       ════════════════════════════════ -->
+  <view class="ob-step" wx:if="{{step === 3}}">
+    <text class="ob-title" wx:if="{{mode === 'onboard'}}">💊 正在吃的药</text>
+    <text class="ob-desc" wx:if="{{mode === 'onboard'}}">添加后每天会提醒你按时服药，没有可以跳过</text>
+
+    <!-- 已添加的药物列表 -->
+    <view class="med-list" wx:if="{{meds.length}}">
+      <view class="med-card" wx:for="{{meds}}" wx:key="idx">
+        <view class="mc-left">
+          <text class="mc-name">{{item.name}}</text>
+          <text class="mc-detail">{{item.dosage}} · {{item.detailLabel}} · {{item.timesLabel}}</text>
+        </view>
+        <view class="mc-remove" catchtap="onRemoveMed" data-idx="{{index}}">✕</view>
+      </view>
+    </view>
+
+    <!-- 添加药物表单 -->
+    <view class="add-med-form">
+      <view class="ob-field">
+        <text class="ob-label">药品名称</text>
+        <input class="ob-input" placeholder="如 氨氯地平" value="{{newMed.name}}" bindinput="onMedInput" data-key="name" />
+      </view>
+
+      <view class="ob-field">
+        <text class="ob-label">剂量（选填）</text>
+        <input class="ob-input" placeholder="如 5mg 一片" value="{{newMed.dosage}}" bindinput="onMedInput" data-key="dosage" />
+      </view>
+
+      <view class="ob-field">
+        <text class="ob-label">用药类型</text>
+        <view class="ob-tag-row">
+          <view class="ob-tag {{newMed.med_type === item.val ? 'active' : ''}}" wx:for="{{medTypeOptions}}" wx:key="val" bindtap="onMedType" data-val="{{item.val}}">{{item.icon}} {{item.label}}</view>
+        </view>
+      </view>
+
+      <!-- 疗程设置（仅疗程类型显示） -->
+      <block wx:if="{{newMed.med_type === 'course'}}">
+        <view class="ob-field">
+          <text class="ob-label">几个疗程</text>
+          <view class="ob-tag-row">
+            <view class="ob-tag {{newMed.course_count === item ? 'active' : ''}}" wx:for="{{[1,2,3,4,5,6]}}" wx:key="*this" bindtap="onCourseCount" data-val="{{item}}">{{item}}个</view>
+          </view>
+        </view>
+        <view class="ob-field">
+          <text class="ob-label">每个疗程几天</text>
+          <input class="ob-input" type="number" placeholder="如 7" value="{{newMed.days_per_course}}" bindinput="onMedInput" data-key="days_per_course" />
+        </view>
+      </block>
+
+      <!-- 临时用药天数 -->
+      <view class="ob-field" wx:if="{{newMed.med_type === 'temporary'}}">
+        <text class="ob-label">服用几天</text>
+        <input class="ob-input" type="number" placeholder="如 7" value="{{newMed.course_days}}" bindinput="onMedInput" data-key="course_days" />
+      </view>
+
+      <view class="ob-field">
+        <text class="ob-label">每天几次</text>
+        <view class="ob-tag-row">
+          <view class="ob-tag {{newMed.times_per_day === item ? 'active' : ''}}" wx:for="{{[1,2,3]}}" wx:key="*this" bindtap="onTimesPerDay" data-val="{{item}}">每天{{item}}次</view>
+        </view>
+      </view>
+
+      <button class="add-med-btn" bindtap="onAddMed">+ 添加这个药</button>
+    </view>
+  </view>
+
+  <!-- ════════════════════════════════
+       Step 4: 紧急联系人
+       ════════════════════════════════ -->
+  <view class="ob-step" wx:if="{{step === 4}}">
+    <text class="ob-title" wx:if="{{mode === 'onboard'}}">📞 紧急联系人</text>
+    <text class="ob-desc" wx:if="{{mode === 'onboard'}}">紧急情况时可以快速出示给医护人员</text>
+
+    <view class="ob-field">
+      <text class="ob-label">联系人姓名</text>
+      <input class="ob-input" placeholder="如 配偶/子女姓名" value="{{form.emergency_contact_name}}" bindinput="onInput" data-key="emergency_contact_name" />
+    </view>
+
+    <view class="ob-field">
+      <text class="ob-label">联系电话</text>
+      <input class="ob-input" type="number" placeholder="手机号码" maxlength="11" value="{{form.emergency_contact_phone}}" bindinput="onInput" data-key="emergency_contact_phone" />
+    </view>
+  </view>
+
+  <!-- ── Bottom Buttons ── -->
+  <view class="ob-bottom">
+    <!-- 编辑模式：只有一个保存按钮 -->
+    <block wx:if="{{mode === 'edit'}}">
+      <view class="ob-btn-row">
+        <button class="ob-btn-next" bindtap="onNext" loading="{{saving}}">保存</button>
+      </view>
+    </block>
+
+    <!-- 引导模式：跳过 + 下一步 -->
+    <block wx:else>
+      <view class="ob-btn-row">
+        <view class="ob-btn-skip" bindtap="onSkip" wx:if="{{step >= 2}}">
+          {{step === 4 ? '跳过，以后再填' : '跳过'}}
+        </view>
+        <button class="ob-btn-next" bindtap="onNext" loading="{{saving}}">
+          {{step === 4 ? '完成' : '下一步'}}
+        </button>
+      </view>
+      <view class="ob-btn-back" bindtap="onBack" wx:if="{{step > 1}}">
+        <text>‹ 上一步</text>
+      </view>
+    </block>
+  </view>
+</view>

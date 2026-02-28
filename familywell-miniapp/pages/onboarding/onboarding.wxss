@@ -1,0 +1,152 @@
+page { background: var(--bg); }
+
+.ob-page {
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 40rpx);
+}
+.safe-top { height: calc(44px + env(safe-area-inset-top)); flex-shrink: 0; }
+
+/* ── Progress ── */
+.ob-progress {
+  padding: 16rpx 48rpx 0;
+  display: flex; align-items: center; gap: 20rpx;
+}
+.ob-bar {
+  flex: 1; height: 8rpx; background: var(--border); border-radius: 4rpx;
+  overflow: hidden;
+}
+.ob-fill {
+  height: 100%; background: var(--primary); border-radius: 4rpx;
+  transition: width 0.3s ease;
+}
+.ob-step-label { font-size: 24rpx; color: var(--muted); flex-shrink: 0; }
+
+/* ── Edit Mode Header ── */
+.edit-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20rpx 48rpx 0;
+}
+.eh-back { font-size: 30rpx; color: var(--primary); font-weight: 500; }
+.eh-title { font-size: 34rpx; font-weight: 700; color: var(--text); }
+.eh-placeholder { width: 80rpx; }
+
+/* ── Step Content ── */
+.ob-step {
+  flex: 1; padding: 40rpx 48rpx 0;
+}
+.ob-title { display: block; font-size: 44rpx; font-weight: 800; color: var(--text); }
+.ob-desc { display: block; font-size: 26rpx; color: var(--sub); margin-top: 8rpx; margin-bottom: 40rpx; }
+
+/* ── Field ── */
+.ob-field { margin-bottom: 32rpx; }
+.ob-label {
+  display: block; font-size: 26rpx; font-weight: 600;
+  color: var(--sub); margin-bottom: 12rpx;
+}
+.ob-input {
+  width: 100%; height: 96rpx;
+  padding: 0 28rpx;
+  background: var(--card); border-radius: 24rpx;
+  font-size: 30rpx; color: var(--text);
+  box-sizing: border-box;
+  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
+}
+.ob-input.small {
+  height: 80rpx; font-size: 26rpx; margin-top: 16rpx;
+  background: var(--bg); box-shadow: none;
+}
+
+/* ── Picker ── */
+.ob-picker {
+  height: 96rpx; line-height: 96rpx;
+  padding: 0 28rpx;
+  background: var(--card); border-radius: 24rpx;
+  font-size: 30rpx; color: var(--text);
+  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
+}
+
+/* ── Gender ── */
+.ob-gender-row { display: flex; gap: 24rpx; }
+.ob-gender {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 12rpx;
+  height: 96rpx; border-radius: 24rpx;
+  background: var(--card); border: 2rpx solid var(--border);
+  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
+}
+.ob-gender.active { border-color: var(--primary); background: var(--primary-light); }
+.og-icon { font-size: 36rpx; }
+.og-text { font-size: 30rpx; font-weight: 600; color: var(--text); }
+
+/* ── Tags ── */
+.ob-tag-row { display: flex; flex-wrap: wrap; gap: 16rpx; }
+.ob-tag-grid { display: flex; flex-wrap: wrap; gap: 16rpx; }
+.ob-tag {
+  padding: 14rpx 32rpx; border-radius: 32rpx;
+  background: var(--card); border: 2rpx solid var(--border);
+  font-size: 26rpx; color: var(--text);
+  box-shadow: 0 2rpx 4rpx rgba(0,0,0,0.03);
+}
+.ob-tag.active {
+  border-color: var(--primary); background: var(--primary-light);
+  color: var(--primary); font-weight: 600;
+}
+
+/* ═══════════════════════════════
+   Step 3: Medication
+   ═══════════════════════════════ */
+.med-list { margin-bottom: 32rpx; }
+.med-card {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 24rpx 28rpx;
+  background: var(--card); border-radius: 24rpx;
+  margin-bottom: 12rpx;
+  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
+}
+.mc-left { flex: 1; }
+.mc-name { display: block; font-size: 30rpx; font-weight: 600; color: var(--text); }
+.mc-detail { display: block; font-size: 24rpx; color: var(--muted); margin-top: 4rpx; }
+.mc-remove {
+  width: 52rpx; height: 52rpx; border-radius: 26rpx;
+  background: var(--accent-light); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24rpx; flex-shrink: 0;
+}
+
+.add-med-form {
+  padding: 28rpx; background: var(--card);
+  border-radius: 28rpx; box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+}
+.add-med-btn {
+  margin-top: 8rpx; width: 100%;
+  height: 80rpx; line-height: 80rpx;
+  border-radius: 24rpx; border: 2rpx dashed var(--primary);
+  background: var(--primary-light); color: var(--primary);
+  font-size: 28rpx; font-weight: 600;
+  padding: 0;
+}
+
+/* ── Bottom Buttons ── */
+.ob-bottom {
+  padding: 20rpx 48rpx 0;
+  flex-shrink: 0;
+}
+.ob-btn-row {
+  display: flex; gap: 20rpx; align-items: center;
+}
+.ob-btn-skip {
+  padding: 0 32rpx; height: 96rpx; line-height: 96rpx;
+  font-size: 28rpx; color: var(--muted);
+  flex-shrink: 0;
+}
+.ob-btn-next {
+  flex: 1; height: 96rpx; line-height: 96rpx;
+  border-radius: 32rpx;
+  background: var(--primary); color: #fff;
+  font-size: 32rpx; font-weight: 700;
+  border: none; padding: 0;
+}
+.ob-btn-back {
+  text-align: center; padding: 16rpx 0;
+  font-size: 26rpx; color: var(--muted);
+}

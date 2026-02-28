@@ -5,7 +5,8 @@
     "pages/archive/project-detail",
     "pages/chat/chat",
     "pages/settings/settings",
-    "pages/login/login"
+    "pages/login/login",
+    "pages/onboarding/onboarding"
   ],
   "window": {
     "navigationBarBackgroundColor": "#F6F7F5",

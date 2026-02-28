@@ -55,9 +55,14 @@ Page({
 
       wx.showToast({ title: mode === 'login' ? '登录成功' : '注册成功', icon: 'success' })
 
-      // 跳转首页
       setTimeout(() => {
-        wx.switchTab({ url: '/pages/home/home' })
+        if (mode === 'register') {
+          // 新注册用户 → 引导填资料
+          wx.redirectTo({ url: '/pages/onboarding/onboarding' })
+        } else {
+          // 登录用户 → 直接进首页
+          wx.switchTab({ url: '/pages/home/home' })
+        }
       }, 500)
 
     } catch (err: any) {

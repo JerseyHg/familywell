@@ -161,6 +161,9 @@ export const medsApi = {
 
   completeTask: (taskId: number) =>
     request({ url: `/medications/tasks/${taskId}/complete`, method: 'PUT' }),
+
+  voiceAdd: (text: string) =>
+    request({ url: '/medications/voice-add', method: 'POST', data: { text } }),
 }
 
 // ─── Stats ───

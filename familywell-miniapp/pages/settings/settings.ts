@@ -1,7 +1,8 @@
-import { profileApi, familyApi, recordsApi, authApi } from '../../services/api'
+import { profileApi, familyApi, recordsApi } from '../../services/api'
 
 Page({
   data: {
+    // 紧急信息
     showEmergencyModal: false,
     emergency: {
       name: '',
@@ -11,8 +12,18 @@ Page({
       diseases: '',
       medications: '',
     },
+
+    // 家庭
+    family: null as any,
+    myRole: '' as string,
     familyMembers: [] as any[],
-    inviteCode: '',
+
+    // 加入家庭弹窗
+    showJoinModal: false,
+    joinCode: '',
+    joining: false,
+
+    // 数据
     recordCount: 0,
   },
 
@@ -24,7 +35,7 @@ Page({
   async loadData() {
     try {
       const [profile, family, records] = await Promise.all([
-        profileApi.get(),
+        profileApi.get().catch(() => null),
         familyApi.mine().catch(() => null),
         recordsApi.list({ page: 1, size: 1 }).catch(() => null),
       ])
@@ -39,14 +50,41 @@ Page({
           diseases: (p?.medical_history || []).join('·'),
           medications: (p?.active_medications || []).join('·'),
         },
-        inviteCode: (family as any)?.invite_code || '',
-        familyMembers: (family as any)?.members || [],
         recordCount: (records as any)?.total || 0,
       })
+
+      // 加载家庭信息
+      if (family) {
+        this.setData({ family })
+        await this.loadFamilyMembers((family as any).id)
+      } else {
+        this.setData({ family: null, myRole: '', familyMembers: [] })
+      }
     } catch (err) {
       console.error('Settings load failed:', err)
     }
   },
+
+  async loadFamilyMembers(familyId: number) {
+    try {
+      const members: any = await familyApi.members(familyId)
+      // 判断当前用户角色
+      const myInfo = wx.getStorageSync('userInfo')
+      const myMember = (members as any[]).find((m: any) => {
+        // 用 nickname 匹配或者用 user_id
+        return m.user_id === myInfo?.id
+      })
+
+      this.setData({
+        familyMembers: members || [],
+        myRole: myMember?.role || 'member',
+      })
+    } catch (err) {
+      console.error('Load family members failed:', err)
+    }
+  },
+
+  // ── 紧急信息 ──
 
   showEmergency() {
     this.setData({ showEmergencyModal: true })
@@ -56,12 +94,123 @@ Page({
     this.setData({ showEmergencyModal: false })
   },
 
-  copyInviteCode() {
-    if (this.data.inviteCode) {
-      wx.setClipboardData({ data: this.data.inviteCode })
+  // ══════════════════════════════
+  // 家庭管理
+  // ══════════════════════════════
+
+  // ── 创建家庭 ──
+  onCreateFamily() {
+    wx.showModal({
+      title: '创建家庭',
+      editable: true,
+      placeholderText: '输入家庭名称（选填）',
+      success: async (res) => {
+        if (res.confirm) {
+          try {
+            wx.showLoading({ title: '创建中...' })
+            const family: any = await familyApi.create(res.content || undefined)
+            wx.hideLoading()
+            wx.showToast({ title: '创建成功', icon: 'success' })
+            this.setData({ family, myRole: 'admin' })
+            await this.loadFamilyMembers(family.id)
+          } catch (e) {
+            wx.hideLoading()
+            console.error('Create family failed:', e)
+          }
+        }
+      },
+    })
+  },
+
+  // ── 加入家庭 ──
+  noop() {},
+
+  onShowJoinModal() {
+    this.setData({ showJoinModal: true, joinCode: '' })
+  },
+
+  hideJoinModal() {
+    this.setData({ showJoinModal: false })
+  },
+
+  onJoinCodeInput(e: any) {
+    this.setData({ joinCode: e.detail.value.toUpperCase() })
+  },
+
+  async onSubmitJoin() {
+    const code = this.data.joinCode.trim()
+    if (!code) {
+      wx.showToast({ title: '请输入邀请码', icon: 'none' })
+      return
+    }
+
+    this.setData({ joining: true })
+    try {
+      await familyApi.join(code)
+      wx.showToast({ title: '加入成功', icon: 'success' })
+      this.setData({ showJoinModal: false, joining: false })
+      // 重新加载
+      this.loadData()
+    } catch (e) {
+      this.setData({ joining: false })
+      console.error('Join family failed:', e)
     }
   },
 
+  // ── 复制邀请码 ──
+  copyInviteCode() {
+    if (this.data.family?.invite_code) {
+      wx.setClipboardData({
+        data: this.data.family.invite_code,
+        success: () => wx.showToast({ title: '已复制', icon: 'success' }),
+      })
+    }
+  },
+
+  // ── 查看成员概况（admin） ──
+  onViewMember(e: any) {
+    const uid = e.currentTarget.dataset.uid
+    const name = e.currentTarget.dataset.name
+    // 后续可以跳到成员详情页
+    // 暂时用 overview 接口展示摘要
+    wx.showToast({ title: `查看 ${name} 的健康档案`, icon: 'none' })
+  },
+
+  // ── 移除成员（admin） ──
+  onRemoveMember(e: any) {
+    const uid = e.currentTarget.dataset.uid
+    const name = e.currentTarget.dataset.name
+
+    wx.showModal({
+      title: '移除成员',
+      content: `确定要将 ${name} 移出家庭吗？`,
+      confirmColor: '#E85D3A',
+      success: async (res) => {
+        if (res.confirm) {
+          try {
+            await familyApi.removeMember(this.data.family.id, uid)
+            wx.showToast({ title: '已移除', icon: 'success' })
+            await this.loadFamilyMembers(this.data.family.id)
+          } catch (e) {
+            console.error('Remove member failed:', e)
+          }
+        }
+      },
+    })
+  },
+
+  // ── 编辑个人信息 ──
+  goEditProfile(e: any) {
+    const step = e.currentTarget.dataset.step
+    wx.navigateTo({ url: `/pages/onboarding/onboarding?mode=edit&step=${step}` })
+  },
+
+  // ── 跳转归档 ──
+  goArchive() {
+    wx.switchTab({ url: '/pages/archive/archive' })
+  },
+
+  // ── 退出登录 ──
   onLogout() {
     wx.showModal({
       title: '确认退出',

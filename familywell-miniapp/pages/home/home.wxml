@@ -5,13 +5,37 @@
   <text class="title">{{profile.nickname || '我'}}的健康档案</text>
 </view>
 
-<!-- ── Upload Button ── -->
-<view class="upload-btn" bindtap="onUpload">
-  <view class="upload-deco" />
-  <view class="upload-icon">📷</view>
-  <view class="upload-text">
-    <text class="upload-title">拍照上传</text>
-    <text class="upload-desc">体检单、处方、食物… AI 自动识别归档</text>
+<!-- ── Action Buttons ── -->
+<view class="action-row">
+  <view class="action-btn upload" bindtap="onUpload">
+    <view class="ab-icon">📷</view>
+    <view class="ab-text">
+      <text class="ab-title">拍照上传</text>
+      <text class="ab-desc">体检单、处方、食物…</text>
+    </view>
+  </view>
+  <view class="action-btn voice" bindtap="onVoiceAdd">
+    <view class="ab-icon">🎙️</view>
+    <view class="ab-text">
+      <text class="ab-title">语音记录</text>
+      <text class="ab-desc">说一下用药、症状…</text>
+    </view>
+  </view>
+</view>
+
+<!-- ── 语音输入弹窗 ── -->
+<view class="modal-mask" wx:if="{{showVoiceModal}}" bindtap="hideVoiceModal">
+  <view class="voice-modal" catchtap="noop">
+    <view class="vm-header">
+      <text class="vm-title">🎙️ 语音记录</text>
+      <view class="vm-close" bindtap="hideVoiceModal">✕</view>
+    </view>
+    <view class="vm-body">
+      <text class="vm-hint">说说你的情况，AI 会自动帮你添加用药和提醒</text>
+      <text class="vm-example">例如："我得了灰指甲，医生开了伊曲康唑200mg，3个疗程每个疗程7天，每天吃2次"</text>
+      <textarea class="vm-textarea" placeholder="点击输入或粘贴语音转文字内容..." value="{{voiceText}}" bindinput="onVoiceTextInput" maxlength="500" auto-height />
+      <button class="vm-submit" bindtap="onSubmitVoice" loading="{{voiceSubmitting}}">AI 识别并添加</button>
+    </view>
   </view>
 </view>
 
@@ -19,6 +43,12 @@
 <view class="ai-tip-bar" wx:if="{{aiTip}}">
   <text class="atb-icon">🌿</text>
   <text class="atb-text">{{aiTip}}</text>
+</view>
+
+<!-- ── 一切顺利（无待办时的保底卡） ── -->
+<view class="ok-bar" wx:if="{{!pendingTasks.length && !alertCount}}">
+  <text class="ok-icon">✅</text>
+  <text class="ok-text">今日一切顺利，没有待处理事项</text>
 </view>
 
 <!-- ── Pending Med Tasks ── -->

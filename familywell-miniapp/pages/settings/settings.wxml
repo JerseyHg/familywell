@@ -47,39 +47,98 @@
   </view>
 </view>
 
-<!-- ── Menu Sections ── -->
+<!-- ── Menu: 个人信息 ── -->
 <view class="section-label">个人信息</view>
 <view class="menu-group">
-  <view class="menu-item">
+  <view class="menu-item" bindtap="goEditProfile" data-step="1">
     <text class="mi-icon">👤</text><text class="mi-label">个人资料</text><text class="mi-arrow">›</text>
   </view>
-  <view class="menu-item">
+  <view class="menu-item" bindtap="goEditProfile" data-step="2">
     <text class="mi-icon">📋</text><text class="mi-label">既往病史</text><text class="mi-arrow">›</text>
   </view>
-  <view class="menu-item">
+  <view class="menu-item" bindtap="goEditProfile" data-step="4">
     <text class="mi-icon">📞</text><text class="mi-label">紧急联系人</text><text class="mi-arrow">›</text>
   </view>
 </view>
 
+<!-- ══════════════════════════════
+     家庭管理（核心改动）
+     ══════════════════════════════ -->
 <view class="section-label">家庭</view>
-<view class="menu-group">
-  <view class="menu-item">
-    <text class="mi-icon">👨‍👩‍👦</text>
-    <text class="mi-label">家庭成员</text>
-    <text class="mi-desc">{{familyMembers.length || 0}} 人</text>
+
+<!-- ── 未加入家庭：显示创建/加入 ── -->
+<view class="menu-group" wx:if="{{!family}}">
+  <view class="menu-item" bindtap="onCreateFamily">
+    <text class="mi-icon">➕</text>
+    <text class="mi-label">创建家庭</text>
+    <text class="mi-desc">成为管理者</text>
     <text class="mi-arrow">›</text>
   </view>
-  <view class="menu-item" bindtap="copyInviteCode" wx:if="{{inviteCode}}">
+  <view class="menu-item" bindtap="onShowJoinModal">
     <text class="mi-icon">🔗</text>
-    <text class="mi-label">邀请码</text>
-    <text class="mi-code">{{inviteCode}}</text>
-    <text class="mi-copy">复制</text>
+    <text class="mi-label">加入家庭</text>
+    <text class="mi-desc">输入邀请码</text>
+    <text class="mi-arrow">›</text>
   </view>
 </view>
 
+<!-- ── 已加入家庭：显示家庭信息 ── -->
+<block wx:if="{{family}}">
+  <!-- 家庭卡片 -->
+  <view class="family-card">
+    <view class="fc-top">
+      <text class="fc-icon">🏠</text>
+      <view class="fc-info">
+        <text class="fc-name">{{family.name}}</text>
+        <text class="fc-role">{{myRole === 'admin' ? '管理者' : '成员'}}</text>
+      </view>
+    </view>
+    <view class="fc-code-row" bindtap="copyInviteCode">
+      <text class="fc-code-label">邀请码</text>
+      <text class="fc-code">{{family.invite_code}}</text>
+      <text class="fc-copy">复制</text>
+    </view>
+  </view>
+
+  <!-- 成员列表 -->
+  <view class="member-list">
+    <view class="member-item" wx:for="{{familyMembers}}" wx:key="user_id">
+      <view class="mb-left">
+        <view class="mb-avatar">{{item.nickname ? item.nickname[0] : '?'}}</view>
+        <view class="mb-info">
+          <text class="mb-name">{{item.nickname || '未命名'}}</text>
+          <text class="mb-role-tag {{item.role === 'admin' ? 'admin' : ''}}">{{item.role === 'admin' ? '管理者' : '成员'}}</text>
+        </view>
+      </view>
+      <view class="mb-actions">
+        <!-- admin 可查看成员概况 -->
+        <text class="mb-detail" wx:if="{{myRole === 'admin'}}" catchtap="onViewMember" data-uid="{{item.user_id}}" data-name="{{item.nickname}}">查看</text>
+        <!-- admin 可移除非自己的成员 -->
+        <text class="mb-remove" wx:if="{{myRole === 'admin' && item.role !== 'admin'}}" catchtap="onRemoveMember" data-uid="{{item.user_id}}" data-name="{{item.nickname}}">移除</text>
+      </view>
+    </view>
+  </view>
+</block>
+
+<!-- ── 加入家庭弹窗 ── -->
+<view class="modal-mask" wx:if="{{showJoinModal}}" bindtap="hideJoinModal">
+  <view class="join-modal" catchtap="noop">
+    <view class="jm-header">
+      <text class="jm-title">加入家庭</text>
+      <view class="jm-close" bindtap="hideJoinModal">✕</view>
+    </view>
+    <view class="jm-body">
+      <text class="jm-label">请输入邀请码</text>
+      <input class="jm-input" placeholder="如 FW3K9X" maxlength="6" value="{{joinCode}}" bindinput="onJoinCodeInput" />
+      <button class="jm-submit" bindtap="onSubmitJoin" loading="{{joining}}">加入</button>
+    </view>
+  </view>
+</view>
+
+<!-- ── Menu: 数据 ── -->
 <view class="section-label">数据</view>
 <view class="menu-group">
-  <view class="menu-item">
+  <view class="menu-item" bindtap="goArchive">
     <text class="mi-icon">📂</text>
     <text class="mi-label">全部记录</text>
     <text class="mi-desc">{{recordCount}} 条</text>
@@ -90,6 +149,7 @@
   </view>
 </view>
 
+<!-- ── Menu: 关于 ── -->
 <view class="section-label">关于</view>
 <view class="menu-group">
   <view class="menu-item">
