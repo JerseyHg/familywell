@@ -1,3 +1,9 @@
+"""
+app/models/user.py — 用户模型
+──────────────────────────────
+[P1-2] User 表新增 openid 字段（可选，用于微信登录）
+       password_hash 改为可选（微信登录的用户可能没有密码）
+"""
 from datetime import datetime, date
 from sqlalchemy import (
     BigInteger, String, Boolean, DateTime, Date, DECIMAL, JSON,
@@ -12,7 +18,13 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)  # [P1-2] 微信用户可能无密码
+
+    # ── [P1-2] 微信 openid ──
+    openid: Mapped[str | None] = mapped_column(
+        String(100), unique=True, nullable=True, index=True
+    )
+
     nickname: Mapped[str | None] = mapped_column(String(50))
     avatar_url: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -36,9 +48,7 @@ class UserProfile(Base):
     real_name: Mapped[str | None] = mapped_column(String(50))
     gender: Mapped[str | None] = mapped_column(String(10))
     birthday: Mapped[date | None] = mapped_column(Date)
-    blood_type: Mapped[str | None] = mapped_column(
-        String(10)
-    )
+    blood_type: Mapped[str | None] = mapped_column(String(10))
     height_cm: Mapped[float | None] = mapped_column(DECIMAL(5, 1))
     weight_kg: Mapped[float | None] = mapped_column(DECIMAL(5, 1))
     allergies: Mapped[dict | None] = mapped_column(JSON)

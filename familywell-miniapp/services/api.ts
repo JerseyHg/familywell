@@ -1,6 +1,10 @@
-// 开发调试（微信开发者工具勾选「不校验域名」）
-// const BASE_URL = 'http://你的服务器IP:8004/api'
-// 生产环境
+/**
+ * services/api.ts — API 请求封装
+ * ─────────────────────────────────
+ * [P1-1] recordsApi 新增 update, confirmPrescription
+ * [P1-2] authApi 新增 wxLogin
+ */
+
 const BASE_URL = 'https://tbowo.top/familywell/api'
 
 interface RequestOptions {
@@ -45,6 +49,13 @@ export function request<T = any>(options: RequestOptions): Promise<T> {
           return
         }
 
+        // [P0-2] 处理速率限制
+        if (res.statusCode === 429) {
+          wx.showToast({ title: '操作太频繁，请稍后再试', icon: 'none' })
+          reject(new Error('rate_limited'))
+          return
+        }
+
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data as T)
         } else {
@@ -69,6 +80,10 @@ export const authApi = {
 
   login: (data: { username: string; password: string }) =>
     request({ url: '/auth/login', method: 'POST', data }),
+
+  // [P1-2] 微信登录
+  wxLogin: (data: { code: string; nickname?: string; avatar_url?: string }) =>
+    request({ url: '/auth/wx-login', method: 'POST', data }),
 
   me: () => request({ url: '/auth/me' }),
 }
@@ -111,7 +126,20 @@ export const recordsApi = {
     return request({ url: `/records${query ? '?' + query : ''}` })
   },
 
+  // [P1-1] 记录详情（含 ai_raw_result 和图片URL）
   detail: (id: number) => request({ url: `/records/${id}` }),
+
+  // [P1-1] 编辑记录
+  update: (id: number, data: any) =>
+    request({ url: `/records/${id}`, method: 'PUT', data }),
+
+  // [P1-3] 确认处方药物
+  confirmPrescription: (id: number, medications: any[]) =>
+    request({
+      url: `/records/${id}/confirm-prescription`,
+      method: 'POST',
+      data: { medications },
+    }),
 }
 
 // ─── Projects (归档项目) ───
@@ -186,30 +214,23 @@ export const familyApi = {
   create: (name?: string) =>
     request({ url: '/families', method: 'POST', data: { name } }),
 
-  mine: () => request({ url: '/families/mine' }),
+  getMyFamily: () => request({ url: '/families/my' }),
 
   join: (inviteCode: string) =>
     request({ url: '/families/join', method: 'POST', data: { invite_code: inviteCode } }),
 
-  members: (familyId: number) =>
-    request({ url: `/families/${familyId}/members` }),
-
-  overview: (familyId: number) =>
-    request({ url: `/families/${familyId}/overview` }),
-
-  removeMember: (familyId: number, userId: number) =>
-    request({ url: `/families/${familyId}/members/${userId}`, method: 'DELETE' }),
+  overview: () => request({ url: '/families/overview' }),
 }
 
 // ─── Reminders ───
 export const reminderApi = {
-  list: (unreadOnly = false, page = 1) =>
-    request({ url: `/reminders?unread_only=${unreadOnly}&page=${page}` }),
-
-  urgent: () => request({ url: '/reminders/urgent' }),
+  list: () => request({ url: '/reminders' }),
 
   markRead: (id: number) =>
     request({ url: `/reminders/${id}/read`, method: 'PUT' }),
+
+  markResolved: (id: number) =>
+    request({ url: `/reminders/${id}/resolve`, method: 'PUT' }),
 
   getSettings: () => request({ url: '/reminders/settings' }),
 
@@ -217,141 +238,16 @@ export const reminderApi = {
     request({ url: '/reminders/settings', method: 'PUT', data }),
 }
 
-// ─── Chat (AI 健康助手) ───
+// ─── Chat ───
 export const chatApi = {
-  // 同步模式（fallback）
-  send: (data: { question: string; session_id?: string; include_family?: boolean }) =>
-    request({ url: '/chat', method: 'POST', data }),
-
-  /**
-   * ★ 流式模式 — SSE 逐字推送
-   *
-   * 回调顺序:
-   *   onCharts(charts)     ← 图表先到（<100ms）
-   *   onSources(sources)   ← 引用来源
-   *   onText(delta)        ← 文字逐块到达（多次调用）
-   *   onDone(session_id)   ← 结束
-   */
-  stream: (
-    data: { question: string; session_id?: string; include_family?: boolean },
-    callbacks: {
-      onCharts?: (charts: any[]) => void
-      onSources?: (sources: any[]) => void
-      onText?: (delta: string) => void
-      onDone?: (sessionId: string) => void
-      onError?: (err: any) => void
-    },
-  ) => {
-    const token = getToken()
-    const task = wx.request({
-      url: `${BASE_URL}/chat/stream`,
-      method: 'POST',
-      enableChunkedTransfer: true,
-      header: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      data,
-      success(res) {
-        // fallback: 如果 onChunkReceived 不触发，尝试从完整响应解析
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          const text = typeof res.data === 'string' ? res.data : JSON.stringify(res.data)
-          const lines = text.split('\n')
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue
-            try {
-              const payload = JSON.parse(line.slice(6))
-              switch (payload.type) {
-                case 'charts': callbacks.onCharts?.(payload.charts || []); break
-                case 'sources': callbacks.onSources?.(payload.sources || []); break
-                case 'text': callbacks.onText?.(payload.content || ''); break
-                case 'done': callbacks.onDone?.(payload.session_id || ''); break
-              }
-            } catch (_) {}
-          }
-        }
-      },
-      fail(err) {
-        callbacks.onError?.(err)
-      },
-    })
-    let chunkedReceived = false
-
-    // 用于处理跨 chunk 的不完整行
-    let buffer = ''
-
-    task.onChunkReceived?.((res: { data: ArrayBuffer }) => {
-      chunkedReceived = true
-      try {
-        // ArrayBuffer → string
-        const bytes = new Uint8Array(res.data)
-        let text = ''
-        for (let i = 0; i < bytes.length; i++) {
-          text += String.fromCharCode(bytes[i])
-        }
-        // 处理 UTF-8 多字节（中文等）
-        try {
-          text = decodeURIComponent(escape(text))
-        } catch (_) { /* 不是 UTF-8 就用原文 */ }
-
-        buffer += text
-
-        // 按 SSE 协议解析完整的 "data: {...}\n\n" 行
-        const parts = buffer.split('\n\n')
-        // 最后一个可能不完整，留在 buffer
-        buffer = parts.pop() || ''
-
-        for (const part of parts) {
-          const lines = part.split('\n')
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue
-            const jsonStr = line.slice(6) // 去掉 "data: "
-            if (!jsonStr.trim()) continue
-
-            try {
-              const payload = JSON.parse(jsonStr)
-
-              switch (payload.type) {
-                case 'charts':
-                  callbacks.onCharts?.(payload.charts || [])
-                  break
-                case 'sources':
-                  callbacks.onSources?.(payload.sources || [])
-                  break
-                case 'text':
-                  callbacks.onText?.(payload.content || '')
-                  break
-                case 'done':
-                  callbacks.onDone?.(payload.session_id || '')
-                  break
-              }
-            } catch (parseErr) {
-              console.warn('SSE parse error:', parseErr, jsonStr)
-            }
-          }
-        }
-      } catch (e) {
-        console.error('onChunkReceived error:', e)
-      }
-    })
-
-    return task  // 返回 RequestTask，可用 task.abort() 取消
-  },
-
-  sessions: () => request({ url: '/chat/sessions' }),
-
-  sessionMessages: (sessionId: string) =>
-    request({ url: `/chat/sessions/${sessionId}` }),
-
-  deleteSession: (sessionId: string) =>
-    request({ url: `/chat/sessions/${sessionId}`, method: 'DELETE' }),
+  // SSE 流式接口在 chat 页面中直接用 wx.request 处理
 }
 
-// ─── Search (语义搜索) ───
+// ─── Search ───
 export const searchApi = {
-  search: (q: string, topK = 10, contentType?: string) => {
-    let url = `/search?q=${encodeURIComponent(q)}&top_k=${topK}`
-    if (contentType) url += `&content_type=${contentType}`
-    return request({ url })
+  search: (q: string, category?: string) => {
+    const params = new URLSearchParams({ q })
+    if (category) params.append('category', category)
+    return request({ url: `/search?${params}` })
   },
 }

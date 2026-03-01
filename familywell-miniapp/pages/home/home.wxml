@@ -1,3 +1,5 @@
+<!-- pages/home/home.wxml — 首页（完整版，含语音录入改造 + 记录跳转） -->
+
 <!-- ── Greeting ── -->
 <view class="safe-top" />
 <view class="header">
@@ -23,7 +25,7 @@
   </view>
 </view>
 
-<!-- ── 语音输入弹窗 ── -->
+<!-- ── 语音输入弹窗（WechatSI 改造版） ── -->
 <view class="modal-mask" wx:if="{{showVoiceModal}}" bindtap="hideVoiceModal">
   <view class="voice-modal" catchtap="noop">
     <view class="vm-header">
@@ -36,8 +38,49 @@
 🍽️ 饮食："中午吃了一碗米饭、红烧鱼、炒青菜"
 ❤️ 指标："今天血压 135/85，心率 72"
 📝 症状："最近头疼，晚上睡不好"</text>
-      <textarea class="vm-textarea" placeholder="点击输入或粘贴语音转文字内容..." value="{{voiceText}}" bindinput="onVoiceTextInput" maxlength="500" auto-height />
-      <button class="vm-submit" bindtap="onSubmitVoice" loading="{{voiceSubmitting}}">AI 识别并记录</button>
+
+      <!-- 录音状态指示 -->
+      <view class="vm-record-area">
+        <!-- 未录音 / 录音完成 → 显示文本框 -->
+        <textarea
+          class="vm-textarea"
+          placeholder="点击下方按钮录音，或直接输入文字..."
+          value="{{voiceText}}"
+          bindinput="onVoiceTextInput"
+          maxlength="500"
+          auto-height
+        />
+
+        <!-- 录音中指示 -->
+        <view class="vm-recording" wx:if="{{isRecording}}">
+          <view class="recording-wave">
+            <view class="wave-bar" wx:for="{{[1,2,3,4,5,4,3,2,1]}}" wx:key="*this"
+              style="animation-delay: {{index * 0.1}}s; height: {{item * 12 + 20}}rpx;"
+            />
+          </view>
+          <text class="recording-text">正在听...</text>
+          <text class="recording-duration">{{recordingDuration}}s</text>
+        </view>
+      </view>
+
+      <!-- 底部操作区 -->
+      <view class="vm-actions">
+        <!-- 录音按钮 -->
+        <view
+          class="vm-record-btn {{isRecording ? 'recording' : ''}}"
+          bindtouchstart="onRecordStart"
+          bindtouchend="onRecordStop"
+          bindtouchcancel="onRecordStop"
+        >
+          <text class="record-icon">{{isRecording ? '⏹' : '🎙️'}}</text>
+          <text class="record-label">{{isRecording ? '松开结束' : '按住说话'}}</text>
+        </view>
+
+        <!-- 提交按钮 -->
+        <view class="vm-submit-btn {{voiceText ? 'active' : ''}}" bindtap="onSubmitVoice">
+          <text>AI 识别并记录</text>
+        </view>
+      </view>
     </view>
   </view>
 </view>
@@ -85,8 +128,10 @@
 <view class="section-label" wx:if="{{recentActivity.length}}">最近动态</view>
 <view class="activity-list">
   <view class="activity-item" wx:for="{{recentActivity}}" wx:key="id"
+    data-id="{{item.id}}"
     data-text="{{item._voiceText}}"
-    bindtap="{{item.ai_status === 'failed' ? 'onRetryVoice' : ''}}">
+    bindtap="{{item.ai_status === 'failed' ? 'onRetryVoice' : 'onActivityTap'}}"
+  >
     <text class="activity-icon">
       {{item.category === 'lab' ? '🔬' : item.category === 'prescription' ? '📝' : item.category === 'checkup' ? '📊' : item.category === 'insurance' ? '🛡️' : item.category === 'food' ? '🍽️' : item.category === 'bp_reading' ? '❤️' : item.category === 'visit' ? '🏥' : '📄'}}
     </text>

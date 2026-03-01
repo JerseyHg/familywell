@@ -15,6 +15,7 @@ from app.models.medication import Medication
 from app.models.insurance import Insurance
 from app.models.reminder import Reminder
 from app.services import ai_service, cos_service, embedding_service
+from app.services.health_validator import validate_indicators_batch
 
 logger = logging.getLogger(__name__)
 
@@ -121,10 +122,14 @@ async def _process_indicators(
     db: AsyncSession, user_id: int, record: Record, ai_result: dict
 ):
     """Extract health indicators from checkup/lab reports."""
-    indicators = ai_result.get("indicators", [])
+    raw_indicators = ai_result.get("indicators", [])
+    valid_indicators, warnings = validate_indicators_batch(raw_indicators)
     measured_at = record.record_date or datetime.utcnow()
+    if warnings:
+        logger.warning(f"Record {record.id} validation warnings: {warnings}")
+        ai_result["_validation_warnings"] = warnings
 
-    for ind in indicators:
+    for ind in valid_indicators:
         hi = HealthIndicator(
             user_id=user_id,
             record_id=record.id,
@@ -159,6 +164,11 @@ async def _process_prescription(
 ):
     """Extract medications from prescription."""
     medications = ai_result.get("medications", [])
+
+    if not medications:
+        return
+    # 不再自动创建 Medication，改为待确认状态
+    record.ai_status = "pending_confirmation"
 
     for med in medications:
         medication = Medication(

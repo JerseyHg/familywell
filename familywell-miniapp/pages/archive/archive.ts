@@ -254,4 +254,10 @@ Page({
       console.error('Failed to create project:', e)
     }
   },
+
+  onRecordTap(e: any) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    wx.navigateTo({ url: `/pages/record-detail/record-detail?id=${id}` })
+  },
 })

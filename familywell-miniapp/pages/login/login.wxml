@@ -1,50 +1,95 @@
+<!--
+  pages/login/login.wxml — 登录页
+  [P1-2] 新增微信一键登录界面
+-->
 <view class="login-page">
-  <view class="logo-area">
-    <text class="logo-icon">🏥</text>
+  <view class="safe-top" />
+
+  <view class="login-header">
+    <text class="app-logo">🏥</text>
     <text class="app-name">FamilyWell</text>
-    <text class="app-desc">拍照即归档，AI 帮你管</text>
+    <text class="app-desc">家庭健康档案管理</text>
   </view>
 
-  <!-- Tab switch -->
-  <view class="tab-bar">
-    <view class="tab {{mode === 'login' ? 'active' : ''}}" bindtap="switchMode" data-mode="login">登录</view>
-    <view class="tab {{mode === 'register' ? 'active' : ''}}" bindtap="switchMode" data-mode="register">注册</view>
+  <!-- ═══ 微信登录模式 ═══ -->
+  <view class="login-body" wx:if="{{mode === 'wechat'}}">
+    <view class="wx-login-card">
+      <view
+        class="wx-login-btn"
+        bindtap="onWxLogin"
+      >
+        <text class="wx-icon">💬</text>
+        <text class="wx-text">{{wxLoading ? '登录中...' : '微信一键登录'}}</text>
+      </view>
+      <text class="wx-hint">首次使用将自动创建账号</text>
+    </view>
+
+    <view class="switch-row">
+      <text class="switch-text" bindtap="switchToAccount">使用账号密码登录 →</text>
+    </view>
   </view>
 
-  <view class="form-area">
-    <view class="input-group">
-      <text class="input-label">用户名</text>
-      <input
-        class="input-field"
-        placeholder="请输入用户名"
-        value="{{username}}"
-        bindinput="onUsernameInput"
-      />
+  <!-- ═══ 账号密码模式 ═══ -->
+  <view class="login-body" wx:if="{{mode !== 'wechat'}}">
+    <view class="form-card">
+      <!-- 模式切换 -->
+      <view class="mode-tabs">
+        <view
+          class="mode-tab {{mode === 'account-login' ? 'active' : ''}}"
+          data-mode="account-login"
+          bindtap="switchMode"
+        >登录</view>
+        <view
+          class="mode-tab {{mode === 'account-register' ? 'active' : ''}}"
+          data-mode="account-register"
+          bindtap="switchMode"
+        >注册</view>
+      </view>
+
+      <view class="field">
+        <text class="field-label">用户名</text>
+        <input
+          class="field-input"
+          placeholder="请输入用户名"
+          value="{{username}}"
+          bindinput="onUsernameInput"
+        />
+      </view>
+
+      <view class="field">
+        <text class="field-label">密码</text>
+        <input
+          class="field-input"
+          placeholder="请输入密码"
+          password
+          value="{{password}}"
+          bindinput="onPasswordInput"
+        />
+      </view>
+
+      <view class="field" wx:if="{{mode === 'account-register'}}">
+        <text class="field-label">昵称</text>
+        <input
+          class="field-input"
+          placeholder="给自己取个名字"
+          value="{{nickname}}"
+          bindinput="onNicknameInput"
+        />
+      </view>
+
+      <button
+        class="submit-btn"
+        bindtap="onSubmit"
+        loading="{{loading}}"
+      >
+        {{mode === 'account-login' ? '登录' : '注册'}}
+      </button>
     </view>
 
-    <view class="input-group">
-      <text class="input-label">密码</text>
-      <input
-        class="input-field"
-        placeholder="请输入密码"
-        password="{{true}}"
-        value="{{password}}"
-        bindinput="onPasswordInput"
-      />
+    <view class="switch-row">
+      <text class="switch-text" bindtap="switchToWechat">← 返回微信登录</text>
     </view>
-
-    <view class="input-group" wx:if="{{mode === 'register'}}">
-      <text class="input-label">昵称</text>
-      <input
-        class="input-field"
-        placeholder="给自己取个名字"
-        value="{{nickname}}"
-        bindinput="onNicknameInput"
-      />
-    </view>
-
-    <button class="submit-btn" bindtap="onSubmit" loading="{{loading}}">
-      {{mode === 'login' ? '登 录' : '注 册'}}
-    </button>
   </view>
+
+  <view class="safe-bottom" />
 </view>

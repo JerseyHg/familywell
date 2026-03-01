@@ -6,7 +6,8 @@
     "pages/chat/chat",
     "pages/settings/settings",
     "pages/login/login",
-    "pages/onboarding/onboarding"
+    "pages/onboarding/onboarding",
+    "pages/record-detail/record-detail"
   ],
   "window": {
     "navigationBarBackgroundColor": "#F6F7F5",
@@ -31,5 +32,11 @@
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json",
-  "lazyCodeLoading": "requiredComponents"
+  "lazyCodeLoading": "requiredComponents",
+  "plugins": {
+    "WechatSI": {
+      "version": "0.3.6",
+      "provider": "wx069ba97219f66d99"
+    }
+  }
 }

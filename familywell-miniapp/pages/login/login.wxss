@@ -1,109 +1,95 @@
-.login-page {
-  min-height: 100vh;
-  background: #F6F7F5;
-  padding: 0 48rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
+/* pages/login/login.wxss */
 
-.logo-area {
-  margin-top: 160rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: 80rpx;
-}
+page { background: var(--bg); }
+.safe-top { height: calc(80px + env(safe-area-inset-top)); }
+.safe-bottom { height: calc(60rpx + env(safe-area-inset-bottom)); }
 
-.logo-icon {
-  font-size: 80rpx;
-  margin-bottom: 16rpx;
+.login-header {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 40rpx 0;
 }
-
+.app-logo { font-size: 80rpx; margin-bottom: 16rpx; }
 .app-name {
-  font-size: 48rpx;
-  font-weight: 700;
-  color: #1A1A1A;
-  margin-bottom: 12rpx;
+  font-size: 48rpx; font-weight: 800; color: var(--text);
 }
-
 .app-desc {
-  font-size: 28rpx;
-  color: #9BA5B0;
+  font-size: 26rpx; color: var(--sub); margin-top: 8rpx;
 }
 
-.tab-bar {
-  display: flex;
-  background: #EAEAEA;
-  border-radius: 16rpx;
+.login-body { padding: 0 48rpx; }
+
+/* ── WeChat Login ── */
+.wx-login-card {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 48rpx 32rpx;
+}
+.wx-login-btn {
+  display: flex; align-items: center; justify-content: center; gap: 16rpx;
+  width: 100%; padding: 28rpx;
+  border-radius: 48rpx;
+  background: #07C160;
+  color: #fff; font-size: 32rpx; font-weight: 600;
+  box-shadow: 0 8rpx 32rpx rgba(7,193,96,0.3);
+}
+.wx-icon { font-size: 40rpx; }
+.wx-hint {
+  margin-top: 20rpx;
+  font-size: 24rpx; color: var(--muted);
+}
+
+/* ── Mode Switch ── */
+.switch-row {
+  text-align: center; padding: 40rpx;
+}
+.switch-text {
+  font-size: 26rpx; color: var(--primary);
+}
+
+/* ── Account Form ── */
+.form-card {
+  background: var(--card);
+  border-radius: 32rpx;
+  padding: 40rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.06);
+}
+.mode-tabs {
+  display: flex; gap: 0;
+  background: var(--bg);
+  border-radius: 20rpx;
   padding: 6rpx;
-  margin-bottom: 48rpx;
-  width: 100%;
+  margin-bottom: 40rpx;
 }
-
-.tab {
-  flex: 1;
-  text-align: center;
-  padding: 16rpx 0;
-  font-size: 28rpx;
-  color: #666;
-  border-radius: 12rpx;
-  transition: all 0.2s;
+.mode-tab {
+  flex: 1; text-align: center;
+  padding: 18rpx; border-radius: 16rpx;
+  font-size: 28rpx; color: var(--sub);
 }
-
-.tab.active {
-  background: #fff;
-  color: #2D8B6F;
+.mode-tab.active {
+  background: var(--card); color: var(--text);
   font-weight: 600;
   box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.06);
 }
 
-.form-area {
-  width: 100%;
+.field { margin-bottom: 28rpx; }
+.field-label {
+  display: block; font-size: 24rpx; color: var(--sub);
+  margin-bottom: 10rpx; font-weight: 600;
 }
-
-.input-group {
-  margin-bottom: 32rpx;
-}
-
-.input-label {
-  font-size: 26rpx;
-  color: #666;
-  margin-bottom: 12rpx;
-  display: block;
-}
-
-.input-field {
-  width: 100%;
-  height: 88rpx;
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 0 24rpx;
-  font-size: 30rpx;
-  color: #333;
+.field-input {
+  width: 100%; height: 88rpx; padding: 0 24rpx;
+  background: var(--bg); border-radius: 20rpx;
+  font-size: 30rpx; color: var(--text);
   box-sizing: border-box;
-  border: 2rpx solid #E8E8E8;
-}
-
-.input-field:focus {
-  border-color: #2D8B6F;
 }
 
 .submit-btn {
-  width: 100% !important;
-  height: 88rpx;
-  background: #2D8B6F !important;
+  width: 100% !important; margin-top: 20rpx;
+  padding: 24rpx !important;
+  border-radius: 48rpx !important;
+  background: var(--primary) !important;
   color: #fff !important;
-  font-size: 32rpx;
-  font-weight: 600;
-  border-radius: 16rpx;
-  border: none;
-  margin-top: 24rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-size: 30rpx !important; font-weight: 600 !important;
+  border: none !important;
+  line-height: 1.5 !important;
 }
-
-.submit-btn::after {
-  border: none;
-}
+.submit-btn::after { display: none; }

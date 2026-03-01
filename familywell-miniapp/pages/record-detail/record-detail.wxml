@@ -1,0 +1,151 @@
+<!--
+  pages/record-detail/record-detail.wxml — 记录详情页
+  [P1-1] 原始图片 + AI 识别结果 + 编辑功能
+  [P1-3] 处方确认弹窗
+-->
+<view class="detail-page">
+  <view class="safe-top" />
+
+  <!-- Loading -->
+  <view class="loading-wrap" wx:if="{{loading}}">
+    <view class="loading-dots">
+      <view class="dot-anim" /><view class="dot-anim" /><view class="dot-anim" />
+    </view>
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <block wx:if="{{!loading && record}}">
+
+    <!-- ── 顶部：原始图片 ── -->
+    <view class="image-section" wx:if="{{imageUrl}}" bindtap="onPreviewImage">
+      <image class="record-image" src="{{imageUrl}}" mode="widthFix" />
+      <view class="image-hint">点击查看大图</view>
+    </view>
+
+    <!-- ── 基本信息卡 ── -->
+    <view class="info-card">
+      <view class="info-header">
+        <text class="info-icon">{{categoryIcon}}</text>
+        <view class="info-title-area">
+          <text class="info-title">{{record.title || '未命名'}}</text>
+          <text class="info-category">{{categoryName}}</text>
+        </view>
+        <view class="edit-btn" bindtap="onStartEdit" wx:if="{{!editing && !needConfirm}}">✏️ 编辑</view>
+      </view>
+
+      <!-- 非编辑模式 -->
+      <view class="info-body" wx:if="{{!editing}}">
+        <view class="info-row" wx:if="{{record.hospital}}">
+          <text class="info-label">医院</text>
+          <text class="info-value">{{record.hospital}}</text>
+        </view>
+        <view class="info-row" wx:if="{{record.record_date}}">
+          <text class="info-label">日期</text>
+          <text class="info-value">{{record.record_date}}</text>
+        </view>
+        <view class="info-row" wx:if="{{record.source}}">
+          <text class="info-label">来源</text>
+          <text class="info-value">{{record.source === 'camera' ? '拍照上传' : record.source === 'voice' ? '语音记录' : record.source}}</text>
+        </view>
+        <view class="info-row" wx:if="{{record.notes}}">
+          <text class="info-label">备注</text>
+          <text class="info-value">{{record.notes}}</text>
+        </view>
+      </view>
+
+      <!-- 编辑模式 -->
+      <view class="edit-body" wx:if="{{editing}}">
+        <view class="edit-row">
+          <text class="edit-label">标题</text>
+          <input class="edit-input" value="{{editForm.title}}" bindinput="onEditInput" data-key="title" placeholder="记录标题" />
+        </view>
+        <view class="edit-row">
+          <text class="edit-label">医院</text>
+          <input class="edit-input" value="{{editForm.hospital}}" bindinput="onEditInput" data-key="hospital" placeholder="医院名称" />
+        </view>
+        <view class="edit-row">
+          <text class="edit-label">日期</text>
+          <picker mode="date" value="{{editForm.record_date}}" bindchange="onEditDate">
+            <view class="edit-picker">{{editForm.record_date || '选择日期'}}</view>
+          </picker>
+        </view>
+        <view class="edit-row">
+          <text class="edit-label">备注</text>
+          <textarea class="edit-textarea" value="{{editForm.notes}}" bindinput="onEditInput" data-key="notes" placeholder="添加备注..." auto-height />
+        </view>
+        <view class="edit-actions">
+          <view class="edit-cancel" bindtap="onCancelEdit">取消</view>
+          <view class="edit-save" bindtap="onSaveEdit">保存</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- ── 校验警告（P0-3）── -->
+    <view class="warnings-card" wx:if="{{validationWarnings.length > 0}}">
+      <text class="warn-title">⚠️ 数据校验提示</text>
+      <view class="warn-item" wx:for="{{validationWarnings}}" wx:key="*this">
+        <text class="warn-text">{{item}}</text>
+      </view>
+    </view>
+
+    <!-- ── 健康指标（体检/化验）── -->
+    <view class="section-card" wx:if="{{indicators.length > 0}}">
+      <text class="section-title">📊 检查指标</text>
+      <view class="indicator-grid">
+        <view class="indicator-item {{item.abnormal ? 'abnormal' : ''}}" wx:for="{{indicators}}" wx:key="type">
+          <text class="ind-name">{{item.name || item.type}}</text>
+          <text class="ind-value">{{item.value}} <text class="ind-unit">{{item.unit || ''}}</text></text>
+          <text class="ind-ref" wx:if="{{item.reference_low != null}}">参考: {{item.reference_low}}-{{item.reference_high}}</text>
+          <text class="ind-badge" wx:if="{{item.abnormal}}">异常</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- ── 处方药物 ── -->
+    <view class="section-card" wx:if="{{medications.length > 0}}">
+      <text class="section-title">💊 处方药物</text>
+
+      <!-- 待确认模式 [P1-3] -->
+      <block wx:if="{{needConfirm}}">
+        <text class="confirm-hint">以下是 AI 识别的药物，请确认后添加到用药管理：</text>
+        <view class="med-confirm-list">
+          <view class="med-confirm-item" wx:for="{{medConfirmList}}" wx:key="index" data-index="{{index}}" bindtap="onToggleMed">
+            <view class="med-checkbox {{item.confirmed ? 'checked' : ''}}">
+              <text wx:if="{{item.confirmed}}">✓</text>
+            </view>
+            <view class="med-confirm-info">
+              <text class="med-name">{{item.name}}</text>
+              <text class="med-detail">{{item.dosage || ''}} {{item.frequency || ''}}</text>
+            </view>
+          </view>
+        </view>
+        <view class="confirm-btn" bindtap="onConfirmPrescription">确认添加药物</view>
+      </block>
+
+      <!-- 已确认模式 -->
+      <block wx:else>
+        <view class="med-list">
+          <view class="med-item" wx:for="{{medications}}" wx:key="name">
+            <text class="med-name">{{item.name}}</text>
+            <text class="med-detail">{{item.dosage || ''}} · {{item.frequency || ''}}</text>
+          </view>
+        </view>
+      </block>
+    </view>
+
+    <!-- ── AI 原文 OCR ── -->
+    <view class="section-card" wx:if="{{rawText}}">
+      <text class="section-title">📄 识别原文</text>
+      <text class="raw-text">{{rawText}}</text>
+    </view>
+
+    <!-- ── 底部操作 ── -->
+    <view class="bottom-actions">
+      <view class="action-ask-ai" bindtap="onAskAI">
+        <text>🤖 让 AI 解读这份记录</text>
+      </view>
+    </view>
+
+    <view class="safe-bottom" />
+  </block>
+</view>

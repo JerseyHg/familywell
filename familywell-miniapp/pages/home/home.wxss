@@ -1,3 +1,5 @@
+/* pages/home/home.wxss — 首页样式（完整版，含语音录入样式） */
+
 page { background: var(--bg); }
 
 .safe-top { height: calc(44px + env(safe-area-inset-top)); }
@@ -192,4 +194,128 @@ page { background: var(--bg); }
 @keyframes tagPulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+/* ══════════════════════════════════════════
+   语音录入（WechatSI）— 追加样式
+   ══════════════════════════════════════════ */
+
+/* 录音区域 */
+.vm-record-area {
+  position: relative;
+  margin-bottom: 24rpx;
+}
+
+/* 录音中覆盖层 */
+.vm-recording {
+  position: absolute; inset: 0;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 24rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+}
+
+/* 波形动画 */
+.recording-wave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  height: 120rpx;
+}
+
+.wave-bar {
+  width: 8rpx;
+  border-radius: 4rpx;
+  background: var(--primary);
+  animation: waveAnim 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes waveAnim {
+  0% {
+    transform: scaleY(0.4);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.recording-text {
+  font-size: 28rpx;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.recording-duration {
+  font-size: 24rpx;
+  color: var(--muted);
+}
+
+/* 底部操作区 */
+.vm-actions {
+  display: flex;
+  gap: 20rpx;
+  align-items: center;
+}
+
+/* 录音按钮 */
+.vm-record-btn {
+  flex-shrink: 0;
+  width: 160rpx;
+  height: 88rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(135deg, #3B7DD8, #5B9BF0);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rpx;
+  box-shadow: 0 4rpx 16rpx rgba(59, 125, 216, 0.3);
+  transition: all 0.2s;
+}
+
+.vm-record-btn.recording {
+  background: linear-gradient(135deg, #E85D3A, #F07B5A);
+  box-shadow: 0 4rpx 16rpx rgba(232, 93, 58, 0.3);
+  animation: recordPulse 1s ease-in-out infinite;
+}
+
+@keyframes recordPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+.record-icon {
+  font-size: 28rpx;
+}
+
+.record-label {
+  font-size: 20rpx;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* 提交按钮 */
+.vm-submit-btn {
+  flex: 1;
+  height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  border-radius: 28rpx;
+  background: var(--border);
+  color: var(--muted);
+  font-size: 30rpx;
+  font-weight: 700;
+  transition: all 0.2s;
+}
+
+.vm-submit-btn.active {
+  background: linear-gradient(135deg, #2D8B6F, #3CC492);
+  color: #fff;
+  box-shadow: 0 4rpx 16rpx rgba(45, 139, 111, 0.3);
 }
