@@ -1,3 +1,9 @@
+/**
+ * pages/chat/chat.ts — AI 健康助手
+ * ═══════════════════════════════════════
+ * ★ 修复：随机 placeholder 提示词（Problem 3）
+ * ★ 修复：追问提示词改为 wrap 布局（Problem 5）
+ */
 import { chatApi } from '../../services/api'
 
 interface Message {
@@ -7,6 +13,20 @@ interface Message {
   charts?: any[]
 }
 
+// ★ 温和语气的随机 placeholder
+const PLACEHOLDERS = [
+  '今天感觉怎么样？随时聊聊~',
+  '有什么健康问题想了解的吗？',
+  '我在这里，有什么需要帮忙的~',
+  '想聊聊最近的身体状况吗？',
+  '药吃了吗？有什么想问的尽管说~',
+  '最近睡得好吗？跟我聊聊吧~',
+  '有什么不舒服的地方吗？',
+  '记录一下今天的健康状况吧~',
+  '需要查看最近的健康数据吗？',
+  '今天过得怎么样？我来帮你看看~',
+]
+
 Page({
   data: {
     messages: [] as Message[],
@@ -14,8 +34,9 @@ Page({
     typing: false,
     sessionId: '',
     scrollToView: '',
+    placeholder: '今天感觉怎么样？随时聊聊~',
 
-    // ✅ 优化：更丰富的欢迎页模板问题（2x4 网格）
+    // ✅ 欢迎页模板问题（2x4 网格）
     homePrompts: [
       { icon: '🍽️', text: '过去7天饮食情况' },
       { icon: '💊', text: '这周药吃齐了吗' },
@@ -27,7 +48,7 @@ Page({
       { icon: '🏥', text: '下次该做什么检查' },
     ],
 
-    // ✅ 优化：更丰富的追问提示词（根据对话上下文动态更新）
+    // 追问提示词
     followupPrompts: [
       { icon: '📈', text: 'PSA 变化趋势' },
       { icon: '🏥', text: '下次该做什么检查' },
@@ -37,15 +58,18 @@ Page({
     ],
   },
 
-  // 流式文本累积（不放 data 里，避免 setData 序列化开销）
+  // 流式文本累积
   _streamText: '',
   _streamMsgIdx: -1,
   _streamTask: null as any,
-  // 节流：每 80ms 才 setData 一次（小程序 setData 有性能开销）
   _throttleTimer: null as any,
 
   onShow() {
     this.getTabBar()?.setData({ active: 2 })
+
+    // ★ 每次进入页面随机选一个 placeholder
+    const idx = Math.floor(Math.random() * PLACEHOLDERS.length)
+    this.setData({ placeholder: PLACEHOLDERS[idx] })
 
     const app = getApp()
     const initQ = app.globalData?.chatInitQuestion
@@ -56,7 +80,6 @@ Page({
   },
 
   onHide() {
-    // 离开页面时取消进行中的流式请求
     this._streamTask?.abort?.()
   },
 
@@ -87,7 +110,7 @@ Page({
     const userMsg: Message = { id: `msg_${Date.now()}`, role: 'user', text: question }
     const messages = [...this.data.messages, userMsg]
 
-    // 2. 预创建空的 AI 消息占位（后续流式填充）
+    // 2. 预创建空的 AI 消息占位
     const aiMsg: Message = { id: `ai_${Date.now()}`, role: 'assistant', text: '', charts: [] }
     messages.push(aiMsg)
     const aiIdx = messages.length - 1
@@ -110,23 +133,17 @@ Page({
         include_family: false,
       },
       {
-        // ── 图表先到（<100ms），立即渲染 ──
         onCharts: (charts) => {
-          this.setData({
-            [`messages[${aiIdx}].charts`]: charts,
-          })
+          this.setData({ [`messages[${aiIdx}].charts`]: charts })
           this._scrollToBottom()
         },
 
-        // ── 文字逐块到达，节流更新 UI ──
         onText: (delta) => {
           this._streamText += delta
           this._throttledUpdateText()
         },
 
-        // ── 结束信号 ──
         onDone: (sessionId) => {
-          // 清理节流定时器，做最后一次 flush
           if (this._throttleTimer) {
             clearTimeout(this._throttleTimer)
             this._throttleTimer = null
@@ -139,12 +156,9 @@ Page({
           })
           this._scrollToBottom()
           this._streamTask = null
-
-          // ✅ 根据对话内容动态更新追问提示词
           this._updateFollowupPrompts(question)
         },
 
-        // ── 错误处理：降级到同步模式 ──
         onError: (err) => {
           console.error('Stream failed, falling back to sync:', err)
           this._streamTask = null
@@ -155,12 +169,11 @@ Page({
   },
 
   /**
-   * ✅ 根据用户最后一个问题，动态切换追问提示词
+   * 根据用户最后一个问题，动态切换追问提示词
    */
   _updateFollowupPrompts(lastQuestion: string) {
     const q = lastQuestion.toLowerCase()
 
-    // 根据上一个话题推荐相关追问
     let prompts = []
 
     if (q.includes('药') || q.includes('服药') || q.includes('用药')) {
@@ -194,7 +207,6 @@ Page({
         { icon: '📋', text: '最近身体怎么样' },
       ]
     } else {
-      // 默认追问
       prompts = [
         { icon: '📈', text: 'PSA 变化趋势' },
         { icon: '💊', text: '这周药吃齐了吗' },
@@ -207,27 +219,18 @@ Page({
     this.setData({ followupPrompts: prompts })
   },
 
-  /**
-   * 节流更新文字：每 80ms 最多 setData 一次。
-   * 避免每个 token（10-50ms 间隔）都触发 setData。
-   */
   _throttledUpdateText() {
     if (this._throttleTimer) return
     this._throttleTimer = setTimeout(() => {
       this._throttleTimer = null
       const idx = this._streamMsgIdx
       if (idx >= 0) {
-        this.setData({
-          [`messages[${idx}].text`]: this._streamText,
-        })
+        this.setData({ [`messages[${idx}].text`]: this._streamText })
         this._scrollToBottom()
       }
     }, 80)
   },
 
-  /**
-   * 降级到同步模式：如果流式失败（老版本小程序不支持 enableChunkedTransfer 等）
-   */
   async _fallbackSync(question: string, aiIdx: number) {
     try {
       const res: any = await chatApi.send({
@@ -255,7 +258,6 @@ Page({
     this.setData({ scrollToView: `msg-${idx}` })
   },
 
-  // ── New conversation ──
   onNewChat() {
     this._streamTask?.abort?.()
     this.setData({
@@ -263,5 +265,8 @@ Page({
       sessionId: '',
       typing: false,
     })
+    // 新对话也换一个 placeholder
+    const idx = Math.floor(Math.random() * PLACEHOLDERS.length)
+    this.setData({ placeholder: PLACEHOLDERS[idx] })
   },
 })

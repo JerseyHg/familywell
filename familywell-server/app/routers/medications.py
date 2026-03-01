@@ -1,19 +1,24 @@
 """
 app/routers/medications.py — 用药管理 + 语音记录
 ──────────────────────────────────────────────────
-★ voice-add 改为多类型拆分：一段话里的饮食/用药/指标/症状各自保存
+★ voice-add 改为：
+  1. 一定创建 Record (category=medication_log) → 归档可见
+  2. 已有药物 → 自动打卡
+  3. 新药物 → 创建 MedicationSuggestion（待确认），不直接创建 Medication
+★ 新增 confirm-suggestion / dismiss-suggestion 端点
 """
 from datetime import date, datetime, time as time_type, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models.user import User
-from app.models.medication import Medication, MedicationTask
+from app.models.medication import Medication, MedicationTask, MedicationSuggestion
 from app.schemas.medication import (
     MedicationCreate, MedicationUpdate, MedicationResponse, TaskResponse,
+    SuggestionConfirmRequest,
 )
 from app.utils.deps import get_current_user
 
@@ -42,6 +47,7 @@ async def _generate_tasks_for_med(db: AsyncSession, med: Medication, target_date
                 scheduled_date=target_date,
                 scheduled_time=scheduled_time,
                 status="pending",
+                medication_name=med.name,
             )
             db.add(task)
             count += 1
@@ -119,6 +125,129 @@ async def update_medication(
 
 
 # ══════════════════════════════════════════════════
+# Medication Suggestions — 确认 / 忽略
+# ══════════════════════════════════════════════════
+
+DEFAULT_TIMES = {1: ["08:00"], 2: ["08:00", "20:00"], 3: ["08:00", "12:00", "20:00"]}
+
+
+@router.get("/suggestions")
+async def list_suggestions(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取所有待确认的药物建议。"""
+    result = await db.execute(
+        select(MedicationSuggestion)
+        .where(
+            MedicationSuggestion.user_id == user.id,
+            MedicationSuggestion.status == "pending",
+        )
+        .order_by(MedicationSuggestion.created_at.desc())
+    )
+    suggestions = result.scalars().all()
+    return [
+        {
+            "id": s.id,
+            "name": s.name,
+            "dosage": s.dosage,
+            "frequency": s.frequency,
+            "source_text": s.source_text,
+            "created_at": s.created_at.isoformat() if s.created_at else None,
+        }
+        for s in suggestions
+    ]
+
+
+@router.post("/suggestions/{suggestion_id}/confirm")
+async def confirm_suggestion(
+    suggestion_id: int,
+    req: SuggestionConfirmRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    用户确认药物建议 → 创建 Medication + 当天 Task。
+    """
+    result = await db.execute(
+        select(MedicationSuggestion).where(
+            MedicationSuggestion.id == suggestion_id,
+            MedicationSuggestion.user_id == user.id,
+            MedicationSuggestion.status == "pending",
+        )
+    )
+    suggestion = result.scalar_one_or_none()
+    if not suggestion:
+        raise HTTPException(status_code=404, detail="建议不存在或已处理")
+
+    times_per_day = req.times_per_day or 1
+    scheduled_times = DEFAULT_TIMES.get(times_per_day, ["08:00"])
+
+    today = date.today()
+    end_date = None
+    if req.med_type == "course" and req.total_days:
+        end_date = today + timedelta(days=req.total_days)
+    elif req.med_type == "temporary":
+        end_date = today + timedelta(days=req.total_days or 7)
+
+    med = Medication(
+        user_id=user.id,
+        name=suggestion.name,
+        dosage=req.dosage or suggestion.dosage,
+        frequency=f"每天{times_per_day}次",
+        scheduled_times=scheduled_times,
+        start_date=today,
+        end_date=end_date,
+        is_active=True,
+    )
+    db.add(med)
+    await db.flush()
+
+    await _generate_tasks_for_med(db, med, today)
+
+    suggestion.status = "confirmed"
+    suggestion.confirmed_at = datetime.utcnow()
+    suggestion.medication_id = med.id
+
+    await db.commit()
+
+    try:
+        from app.services.rag_service import invalidate_user_cache
+        await invalidate_user_cache(user.id)
+    except Exception:
+        pass
+
+    return {
+        "message": f"已添加药物「{suggestion.name}」，今日服药提醒已生成",
+        "medication_id": med.id,
+    }
+
+
+@router.post("/suggestions/{suggestion_id}/dismiss")
+async def dismiss_suggestion(
+    suggestion_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """用户忽略药物建议。"""
+    result = await db.execute(
+        select(MedicationSuggestion).where(
+            MedicationSuggestion.id == suggestion_id,
+            MedicationSuggestion.user_id == user.id,
+            MedicationSuggestion.status == "pending",
+        )
+    )
+    suggestion = result.scalar_one_or_none()
+    if not suggestion:
+        raise HTTPException(status_code=404, detail="建议不存在或已处理")
+
+    suggestion.status = "dismissed"
+    await db.commit()
+
+    return {"message": f"已忽略「{suggestion.name}」"}
+
+
+# ══════════════════════════════════════════════════
 # Voice Add — 多类型拆分
 # ══════════════════════════════════════════════════
 
@@ -187,6 +316,7 @@ async def voice_add_medication(
     """
     通用语音记录入口。★ 支持多类型拆分：
     一段话中的饮食/用药/指标/症状分别保存到各自的表和 embedding 中。
+    ★ 用药新逻辑：已有药物自动打卡，新药物创建 Suggestion 待确认。
     """
     from app.config import get_settings
     from app.models.record import Record
@@ -201,7 +331,6 @@ async def voice_add_medication(
     )
 
     # ── 1. AI 多类型拆分 ──
-    # ★ 把当前时间告诉 AI，用于推断 meal_type 和日期
     now = datetime.now()
     time_context = f"\n\n（当前时间：{now.strftime('%Y-%m-%d %H:%M')}，星期{['一','二','三','四','五','六','日'][now.weekday()]}）\n用户描述："
 
@@ -227,7 +356,6 @@ async def voice_add_medication(
 
     items = ai_result.get("items", [])
     if not items:
-        # 兜底：如果 AI 没返回 items，当作旧格式处理
         if ai_result.get("type"):
             items = [ai_result]
         else:
@@ -245,7 +373,11 @@ async def voice_add_medication(
 
         try:
             if item_type == "medication":
-                result_item = await _process_medication(db, user, data, summary, today)
+                result_item, record_id = await _process_medication(
+                    db, user, data, summary, today, req.text
+                )
+                if record_id:
+                    record_ids_to_embed.append(record_id)
             elif item_type == "food":
                 result_item, record_id = await _process_food(db, user, data, summary, today)
                 if record_id:
@@ -298,56 +430,119 @@ async def voice_add_medication(
     return {
         "items": response_items,
         "total": len(response_items),
-        # 向后兼容旧前端：取第一个 item 的 type/summary
         "type": response_items[0]["type"] if response_items else "unknown",
         "summary": response_items[0]["summary"] if response_items else req.text[:30],
     }
 
 
 # ══════════════════════════════════════════════════
-# 各类型的处理函数（从原来的 if/elif 抽取出来）
+# 各类型的处理函数
 # ══════════════════════════════════════════════════
-
-DEFAULT_TIMES = {1: ["08:00"], 2: ["08:00", "20:00"], 3: ["08:00", "12:00", "20:00"]}
 
 
 async def _process_medication(
-    db: AsyncSession, user: User, data: dict, summary: str, today: date
-) -> dict:
-    """处理用药类型 → 创建 Medication + 当天 Task"""
-    created_meds = []
+    db: AsyncSession, user: User, data: dict, summary: str, today: date,
+    original_text: str = "",
+) -> tuple[dict, int | None]:
+    """
+    ★ 新逻辑：
+    1. 一定创建 Record(category=medication_log) → 归档可见
+    2. 已有药物 → 自动打卡（找 pending task → done）
+    3. 新药物 → 创建 MedicationSuggestion（待用户确认）
+    """
+    from app.models.record import Record
 
-    for m in data.get("medications", []):
+    medications = data.get("medications", [])
+    med_names = [m.get("name", "").strip() for m in medications if m.get("name", "").strip()]
+
+    # ── ① 创建 Record（归档可见） ──
+    raw_text = f"服药记录：{summary}。药物：{'、'.join(med_names) if med_names else '未知'}。"
+    record = Record(
+        user_id=user.id,
+        category="medication_log",
+        title=summary,
+        record_date=today,
+        ai_status="completed",
+        source="voice",
+        ai_raw_result={
+            "category": "medication_log",
+            "title": summary,
+            "raw_text": raw_text,
+            "date": today.isoformat(),
+            **data,
+        },
+    )
+    db.add(record)
+    await db.flush()
+
+    auto_checked = []
+    new_suggestions = []
+
+    for m in medications:
         name = m.get("name", "").strip()
         if not name:
             continue
 
-        med_type = m.get("med_type", "long_term")
-        times_per_day = int(m.get("times_per_day", 1))
-        scheduled_times = DEFAULT_TIMES.get(times_per_day, ["08:00"])
-
-        end_date = None
-        if med_type == "course":
-            total = int(m.get("course_count", 1)) * int(m.get("days_per_course", 7))
-            if total > 0:
-                end_date = today + timedelta(days=total)
-        elif med_type == "temporary":
-            end_date = today + timedelta(days=int(m.get("total_days", 7)))
-
-        med = Medication(
-            user_id=user.id, name=name, dosage=m.get("dosage"),
-            frequency=f"每天{times_per_day}次", scheduled_times=scheduled_times,
-            start_date=today, end_date=end_date, is_active=True,
+        # ── ② 查找已有药物（模糊匹配名称） ──
+        existing_result = await db.execute(
+            select(Medication).where(
+                Medication.user_id == user.id,
+                Medication.is_active == True,
+                func.lower(Medication.name) == func.lower(name),
+            )
         )
-        db.add(med)
-        await db.flush()
-        await _generate_tasks_for_med(db, med, today)
-        created_meds.append({"name": name, "dosage": m.get("dosage")})
+        existing_med = existing_result.scalar_one_or_none()
+
+        if existing_med:
+            # ── ③ 已有药物 → 自动打卡 ──
+            task_result = await db.execute(
+                select(MedicationTask).where(
+                    MedicationTask.medication_id == existing_med.id,
+                    MedicationTask.scheduled_date == today,
+                    MedicationTask.status == "pending",
+                )
+                .order_by(MedicationTask.scheduled_time)
+                .limit(1)
+            )
+            task = task_result.scalar_one_or_none()
+
+            if task:
+                task.status = "done"
+                task.completed_at = datetime.utcnow()
+                auto_checked.append(name)
+                logger.info(f"Auto-checked task {task.id} for med '{name}'")
+            else:
+                # 没有 pending task（可能已经打过卡了），只记录
+                auto_checked.append(f"{name}（今日已完成）")
+        else:
+            # ── ④ 新药物 → 创建 Suggestion ──
+            suggestion = MedicationSuggestion(
+                user_id=user.id,
+                record_id=record.id,
+                name=name,
+                dosage=m.get("dosage"),
+                frequency=f"每天{m.get('times_per_day', 1)}次" if m.get("times_per_day") else None,
+                ai_raw=m,
+                source_text=original_text[:200] if original_text else None,
+                status="pending",
+            )
+            db.add(suggestion)
+            new_suggestions.append(name)
+            logger.info(f"Created suggestion for new med '{name}'")
+
+    # 构建返回消息
+    parts = []
+    if auto_checked:
+        parts.append(f"已自动打卡：{'、'.join(auto_checked)}")
+    if new_suggestions:
+        parts.append(f"发现新药物：{'、'.join(new_suggestions)}，请在首页确认")
+    message = "；".join(parts) if parts else f"已记录：{summary}"
 
     return {
-        "medications": created_meds,
-        "message": f"已添加 {len(created_meds)} 个药物，今日服药提醒已生成",
-    }
+        "auto_checked": auto_checked,
+        "new_suggestions": new_suggestions,
+        "message": message,
+    }, record.id
 
 
 async def _process_food(
@@ -421,7 +616,8 @@ async def _process_vitals(
 
     for ind in indicators:
         hi = HealthIndicator(
-            user_id=user.id, record_id=record.id,
+            user_id=user.id,
+            record_id=record.id,
             indicator_type=ind.get("type", "unknown"),
             value=float(ind.get("value", 0)),
             unit=ind.get("unit"),
@@ -544,4 +740,3 @@ async def complete_task(
         pass
 
     return {"status": "completed", "completed_at": task.completed_at.isoformat()}
-

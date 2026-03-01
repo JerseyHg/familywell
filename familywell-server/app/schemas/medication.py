@@ -48,3 +48,12 @@ class TaskResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ── Suggestion Confirm ──
+class SuggestionConfirmRequest(BaseModel):
+    """用户确认药物建议时提交的补充信息。"""
+    times_per_day: int | None = 1
+    med_type: str | None = "long_term"   # long_term | course | temporary
+    total_days: int | None = None        # 疗程/临时用药的总天数
+    dosage: str | None = None            # 用户可补充/修改剂量

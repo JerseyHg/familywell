@@ -1,6 +1,7 @@
 /**
  * pages/home/home.ts — 首页（完整版）
  * ══════════════════════════════════════════════════════════
+ * ★ 新增：待确认药物建议（MedicationSuggestion）
  * ★ 语音修复：WechatSI 回调用「属性赋值」（manager.onStop = func）
  * ★ 追加模式：多次录音拼接，方便补充说明
  * ★ 后端支持多类型拆分：一段话里的饮食/用药/指标各自保存
@@ -19,6 +20,7 @@ Page({
     aiTip: '',
     recentActivity: [] as any[],
     alertCount: 0,
+    medSuggestions: [] as any[],   // ★ 待确认药物建议
     prompts: [
       { icon: '🍽️', text: '过去7天饮食情况' },
       { icon: '💉', text: '血压最近趋势怎样' },
@@ -89,12 +91,23 @@ Page({
   async loadHomeData() {
     try {
       const res: any = await homeApi.getData()
+
+      // ★ 为 suggestions 添加前端交互状态
+      const suggestions = (res.medication_suggestions || []).map((s: any) => ({
+        ...s,
+        _expanded: false,
+        _times: 1,
+        _medType: 'long_term',
+        _totalDays: 7,
+      }))
+
       this.setData({
         profile: res.profile,
         pendingTasks: res.pending_tasks || [],
         aiTip: res.ai_tip || '',
         recentActivity: res.recent_activity || [],
         alertCount: res.alert_count || 0,
+        medSuggestions: suggestions,
       })
     } catch (err) {
       console.error('Failed to load home data:', err)
@@ -131,6 +144,70 @@ Page({
   },
 
   // ════════════════════════════════════════
+  //  ★ 药物建议：展开 / 确认 / 忽略
+  // ════════════════════════════════════════
+
+  onToggleSuggestion(e: any) {
+    const id = e.currentTarget.dataset.id
+    const list = this.data.medSuggestions
+    const idx = list.findIndex((s: any) => s.id === id)
+    if (idx < 0) return
+    this.setData({ [`medSuggestions[${idx}]._expanded`]: true })
+  },
+
+  onSugTimes(e: any) {
+    const { id, times } = e.currentTarget.dataset
+    const idx = this.data.medSuggestions.findIndex((s: any) => s.id === Number(id))
+    if (idx < 0) return
+    this.setData({ [`medSuggestions[${idx}]._times`]: Number(times) })
+  },
+
+  onSugType(e: any) {
+    const { id, type } = e.currentTarget.dataset
+    const idx = this.data.medSuggestions.findIndex((s: any) => s.id === Number(id))
+    if (idx < 0) return
+    this.setData({ [`medSuggestions[${idx}]._medType`]: type })
+  },
+
+  onSugDays(e: any) {
+    const id = e.currentTarget.dataset.id
+    const idx = this.data.medSuggestions.findIndex((s: any) => s.id === Number(id))
+    if (idx < 0) return
+    this.setData({ [`medSuggestions[${idx}]._totalDays`]: Number(e.detail.value) || 7 })
+  },
+
+  async onConfirmSuggestion(e: any) {
+    const id = e.currentTarget.dataset.id
+    const sug = this.data.medSuggestions.find((s: any) => s.id === Number(id))
+    if (!sug) return
+
+    try {
+      await medsApi.confirmSuggestion(Number(id), {
+        times_per_day: sug._times,
+        med_type: sug._medType,
+        total_days: (sug._medType === 'course' || sug._medType === 'temporary') ? sug._totalDays : null,
+        dosage: sug.dosage,
+      })
+      wx.showToast({ title: `已添加「${sug.name}」`, icon: 'success' })
+      this.loadHomeData()
+    } catch (err: any) {
+      wx.showToast({ title: err.message || '确认失败', icon: 'none' })
+    }
+  },
+
+  async onDismissSuggestion(e: any) {
+    const id = e.currentTarget.dataset.id
+    const sug = this.data.medSuggestions.find((s: any) => s.id === Number(id))
+    try {
+      await medsApi.dismissSuggestion(Number(id))
+      wx.showToast({ title: `已忽略「${sug?.name || '药物'}」`, icon: 'none' })
+      this.loadHomeData()
+    } catch (err: any) {
+      wx.showToast({ title: err.message || '操作失败', icon: 'none' })
+    }
+  },
+
+  // ════════════════════════════════════════
   //  AI 提示词 → 跳转 Chat
   // ════════════════════════════════════════
 
@@ -155,76 +232,8 @@ Page({
   },
 
   // ════════════════════════════════════════
-  //  语音录入（WechatSI 同声传译插件）
-  //  ★ 属性赋值注册回调 + 追加模式
+  //  语音录入（WechatSI）
   // ════════════════════════════════════════
-
-  noop() {},
-
-  _ensureVoiceManager() {
-    if (this._voiceInited) return
-
-    console.log('[Voice] initializing manager...')
-    const manager = plugin.getRecordRecognitionManager()
-    const page = this
-
-    // ★ 属性赋值（不是方法调用！）
-    manager.onStart = function(res: any) {
-      console.log('[Voice] ✅ onStart fired', res)
-    }
-
-    // ★ 追加模式：实时结果拼到 _baseText 后面
-    manager.onRecognize = function(res: any) {
-      console.log('[Voice] onRecognize:', res.result)
-      if (res.result) {
-        page.setData({ voiceText: page._baseText + res.result })
-      }
-    }
-
-    // ★ 追加模式：最终结果确认后更新 _baseText
-    manager.onStop = function(res: any) {
-      console.log('[Voice] onStop, result:', res.result)
-
-      if (page._stopFallbackTimer) {
-        clearTimeout(page._stopFallbackTimer)
-        page._stopFallbackTimer = null
-      }
-      if (page._recordTimer) {
-        clearInterval(page._recordTimer)
-        page._recordTimer = null
-      }
-
-      page.setData({ isRecording: false })
-
-      if (res.result) {
-        const finalText = page._baseText + res.result
-        page.setData({ voiceText: finalText })
-        // ★ 更新基础文本，加分隔符，为下一次追加做准备
-        page._baseText = finalText + '，'
-      } else if (res.retcode !== 0) {
-        console.error('[Voice] recognition failed:', res)
-        wx.showToast({ title: '语音识别失败，请重试', icon: 'none' })
-      }
-    }
-
-    manager.onError = function(res: any) {
-      console.error('[Voice] onError:', res.msg)
-      if (page._stopFallbackTimer) {
-        clearTimeout(page._stopFallbackTimer)
-        page._stopFallbackTimer = null
-      }
-      if (page._recordTimer) {
-        clearInterval(page._recordTimer)
-        page._recordTimer = null
-      }
-      page.setData({ isRecording: false })
-      wx.showToast({ title: '录音出错，请重试', icon: 'none' })
-    }
-
-    this._voiceManager = manager
-    this._voiceInited = true
-    console.log('[Voice] manager initialized ✅')
-  },
 
   onVoiceAdd() {
     this.setData({
@@ -233,191 +242,123 @@ Page({
       isRecording: false,
       recordingDuration: 0,
     })
-    // ★ 打开弹窗时重置 _baseText
     this._baseText = ''
-    this._ensureVoiceManager()
   },
 
   hideVoiceModal() {
     if (this.data.isRecording) {
-      this._doStopRecording()
+      this._voiceManager?.stop?.()
     }
-    this.setData({ showVoiceModal: false, isRecording: false })
-    this._clearAllTimers()
+    this.setData({ showVoiceModal: false })
   },
+
+  noop() {},
 
   onVoiceTextInput(e: any) {
     this.setData({ voiceText: e.detail.value })
-    // ★ 手动编辑也更新 _baseText
-    this._baseText = e.detail.value
   },
 
-  // ── 点击切换录音 ──
+  // ── 录音 ──
   onToggleRecord() {
     if (this.data.isRecording) {
-      this._doStopRecording()
+      this._stopRecording()
     } else {
-      this._doStartRecording()
+      this._startRecording()
     }
   },
 
-  _doStartRecording() {
-    console.log('[Voice] === START FLOW ===')
+  _initVoice() {
+    if (this._voiceInited) return
+    const manager = plugin.getRecordRecognitionManager()
 
-    const doPrivacy = (): Promise<void> => new Promise((resolve) => {
-      if (typeof wx.requirePrivacyAuthorize === 'function') {
-        wx.requirePrivacyAuthorize({
-          success: () => { console.log('[Voice] 1/3 privacy ✅'); resolve() },
-          fail: () => { console.log('[Voice] 1/3 privacy skipped'); resolve() },
-        })
-      } else { resolve() }
-    })
-
-    const doAuthorize = (): Promise<boolean> => new Promise((resolve) => {
-      wx.authorize({
-        scope: 'scope.record',
-        success: () => { console.log('[Voice] 2/3 authorize ✅'); resolve(true) },
-        fail: () => {
-          wx.showModal({
-            title: '需要录音权限',
-            content: '请在设置中允许使用麦克风',
-            confirmText: '去设置',
-            success: (r) => { if (r.confirm) wx.openSetting() },
-          })
-          resolve(false)
-        },
-      })
-    })
-
-    doPrivacy().then(() => doAuthorize()).then((granted) => {
-      if (!granted) return
-
-      console.log('[Voice] 3/3 starting plugin...')
-      this._ensureVoiceManager()
-
-      // ★ 追加模式：不清空 voiceText，保留之前录的内容
-      this.setData({
-        isRecording: true,
-        recordingDuration: 0,
-      })
-
-      this._voiceManager.start({
-        lang: 'zh_CN',
-        duration: 60000,
-      })
-      console.log('[Voice] start() called')
-
-      let seconds = 0
+    manager.onStart = () => {
+      console.log('[Voice] started')
+      this.setData({ isRecording: true, recordingDuration: 0 })
       this._recordTimer = setInterval(() => {
-        seconds++
-        this.setData({ recordingDuration: seconds })
-        if (seconds >= 60) this._doStopRecording()
+        this.setData({ recordingDuration: this.data.recordingDuration + 1 })
       }, 1000)
-    })
-  },
-
-  _doStopRecording() {
-    console.log('[Voice] stopping...')
-    if (!this.data.isRecording) return
-
-    if (this._recordTimer) {
-      clearInterval(this._recordTimer)
-      this._recordTimer = null
     }
 
-    if (this._voiceManager) {
-      this._voiceManager.stop()
-      console.log('[Voice] stop() called')
-    }
-
-    this.setData({ isRecording: false })
-
-    this._stopFallbackTimer = setTimeout(() => {
-      console.warn('[Voice] onStop not fired within 3s')
-      if (!this.data.voiceText) {
-        wx.showToast({ title: '未识别到语音，请重试', icon: 'none' })
+    manager.onRecognize = (res: any) => {
+      if (res.result) {
+        const combined = this._baseText
+          ? this._baseText + '，' + res.result
+          : res.result
+        this.setData({ voiceText: combined })
       }
-      this._stopFallbackTimer = null
-    }, 3000)
+    }
+
+    manager.onStop = (res: any) => {
+      console.log('[Voice] stopped, result:', res.result)
+      clearInterval(this._recordTimer)
+      clearTimeout(this._stopFallbackTimer)
+      this.setData({ isRecording: false })
+
+      if (res.result) {
+        const combined = this._baseText
+          ? this._baseText + '，' + res.result
+          : res.result
+        this.setData({ voiceText: combined })
+        this._baseText = combined
+      }
+    }
+
+    manager.onError = (err: any) => {
+      console.error('[Voice] error:', err)
+      clearInterval(this._recordTimer)
+      clearTimeout(this._stopFallbackTimer)
+      this.setData({ isRecording: false })
+      wx.showToast({ title: '录音失败，请重试', icon: 'none' })
+    }
+
+    this._voiceManager = manager
+    this._voiceInited = true
   },
 
-  _clearAllTimers() {
-    if (this._recordTimer) { clearInterval(this._recordTimer); this._recordTimer = null }
-    if (this._stopFallbackTimer) { clearTimeout(this._stopFallbackTimer); this._stopFallbackTimer = null }
+  _startRecording() {
+    this._initVoice()
+    if (this.data.voiceText && !this._baseText) {
+      this._baseText = this.data.voiceText
+    }
+    this._voiceManager.start({ lang: 'zh_CN' })
+    this._stopFallbackTimer = setTimeout(() => {
+      if (this.data.isRecording) {
+        this._stopRecording()
+      }
+    }, 55000)
   },
 
-  // ── 提交语音/文字内容 ──
+  _stopRecording() {
+    clearTimeout(this._stopFallbackTimer)
+    this._voiceManager?.stop?.()
+  },
+
+  // ── 提交 ──
   async onSubmitVoice() {
     const text = this.data.voiceText.trim()
     if (!text) {
-      wx.showToast({ title: '请先说话或输入内容', icon: 'none' })
+      wx.showToast({ title: '请先录音或输入内容', icon: 'none' })
       return
     }
-
-    if (this.data.isRecording) {
-      this._doStopRecording()
-      await new Promise(resolve => setTimeout(resolve, 800))
-    }
-
     if (this.data.voiceSubmitting) return
     this.setData({ voiceSubmitting: true })
 
-    this.setData({ showVoiceModal: false, voiceText: '' })
-    this._baseText = ''
-
-    const optimistic = {
-      id: `temp_${Date.now()}`,
-      category: 'other',
-      title: text.slice(0, 30) + (text.length > 30 ? '…' : ''),
-      date: `${new Date().getMonth() + 1}/${new Date().getDate()}`,
-      ai_status: 'processing',
-    }
-    this.setData({
-      recentActivity: [optimistic, ...this.data.recentActivity].slice(0, 5),
-    })
-    wx.showToast({ title: '已提交，AI 处理中', icon: 'none', duration: 1500 })
-
     try {
       const res: any = await medsApi.voiceAdd(text)
+      const items = res.items || [res]
 
-      // ★ 后端现在返回 items 数组
-      const items = res.items || []
-      const icons: Record<string, string> = {
-        medication: '💊', food: '🍽️', vitals: '❤️', symptom: '📝',
+      const parts: string[] = []
+      for (const item of items) {
+        if (item.message) parts.push(item.message)
       }
+      const msg = parts.join('\n') || '已记录'
 
-      if (items.length > 1) {
-        const labels = items.map((i: any) => `${icons[i.type] || '✅'}${i.summary}`).join(' ')
-        wx.showToast({ title: labels.slice(0, 40), icon: 'none', duration: 2500 })
-      } else if (items.length === 1) {
-        const item = items[0]
-        wx.showToast({
-          title: `${icons[item.type] || '✅'} ${item.summary || '记录成功'}`,
-          icon: 'none', duration: 2000,
-        })
-      } else {
-        wx.showToast({ title: '✅ 记录成功', icon: 'none', duration: 2000 })
-      }
-
-      // ★ 立即更新乐观条目状态（不等 loadHomeData）
-      const updated = this.data.recentActivity.map((item: any) =>
-        item.id === optimistic.id
-          ? { ...item, ai_status: 'completed' }
-          : item
-      )
-      this.setData({ recentActivity: updated })
-
-      // 再从后端刷新完整数据
-      await this.loadHomeData()
-    } catch (e) {
-      const updated = this.data.recentActivity.map((item: any) =>
-        item.id === optimistic.id
-          ? { ...item, ai_status: 'failed', _voiceText: text }
-          : item
-      )
-      this.setData({ recentActivity: updated })
-      wx.showToast({ title: '处理失败，点击重试', icon: 'none' })
-      console.error('Voice add failed:', e)
+      wx.showToast({ title: msg.slice(0, 20), icon: 'success', duration: 2000 })
+      this.setData({ showVoiceModal: false, voiceText: '' })
+      this._baseText = ''
+      this.loadHomeData()
+    } catch (err: any) {
+      wx.showToast({ title: err.message || '记录失败', icon: 'none' })
     } finally {
       this.setData({ voiceSubmitting: false })
     }
@@ -425,8 +366,9 @@ Page({
 
   onRetryVoice(e: any) {
     const text = e.currentTarget.dataset.text
-    if (!text) return
-    this.setData({ voiceText: text })
-    this.onSubmitVoice()
+    if (text) {
+      this.setData({ showVoiceModal: true, voiceText: text })
+      this._baseText = ''
+    }
   },
 })

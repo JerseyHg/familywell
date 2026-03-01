@@ -1,3 +1,9 @@
+"""
+app/routers/home.py — 首页聚合接口
+──────────────────────────────────
+★ 修复：nickname 优先使用 profile.real_name
+★ 新增：返回 medication_suggestions（待确认药物建议）
+"""
 from datetime import date
 from fastapi import APIRouter, Depends
 from sqlalchemy import select, func, or_
@@ -7,7 +13,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.models.user import User, UserProfile
 from app.models.record import Record
-from app.models.medication import MedicationTask
+from app.models.medication import MedicationTask, MedicationSuggestion
 from app.models.reminder import Reminder
 from app.schemas.common import HomeResponse
 from app.utils.deps import get_current_user
@@ -24,14 +30,19 @@ async def get_home_data(
     """Simplified homepage data for v2 chat-centric design."""
     today = date.today()
 
-    # 1. Profile summary
+    # 1. Profile summary — ★ 优先使用 real_name
     profile_result = await db.execute(
         select(UserProfile).where(UserProfile.user_id == user.id)
     )
     profile = profile_result.scalar_one_or_none()
 
+    # 取名字优先级：real_name > nickname > "我"
+    display_name = user.nickname or "我"
+    if profile and profile.real_name:
+        display_name = profile.real_name
+
     profile_data = {
-        "nickname": user.nickname,
+        "nickname": display_name,
         "age": None,
         "tags": [],
     }
@@ -99,10 +110,31 @@ async def get_home_data(
     )
     alert_count = alert_result.scalar() or 0
 
+    # 6. ★ 待确认药物建议
+    suggestions_result = await db.execute(
+        select(MedicationSuggestion)
+        .where(
+            MedicationSuggestion.user_id == user.id,
+            MedicationSuggestion.status == "pending",
+        )
+        .order_by(MedicationSuggestion.created_at.desc())
+        .limit(10)
+    )
+    suggestions = suggestions_result.scalars().all()
+
+    medication_suggestions = [{
+        "id": s.id,
+        "name": s.name,
+        "dosage": s.dosage,
+        "frequency": s.frequency,
+        "created_at": s.created_at.strftime("%m/%d") if s.created_at else None,
+    } for s in suggestions]
+
     return HomeResponse(
         profile=profile_data,
         pending_tasks=pending_tasks,
         ai_tip=ai_tip if ai_tip else None,
         recent_activity=recent_activity,
         alert_count=alert_count,
+        medication_suggestions=medication_suggestions,
     )

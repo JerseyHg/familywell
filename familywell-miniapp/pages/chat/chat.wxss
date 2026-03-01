@@ -1,6 +1,9 @@
 /* ══════════════════════════════
    FamilyWell — Chat Page Styles
-   ══════════════════════════════ */
+   ═══════════════════════════════
+   ★ 修复：input-bar 位置不再和 TabBar 重叠（Problem 4）
+   ★ 修复：followup 提示词改为 wrap 多排（Problem 5）
+*/
 
 page { background: var(--bg); height: 100vh; overflow: hidden; }
 
@@ -8,10 +11,9 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
   display: flex;
   flex-direction: column;
   height: 100vh;
-  /* ✅ 为底部自定义 TabBar 留出空间 */
-  padding-bottom: calc(env(safe-area-inset-bottom) + 100rpx);
+  /* ★ 修复 Problem 4：为底部自定义 TabBar 留出精确空间 */
+  padding-bottom: calc(env(safe-area-inset-bottom) + 120rpx);
   box-sizing: border-box;
-  /* ✅ 防止子元素溢出 */
   overflow: hidden;
   width: 100vw;
 }
@@ -34,8 +36,6 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 }
 
 /* ── Message Area ── */
-/* ✅ 修复：scroll-view 不加左右 padding（会导致内容溢出），
-   改为在子元素 .msg-row 上加 padding */
 .message-area {
   flex: 1;
   padding: 20rpx 0;
@@ -46,7 +46,6 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 .scroll-bottom { height: 20rpx; }
 
 /* ── Message Rows ── */
-/* ✅ 修复：padding 加在每行上，而不是 scroll-view 上，避免溢出 */
 .msg-row {
   margin-bottom: 16rpx;
   padding: 0 32rpx;
@@ -76,7 +75,6 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
   font-size: 24rpx; flex-shrink: 0;
 }
 .ai-bubble-group {
-  /* ✅ 修复：限制最大宽度，防止溢出 */
   max-width: calc(100% - 72rpx);
   min-width: 0;
   display: flex; flex-direction: column; gap: 12rpx;
@@ -137,57 +135,134 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
   50% { opacity: 1; transform: scale(1.3); }
 }
 
-/* ══════════════════════════════
-   CHART CARDS
-   ══════════════════════════════ */
+/* ═══════════════════════════════════════════
+   ★ Follow-up Prompts — wrap 多排布局（Problem 5）
+   ═══════════════════════════════════════════ */
+.followup-area {
+  padding: 12rpx 32rpx 8rpx;
+}
+/* 改为 flex-wrap，不再用 scroll-view 横向滚动 */
+.followup-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+.followup-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 14rpx 24rpx;
+  border-radius: 36rpx;
+  background: var(--card);
+  border: 1rpx solid var(--border);
+  font-size: 22rpx;
+  color: var(--sub);
+  box-shadow: 0 2rpx 4rpx rgba(0,0,0,0.04);
+  white-space: nowrap;
+}
 
+/* ═══════════════════════════════════════════
+   ★ Input Bar（Problem 4 修复位置）
+   ═══════════════════════════════════════════ */
+.input-bar {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 16rpx 32rpx;
+  /* ★ 加底部安全距离，避免和 TabBar 重叠 */
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  background: var(--card);
+  border-top: 1rpx solid var(--border);
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.input-wrap {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  border-radius: 44rpx;
+  padding: 20rpx 32rpx;
+  border: 1rpx solid var(--border);
+}
+.input-field { font-size: 28rpx; color: var(--text); width: 100%; }
+.send-btn {
+  width: 80rpx; height: 80rpx; border-radius: 40rpx;
+  background: var(--border);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+.send-btn.active { background: var(--primary); }
+.send-arrow { color: #fff; font-size: 32rpx; font-weight: 700; }
+
+/* ═══════════════════════════════════════════
+   Charts
+   ═══════════════════════════════════════════ */
 .chart-card {
   background: var(--card);
-  border-radius: 32rpx;
-  padding: 28rpx 32rpx;
-  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.06);
+  border-radius: 24rpx;
+  padding: 24rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.06);
 }
 .chart-header {
-  display: flex; align-items: center; gap: 12rpx;
-  margin-bottom: 20rpx;
+  display: flex; align-items: center; gap: 12rpx; margin-bottom: 16rpx;
 }
 .chart-icon { font-size: 28rpx; }
 .chart-title { font-size: 26rpx; font-weight: 700; color: var(--text); }
+.chart-body { padding: 0; }
 
-/* ── Bar Chart Shared ── */
-.bar-row {
-  display: flex; align-items: flex-end; justify-content: space-around;
-  height: 180rpx; margin-bottom: 12rpx;
+/* ── Pie Chart ── */
+.pie-wrapper {
+  display: flex; align-items: center; justify-content: center;
+  position: relative; margin: 16rpx 0 24rpx;
 }
-.bar-row.compact { height: 120rpx; }
-.bar-col { display: flex; flex-direction: column; align-items: center; gap: 6rpx; flex: 1; }
-.bar-stack { display: flex; flex-direction: column-reverse; align-items: center; }
-.dual-bars { display: flex; align-items: flex-end; gap: 4rpx; }
-.bar-seg { width: 28rpx; border-radius: 8rpx 8rpx 0 0; min-height: 4rpx; }
-.bar-seg.single { width: 32rpx; border-radius: 8rpx 8rpx 0 0; }
+.pie-chart {
+  width: 200rpx; height: 200rpx; border-radius: 50%;
+}
+.pie-center {
+  position: absolute;
+  width: 120rpx; height: 120rpx; border-radius: 50%;
+  background: var(--card);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.pie-cal { font-size: 32rpx; font-weight: 700; color: var(--text); }
+.pie-cal-unit { font-size: 18rpx; color: var(--muted); }
+.pie-legend { display: flex; justify-content: center; gap: 32rpx; margin-bottom: 16rpx; }
+.pie-legend-item { display: flex; align-items: center; gap: 8rpx; }
+.pie-legend-dot { width: 16rpx; height: 16rpx; border-radius: 4rpx; }
+.pie-legend-name { font-size: 22rpx; color: var(--sub); }
+.pie-legend-val { font-size: 22rpx; font-weight: 600; color: var(--text); }
+.pie-footer { text-align: center; }
+.pf-item { display: inline-block; font-size: 22rpx; color: var(--sub); margin: 0 16rpx; }
+
+/* ── Blood Pressure ── */
+.bp-latest { text-align: center; margin-bottom: 16rpx; }
+.bp-val { font-size: 48rpx; font-weight: 800; color: var(--text); }
+.bp-unit { font-size: 22rpx; color: var(--muted); margin-left: 8rpx; }
+.line-bars { display: flex; align-items: flex-end; justify-content: space-around; height: 200rpx; padding: 0 16rpx; }
+.bar-group { display: flex; flex-direction: column; align-items: center; gap: 8rpx; }
+.bar-pair { display: flex; gap: 4rpx; align-items: flex-end; }
+.bar { width: 12rpx; border-radius: 6rpx; min-height: 4rpx; }
+.bar-single { width: 20rpx; border-radius: 10rpx; min-height: 4rpx; }
 .bar-label { font-size: 18rpx; color: var(--muted); }
 
-/* ── Chart Legend ── */
-.chart-legend { display: flex; justify-content: center; gap: 24rpx; margin-top: 12rpx; }
-.legend-item { display: flex; align-items: center; gap: 8rpx; font-size: 20rpx; color: var(--sub); }
-.legend-dot { width: 16rpx; height: 16rpx; border-radius: 4rpx; }
-
-/* ── Chart Stats ── */
-.chart-stat { display: flex; align-items: baseline; gap: 8rpx; margin-top: 16rpx; }
-.stat-big { font-size: 40rpx; font-weight: 700; color: var(--text); }
-.stat-unit { font-size: 22rpx; color: var(--sub); }
-.stat-change { font-size: 22rpx; font-weight: 600; margin-left: 12rpx; }
-.stat-change.up { color: #E85D3A; }
-.stat-change.down { color: #2D8B6F; }
-
-/* ── Adherence Chart ── */
-.adherence-summary { display: flex; align-items: center; gap: 24rpx; margin-bottom: 16rpx; }
-.adherence-ring {
-  width: 100rpx; height: 100rpx; border-radius: 50%;
+/* ── Adherence ── */
+.adh-ring-row { display: flex; align-items: center; gap: 24rpx; margin-bottom: 20rpx; }
+.adh-ring {
+  width: 120rpx; height: 120rpx; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 28rpx; font-weight: 700;
+  flex-shrink: 0;
 }
-.adherence-detail { font-size: 24rpx; color: var(--sub); line-height: 1.8; }
+.adh-ring-center {
+  width: 80rpx; height: 80rpx; border-radius: 50%;
+  background: var(--card);
+  display: flex; align-items: center; justify-content: center;
+}
+.adh-pct { font-size: 24rpx; font-weight: 700; color: var(--primary); }
+.adh-stats { display: flex; flex-direction: column; gap: 8rpx; }
+.adh-stat { font-size: 24rpx; color: var(--sub); line-height: 1.8; }
+.med-list { margin-top: 12rpx; }
 .med-item { display: flex; align-items: center; gap: 12rpx; margin-bottom: 12rpx; }
 .med-name { font-size: 24rpx; color: var(--text); width: 160rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .med-bar-bg { flex: 1; height: 16rpx; background: var(--bg); border-radius: 8rpx; overflow: hidden; }
@@ -222,69 +297,3 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 }
 .tip-icon { font-size: 22rpx; flex-shrink: 0; }
 .tip-text { font-size: 22rpx; color: var(--sub); line-height: 1.5; }
-
-/* ── Follow-up Prompts ── */
-.followup-area { padding: 12rpx 32rpx; }
-.followup-scroll { white-space: nowrap; }
-.followup-chip {
-  display: inline-flex; align-items: center; gap: 8rpx;
-  padding: 14rpx 28rpx; border-radius: 36rpx;
-  background: var(--card); border: 1rpx solid var(--border);
-  font-size: 22rpx; color: var(--sub);
-  margin-right: 12rpx;
-  box-shadow: 0 2rpx 4rpx rgba(0,0,0,0.04);
-}
-
-/* ── Input Bar ── */
-.input-bar {
-  display: flex; align-items: center; gap: 16rpx;
-  padding: 16rpx 32rpx 16rpx;
-  background: var(--card);
-  border-top: 1rpx solid var(--border);
-  flex-shrink: 0;
-  width: 100%;
-  box-sizing: border-box;
-}
-.input-wrap {
-  flex: 1;
-  min-width: 0;
-  background: var(--bg);
-  border-radius: 44rpx;
-  padding: 20rpx 32rpx;
-  border: 1rpx solid var(--border);
-}
-.input-field { font-size: 28rpx; color: var(--text); width: 100%; }
-.send-btn {
-  width: 80rpx; height: 80rpx; border-radius: 40rpx;
-  background: var(--border);
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  transition: background 0.2s;
-}
-.send-btn.active { background: var(--primary); }
-.send-arrow { color: #fff; font-size: 32rpx; font-weight: 700; }
-
-/* ── Pie Chart ── */
-.pie-wrapper {
-  display: flex; align-items: center; justify-content: center;
-  position: relative; margin: 16rpx 0 24rpx;
-}
-.pie-chart {
-  width: 200rpx; height: 200rpx; border-radius: 50%;
-  background: conic-gradient(#2D8B6F 0% 33%, #F5A623 33% 55%, #E85D3A 55% 100%);
-}
-.pie-center {
-  position: absolute;
-  width: 120rpx; height: 120rpx; border-radius: 50%;
-  background: var(--card);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-}
-.pie-cal { font-size: 32rpx; font-weight: 700; color: var(--text); }
-.pie-cal-unit { font-size: 18rpx; color: var(--muted); }
-.pie-legend { display: flex; justify-content: center; gap: 32rpx; margin-bottom: 16rpx; }
-.pie-legend-item { display: flex; align-items: center; gap: 8rpx; }
-.pie-legend-dot { width: 16rpx; height: 16rpx; border-radius: 4rpx; }
-.pie-legend-name { font-size: 22rpx; color: var(--sub); }
-.pie-legend-val { font-size: 22rpx; font-weight: 600; color: var(--text); }
-.pie-footer { text-align: center; }
-.pf-item { display: inline-block; font-size: 22rpx; color: var(--sub); margin: 0 16rpx; }

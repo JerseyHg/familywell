@@ -1,8 +1,7 @@
 /**
  * services/api.ts — API 请求封装
  * ─────────────────────────────────
- * [P1-1] recordsApi 新增 update, confirmPrescription
- * [P1-2] authApi 新增 wxLogin
+ * ★ medsApi 新增 confirmSuggestion / dismissSuggestion
  * ★ chatApi 补全 stream / send 方法
  */
 
@@ -188,6 +187,18 @@ export const medsApi = {
 
   voiceAdd: (text: string) =>
     request({ url: '/medications/voice-add', method: 'POST', data: { text } }),
+
+  // ★ 药物建议：确认 / 忽略
+  confirmSuggestion: (id: number, data: {
+    times_per_day?: number;
+    med_type?: string;
+    total_days?: number | null;
+    dosage?: string | null;
+  }) =>
+    request({ url: `/medications/suggestions/${id}/confirm`, method: 'POST', data }),
+
+  dismissSuggestion: (id: number) =>
+    request({ url: `/medications/suggestions/${id}/dismiss`, method: 'POST' }),
 }
 
 // ─── Stats ───
@@ -212,7 +223,6 @@ export const familyApi = {
 
   getMyFamily: () => request({ url: '/families/mine' }),
 
-  // settings.ts 用的是 mine()，加别名兼容
   mine: () => request({ url: '/families/mine' }),
 
   join: (inviteCode: string) =>
@@ -221,11 +231,9 @@ export const familyApi = {
   overview: (familyId: number) =>
     request({ url: `/families/${familyId}/overview` }),
 
-  // settings.ts 需要加载家庭成员列表
   members: (familyId: number) =>
     request({ url: `/families/${familyId}/members` }),
 
-  // settings.ts 需要移除成员
   removeMember: (familyId: number, userId: number) =>
     request({ url: `/families/${familyId}/members/${userId}`, method: 'DELETE' }),
 }
@@ -269,8 +277,8 @@ export const chatApi = {
    */
   stream(params: ChatParams, callbacks: ChatStreamCallbacks) {
     const token = getToken()
-    let fullReceived = ''    // 累积收到的全部文本
-    let processedLen = 0     // 已解析到的位置
+    let fullReceived = ''
+    let processedLen = 0
 
     const task = wx.request({
       url: `${BASE_URL}/chat/stream`,
@@ -284,7 +292,6 @@ export const chatApi = {
       responseType: 'text',
 
       success(res) {
-        // 全部接收完后做一次完整解析（兜底）
         if (typeof res.data === 'string') {
           _parseAllSSELines(res.data, callbacks)
         }
@@ -302,11 +309,9 @@ export const chatApi = {
           const chunk = _arrayBufferToString(resp.data)
           fullReceived += chunk
 
-          // 只解析新到达的部分
           const unprocessed = fullReceived.slice(processedLen)
           const lines = unprocessed.split('\n')
 
-          // 最后一行可能不完整，保留到下次
           for (let i = 0; i < lines.length - 1; i++) {
             const line = lines[i].trim()
             processedLen += lines[i].length + 1
@@ -345,13 +350,10 @@ export const chatApi = {
 
 // ─── SSE 解析辅助函数 ───
 
-/** ArrayBuffer → UTF-8 字符串 */
 function _arrayBufferToString(buf: ArrayBuffer): string {
-  // 优先用 TextDecoder（较新的基础库支持）
   if (typeof TextDecoder !== 'undefined') {
     return new TextDecoder('utf-8').decode(buf)
   }
-  // 兜底：逐字节拼接
   const bytes = new Uint8Array(buf)
   let str = ''
   for (let i = 0; i < bytes.length; i++) {
@@ -364,7 +366,6 @@ function _arrayBufferToString(buf: ArrayBuffer): string {
   }
 }
 
-/** 兜底：对完整的 SSE 文本做一次全量解析 */
 function _parseAllSSELines(fullData: string, callbacks: ChatStreamCallbacks) {
   const lines = fullData.split('\n')
   for (const line of lines) {
@@ -385,7 +386,6 @@ function _handleSSEEvent(evt: any, callbacks: ChatStreamCallbacks) {
       callbacks.onCharts?.(evt.charts || [])
       break
     case 'sources':
-      // sources 暂不需要回调，可扩展
       break
     case 'text':
       callbacks.onText?.(evt.content || '')

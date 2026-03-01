@@ -1,6 +1,12 @@
+"""
+app/models/medication.py — 用药管理模型
+──────────────────────────────────────────
+★ 新增 MedicationSuggestion 表：语音识别到新药物时，先创建待确认建议，
+  用户在首页确认后才创建真正的 Medication + Task。
+"""
 from datetime import datetime, date, time
 from sqlalchemy import (
-    BigInteger, String, Boolean, Integer, DateTime, Date, Time, JSON,
+    BigInteger, String, Boolean, Integer, DateTime, Date, Time, JSON, Text,
     ForeignKey, Index, UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -62,6 +68,42 @@ class MedicationTask(Base):
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
 
+    medication_name: Mapped[str | None] = mapped_column(String(100))
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     medication: Mapped["Medication"] = relationship(back_populates="tasks")
+
+
+class MedicationSuggestion(Base):
+    """
+    语音识别到的新药物建议。
+    用户确认后才创建真正的 Medication + Task，避免产生垃圾数据。
+    """
+    __tablename__ = "medication_suggestion"
+    __table_args__ = (
+        Index("idx_medsug_user_status", "user_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("user.id"), nullable=False
+    )
+    record_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("record.id")
+    )
+
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    dosage: Mapped[str | None] = mapped_column(String(50))
+    frequency: Mapped[str | None] = mapped_column(String(50))
+    ai_raw: Mapped[dict | None] = mapped_column(JSON)
+    source_text: Mapped[str | None] = mapped_column(Text)
+
+    # pending = 待确认, confirmed = 已确认, dismissed = 已忽略
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    medication_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("medication.id")
+    )

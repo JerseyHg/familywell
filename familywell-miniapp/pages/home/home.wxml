@@ -1,4 +1,7 @@
-<!-- pages/home/home.wxml — 首页（完整版） -->
+<!-- pages/home/home.wxml — 首页（完整版）
+  ★ 新增：待确认药物建议区域
+  ★ 修复：medication_log 分类图标
+-->
 
 <!-- ── Greeting ── -->
 <view class="safe-top" />
@@ -89,8 +92,54 @@
   <text class="atb-text">{{aiTip}}</text>
 </view>
 
+<!-- ══════════════════════════════════════════
+     ★ 待确认药物建议
+     ══════════════════════════════════════════ -->
+<view class="suggestion-section" wx:if="{{medSuggestions.length > 0}}">
+  <view class="suggestion-header">
+    <text class="suggestion-title">💊 发现新药物，需要你确认</text>
+  </view>
+  <view class="suggestion-card" wx:for="{{medSuggestions}}" wx:key="id">
+    <view class="sug-info">
+      <text class="sug-name">{{item.name}}</text>
+      <text class="sug-detail" wx:if="{{item.dosage}}">{{item.dosage}}</text>
+      <text class="sug-source">来源：{{item.created_at}} 语音记录</text>
+    </view>
+
+    <!-- 确认表单（展开时显示） -->
+    <view class="sug-form" wx:if="{{item._expanded}}">
+      <view class="sug-form-row">
+        <text class="sfr-label">每天几次</text>
+        <view class="sfr-options">
+          <view class="sfr-opt {{item._times === 1 ? 'active' : ''}}" data-id="{{item.id}}" data-times="1" bindtap="onSugTimes">1次</view>
+          <view class="sfr-opt {{item._times === 2 ? 'active' : ''}}" data-id="{{item.id}}" data-times="2" bindtap="onSugTimes">2次</view>
+          <view class="sfr-opt {{item._times === 3 ? 'active' : ''}}" data-id="{{item.id}}" data-times="3" bindtap="onSugTimes">3次</view>
+        </view>
+      </view>
+      <view class="sug-form-row">
+        <text class="sfr-label">用药类型</text>
+        <view class="sfr-options">
+          <view class="sfr-opt {{item._medType === 'long_term' ? 'active' : ''}}" data-id="{{item.id}}" data-type="long_term" bindtap="onSugType">长期</view>
+          <view class="sfr-opt {{item._medType === 'course' ? 'active' : ''}}" data-id="{{item.id}}" data-type="course" bindtap="onSugType">疗程</view>
+          <view class="sfr-opt {{item._medType === 'temporary' ? 'active' : ''}}" data-id="{{item.id}}" data-type="temporary" bindtap="onSugType">临时</view>
+        </view>
+      </view>
+      <view class="sug-form-row" wx:if="{{item._medType === 'course' || item._medType === 'temporary'}}">
+        <text class="sfr-label">共几天</text>
+        <input class="sfr-input" type="number" placeholder="天数" value="{{item._totalDays}}" data-id="{{item.id}}" bindinput="onSugDays" />
+      </view>
+    </view>
+
+    <view class="sug-actions">
+      <view class="sug-btn dismiss" data-id="{{item.id}}" bindtap="onDismissSuggestion">忽略</view>
+      <view class="sug-btn expand" data-id="{{item.id}}" bindtap="onToggleSuggestion" wx:if="{{!item._expanded}}">设置并添加</view>
+      <view class="sug-btn confirm" data-id="{{item.id}}" bindtap="onConfirmSuggestion" wx:if="{{item._expanded}}">确认添加</view>
+    </view>
+  </view>
+</view>
+
 <!-- ── 一切顺利 ── -->
-<view class="ok-bar" wx:if="{{!pendingTasks.length && !alertCount}}">
+<view class="ok-bar" wx:if="{{!pendingTasks.length && !alertCount && !medSuggestions.length}}">
   <text class="ok-icon">✅</text>
   <text class="ok-text">今日一切顺利，没有待处理事项</text>
 </view>
@@ -131,7 +180,7 @@
     bindtap="{{item.ai_status === 'failed' ? 'onRetryVoice' : 'onActivityTap'}}"
   >
     <text class="activity-icon">
-      {{item.category === 'lab' ? '🔬' : item.category === 'prescription' ? '📝' : item.category === 'checkup' ? '📊' : item.category === 'insurance' ? '🛡️' : item.category === 'food' ? '🍽️' : item.category === 'bp_reading' ? '❤️' : item.category === 'visit' ? '🏥' : '📄'}}
+      {{item.category === 'lab' ? '🔬' : item.category === 'prescription' ? '📝' : item.category === 'checkup' ? '📊' : item.category === 'insurance' ? '🛡️' : item.category === 'food' ? '🍽️' : item.category === 'bp_reading' ? '❤️' : item.category === 'visit' ? '🏥' : item.category === 'medication_log' ? '💊' : '📄'}}
     </text>
     <view class="activity-info">
       <text class="activity-title">{{item.title}}</text>
