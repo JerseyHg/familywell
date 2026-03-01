@@ -84,15 +84,19 @@
 <!-- ── Recent Activity ── -->
 <view class="section-label" wx:if="{{recentActivity.length}}">最近动态</view>
 <view class="activity-list">
-  <view class="activity-item" wx:for="{{recentActivity}}" wx:key="id">
+  <view class="activity-item" wx:for="{{recentActivity}}" wx:key="id"
+    data-text="{{item._voiceText}}"
+    bindtap="{{item.ai_status === 'failed' ? 'onRetryVoice' : ''}}">
     <text class="activity-icon">
-      {{item.category === 'lab' ? '🔬' : item.category === 'prescription' ? '📝' : item.category === 'checkup' ? '📊' : item.category === 'insurance' ? '🛡️' : item.category === 'food' ? '🍽️' : '📄'}}
+      {{item.category === 'lab' ? '🔬' : item.category === 'prescription' ? '📝' : item.category === 'checkup' ? '📊' : item.category === 'insurance' ? '🛡️' : item.category === 'food' ? '🍽️' : item.category === 'bp_reading' ? '❤️' : item.category === 'visit' ? '🏥' : '📄'}}
     </text>
     <view class="activity-info">
       <text class="activity-title">{{item.title}}</text>
       <text class="activity-date">{{item.date}}</text>
     </view>
-    <view class="activity-tag">AI已识别</view>
+    <view class="activity-tag {{item.ai_status === 'processing' ? 'processing' : item.ai_status === 'failed' ? 'failed' : 'done'}}">
+      {{item.ai_status === 'processing' ? '处理中…' : item.ai_status === 'failed' ? '失败 · 重试' : 'AI已识别'}}
+    </view>
   </view>
 </view>
 

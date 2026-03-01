@@ -1,6 +1,6 @@
 from datetime import date
 from fastapi import APIRouter, Depends
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -68,20 +68,28 @@ async def get_home_data(
     except Exception:
         ai_tip = None
 
-    # 4. Recent activity (last 3 completed records)
+    # 4. Recent activity (last 5 records, including processing/failed)
     records_result = await db.execute(
         select(Record)
-        .where(Record.user_id == user.id, Record.ai_status == "completed")
+        .where(
+            Record.user_id == user.id,
+            or_(
+                Record.ai_status == "completed",
+                Record.ai_status == "processing",
+                Record.ai_status == "failed",
+            ),
+        )
         .order_by(Record.created_at.desc())
-        .limit(3)
+        .limit(5)
     )
     records = records_result.scalars().all()
 
     recent_activity = [{
         "id": r.id,
         "category": r.category,
-        "title": r.title or "识别中",
+        "title": r.title or "处理中…",
         "date": r.created_at.strftime("%m/%d"),
+        "ai_status": r.ai_status,
     } for r in records]
 
     # 5. Unresolved alert count

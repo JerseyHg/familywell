@@ -176,6 +176,20 @@ page { background: var(--bg); }
 .activity-date { display: block; font-size: 22rpx; color: var(--muted); margin-top: 2rpx; }
 .activity-tag {
   padding: 4rpx 16rpx; border-radius: 12rpx;
-  background: var(--primary-light); color: var(--primary);
   font-size: 20rpx; font-weight: 600;
+  flex-shrink: 0;
+}
+.activity-tag.done {
+  background: var(--primary-light); color: var(--primary);
+}
+.activity-tag.processing {
+  background: #E8F0FE; color: #3B7DD8;
+  animation: tagPulse 1.5s ease-in-out infinite;
+}
+.activity-tag.failed {
+  background: #FEE8E8; color: #E85D3A;
+}
+@keyframes tagPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }

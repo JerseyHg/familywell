@@ -131,39 +131,53 @@ Page({
       return
     }
 
+    // 防重复提交
+    if (this.data.voiceSubmitting) return
     this.setData({ voiceSubmitting: true })
+
+    // ★ 立即关闭弹窗
+    this.setData({ showVoiceModal: false, voiceText: '' })
+
+    // ★ 乐观更新：先在最近动态里插一条"处理中"
+    const optimistic = {
+      id: `temp_${Date.now()}`,
+      category: 'other',
+      title: text.slice(0, 30) + (text.length > 30 ? '…' : ''),
+      date: `${new Date().getMonth() + 1}/${new Date().getDate()}`,
+      ai_status: 'processing',
+    }
+    this.setData({
+      recentActivity: [optimistic, ...this.data.recentActivity].slice(0, 5),
+    })
+    wx.showToast({ title: '已提交，AI 处理中', icon: 'none', duration: 1500 })
+
+    // 后台处理
     try {
       const res: any = await medsApi.voiceAdd(text)
-      this.setData({ voiceSubmitting: false, showVoiceModal: false })
 
-      // 根据 AI 判断的类型显示不同提示
+      // 成功 → 轻提示 + 刷新真实数据
       const type = res.type || 'unknown'
-      let title = '已记录'
-      let content = res.message || res.summary || '记录成功'
-
-      if (type === 'medication') {
-        const names = (res.medications || []).map((m: any) => m.name).join('、')
-        title = `💊 已添加 ${(res.medications || []).length} 个药物`
-        content = names ? `${names}\n今日服药提醒已生成` : content
-      } else if (type === 'food') {
-        const items = (res.nutrition?.food_items || []).join('、')
-        const cal = res.nutrition?.calories
-        title = '🍽️ 饮食已记录'
-        content = items + (cal ? `\n约 ${cal} 千卡` : '')
-      } else if (type === 'vitals') {
-        const inds = (res.indicators || []).map((i: any) => `${i.type}: ${i.value}${i.unit || ''}`).join('\n')
-        title = '❤️ 指标已记录'
-        content = inds || content
-      } else if (type === 'symptom') {
-        title = '📝 症状已记录'
-      }
-
-      wx.showModal({ title, content, showCancel: false })
-
+      const icons: Record<string, string> = { medication: '💊', food: '🍽️', vitals: '❤️', symptom: '📝' }
+      wx.showToast({ title: `${icons[type] || '✅'} ${res.summary || '记录成功'}`, icon: 'none', duration: 2000 })
       this.loadHomeData()
     } catch (e) {
-      this.setData({ voiceSubmitting: false })
+      // 失败 → 更新状态为 failed
+      const updated = this.data.recentActivity.map((item: any) =>
+        item.id === optimistic.id ? { ...item, ai_status: 'failed', _voiceText: text } : item
+      )
+      this.setData({ recentActivity: updated })
+      wx.showToast({ title: '处理失败，点击重试', icon: 'none' })
       console.error('Voice add failed:', e)
+    } finally {
+      this.setData({ voiceSubmitting: false })
     }
+  },
+
+  /** 重试失败的语音记录 */
+  onRetryVoice(e: any) {
+    const text = e.currentTarget.dataset.text
+    if (!text) return
+    this.setData({ voiceText: text })
+    this.onSubmitVoice()
   },
 })
