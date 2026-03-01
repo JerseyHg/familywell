@@ -1,4 +1,4 @@
-<!-- pages/home/home.wxml — 首页（完整版，含语音录入改造 + 记录跳转） -->
+<!-- pages/home/home.wxml — 首页（完整版） -->
 
 <!-- ── Greeting ── -->
 <view class="safe-top" />
@@ -25,7 +25,7 @@
   </view>
 </view>
 
-<!-- ── 语音输入弹窗（WechatSI 改造版） ── -->
+<!-- ── 语音输入弹窗 ── -->
 <view class="modal-mask" wx:if="{{showVoiceModal}}" bindtap="hideVoiceModal">
   <view class="voice-modal" catchtap="noop">
     <view class="vm-header">
@@ -33,18 +33,18 @@
       <view class="vm-close" bindtap="hideVoiceModal">✕</view>
     </view>
     <view class="vm-body">
-      <text class="vm-hint">说说你的情况，AI 会自动识别并记录</text>
+      <text class="vm-hint">说说你的情况，AI 会自动识别并分类记录</text>
       <text class="vm-example">💊 用药："医生开了氨氯地平5mg，每天一次长期吃"
 🍽️ 饮食："中午吃了一碗米饭、红烧鱼、炒青菜"
 ❤️ 指标："今天血压 135/85，心率 72"
-📝 症状："最近头疼，晚上睡不好"</text>
+📝 症状："最近头疼，晚上睡不好"
+🔀 混合："吃了米饭和鱼，顺便把降压药吃了"</text>
 
       <!-- 录音状态指示 -->
       <view class="vm-record-area">
-        <!-- 未录音 / 录音完成 → 显示文本框 -->
         <textarea
           class="vm-textarea"
-          placeholder="点击下方按钮录音，或直接输入文字..."
+          placeholder="点击下方按钮录音，或直接输入文字...&#10;可多次录音，内容会自动追加"
           value="{{voiceText}}"
           bindinput="onVoiceTextInput"
           maxlength="500"
@@ -68,12 +68,10 @@
         <!-- 录音按钮 -->
         <view
           class="vm-record-btn {{isRecording ? 'recording' : ''}}"
-          bindtouchstart="onRecordStart"
-          bindtouchend="onRecordStop"
-          bindtouchcancel="onRecordStop"
+          catchtap="onToggleRecord"
         >
           <text class="record-icon">{{isRecording ? '⏹' : '🎙️'}}</text>
-          <text class="record-label">{{isRecording ? '松开结束' : '按住说话'}}</text>
+          <text class="record-label">{{isRecording ? '点击结束' : (voiceText ? '继续补充' : '点击录音')}}</text>
         </view>
 
         <!-- 提交按钮 -->
@@ -85,13 +83,13 @@
   </view>
 </view>
 
-<!-- ── AI 温馨提示（简短一行） ── -->
+<!-- ── AI 温馨提示 ── -->
 <view class="ai-tip-bar" wx:if="{{aiTip}}">
   <text class="atb-icon">🌿</text>
   <text class="atb-text">{{aiTip}}</text>
 </view>
 
-<!-- ── 一切顺利（无待办时的保底卡） ── -->
+<!-- ── 一切顺利 ── -->
 <view class="ok-bar" wx:if="{{!pendingTasks.length && !alertCount}}">
   <text class="ok-icon">✅</text>
   <text class="ok-text">今日一切顺利，没有待处理事项</text>

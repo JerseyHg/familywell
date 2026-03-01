@@ -226,6 +226,13 @@ async def update_record(
         except Exception as e:
             logger.warning(f"Re-embedding failed for record {record_id}: {e}")
 
+    # ★ 记录被编辑，清缓存
+    try:
+        from app.services.rag_service import invalidate_user_cache
+        await invalidate_user_cache(user.id)
+    except Exception:
+        pass
+
     # 返回详情
     image_url = None
     if record.file_key:
@@ -323,6 +330,13 @@ async def confirm_prescription(
                 await _generate_tasks_for_med(db, med, today)
 
     await db.flush()
+
+    # ★ 处方确认（新增药物），清缓存
+    try:
+        from app.services.rag_service import invalidate_user_cache
+        await invalidate_user_cache(user.id)
+    except Exception:
+        pass
 
     return {
         "ok": True,

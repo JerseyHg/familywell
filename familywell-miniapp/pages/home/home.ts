@@ -1,8 +1,9 @@
 /**
  * pages/home/home.ts — 首页（完整版）
  * ══════════════════════════════════════════════════════════
- * 包含：首页数据加载、拍照上传、用药打卡、AI 提示词跳转、
- *       语音录入（WechatSI 同声传译插件）、记录详情跳转
+ * ★ 语音修复：WechatSI 回调用「属性赋值」（manager.onStop = func）
+ * ★ 追加模式：多次录音拼接，方便补充说明
+ * ★ 后端支持多类型拆分：一段话里的饮食/用药/指标各自保存
  */
 
 import { homeApi, medsApi, profileApi } from '../../services/api'
@@ -10,56 +11,6 @@ import { batchUpload, pollBatchAIStatus } from '../../services/upload'
 
 // ── 微信同声传译插件 ──
 const plugin = requirePlugin('WechatSI')
-
-// ── 语音识别管理器初始化 ──
-function initVoiceRecognizer(page: any) {
-  const manager = plugin.getRecordRecognitionManager()
-
-  // 录音开始
-  manager.onStart(() => {
-    console.log('Voice recording started')
-  })
-
-  // 实时识别结果（中间结果，会不断更新）
-  manager.onRecognize((res: any) => {
-    if (res.result) {
-      page.setData({ voiceText: res.result })
-    }
-  })
-
-  // 录音结束 + 最终识别结果
-  manager.onStop((res: any) => {
-    page.setData({ isRecording: false })
-
-    // 清除计时器
-    if (page._recordTimer) {
-      clearInterval(page._recordTimer)
-      page._recordTimer = null
-    }
-
-    if (res.result) {
-      page.setData({ voiceText: res.result })
-    } else if (res.retcode !== 0) {
-      console.error('Voice recognition failed:', res)
-      wx.showToast({ title: '语音识别失败，请重试', icon: 'none' })
-    }
-  })
-
-  // 错误处理
-  manager.onError((err: any) => {
-    console.error('Voice recognition error:', err)
-    page.setData({ isRecording: false })
-
-    if (page._recordTimer) {
-      clearInterval(page._recordTimer)
-      page._recordTimer = null
-    }
-
-    wx.showToast({ title: '录音出错，请重试', icon: 'none' })
-  })
-
-  return manager
-}
 
 Page({
   data: {
@@ -86,7 +37,10 @@ Page({
 
   // 非响应式私有属性
   _voiceManager: null as any,
+  _voiceInited: false,
   _recordTimer: null as any,
+  _stopFallbackTimer: null as any,
+  _baseText: '',               // ★ 追加模式：之前已确认的文字
 
   // ════════════════════════════════════════
   //  生命周期
@@ -108,7 +62,6 @@ Page({
       wx.redirectTo({ url: '/pages/login/login' })
       return
     }
-
     this.getTabBar()?.setData({ active: 0 })
     this.checkOnboarding()
     this.loadHomeData()
@@ -122,7 +75,6 @@ Page({
   //  数据加载
   // ════════════════════════════════════════
 
-  /** 检查是否完成引导，未完成则跳转 */
   async checkOnboarding() {
     try {
       const profile: any = await profileApi.get()
@@ -204,9 +156,75 @@ Page({
 
   // ════════════════════════════════════════
   //  语音录入（WechatSI 同声传译插件）
+  //  ★ 属性赋值注册回调 + 追加模式
   // ════════════════════════════════════════
 
   noop() {},
+
+  _ensureVoiceManager() {
+    if (this._voiceInited) return
+
+    console.log('[Voice] initializing manager...')
+    const manager = plugin.getRecordRecognitionManager()
+    const page = this
+
+    // ★ 属性赋值（不是方法调用！）
+    manager.onStart = function(res: any) {
+      console.log('[Voice] ✅ onStart fired', res)
+    }
+
+    // ★ 追加模式：实时结果拼到 _baseText 后面
+    manager.onRecognize = function(res: any) {
+      console.log('[Voice] onRecognize:', res.result)
+      if (res.result) {
+        page.setData({ voiceText: page._baseText + res.result })
+      }
+    }
+
+    // ★ 追加模式：最终结果确认后更新 _baseText
+    manager.onStop = function(res: any) {
+      console.log('[Voice] onStop, result:', res.result)
+
+      if (page._stopFallbackTimer) {
+        clearTimeout(page._stopFallbackTimer)
+        page._stopFallbackTimer = null
+      }
+      if (page._recordTimer) {
+        clearInterval(page._recordTimer)
+        page._recordTimer = null
+      }
+
+      page.setData({ isRecording: false })
+
+      if (res.result) {
+        const finalText = page._baseText + res.result
+        page.setData({ voiceText: finalText })
+        // ★ 更新基础文本，加分隔符，为下一次追加做准备
+        page._baseText = finalText + '，'
+      } else if (res.retcode !== 0) {
+        console.error('[Voice] recognition failed:', res)
+        wx.showToast({ title: '语音识别失败，请重试', icon: 'none' })
+      }
+    }
+
+    manager.onError = function(res: any) {
+      console.error('[Voice] onError:', res.msg)
+      if (page._stopFallbackTimer) {
+        clearTimeout(page._stopFallbackTimer)
+        page._stopFallbackTimer = null
+      }
+      if (page._recordTimer) {
+        clearInterval(page._recordTimer)
+        page._recordTimer = null
+      }
+      page.setData({ isRecording: false })
+      wx.showToast({ title: '录音出错，请重试', icon: 'none' })
+    }
+
+    this._voiceManager = manager
+    this._voiceInited = true
+    console.log('[Voice] manager initialized ✅')
+  },
 
   onVoiceAdd() {
     this.setData({
@@ -215,84 +233,117 @@ Page({
       isRecording: false,
       recordingDuration: 0,
     })
-
-    // 确保录音管理器已初始化
-    if (!this._voiceManager) {
-      this._voiceManager = initVoiceRecognizer(this)
-    }
+    // ★ 打开弹窗时重置 _baseText
+    this._baseText = ''
+    this._ensureVoiceManager()
   },
 
   hideVoiceModal() {
-    // 如果正在录音，先停止
-    if (this.data.isRecording && this._voiceManager) {
-      this._voiceManager.stop()
+    if (this.data.isRecording) {
+      this._doStopRecording()
     }
     this.setData({ showVoiceModal: false, isRecording: false })
-    if (this._recordTimer) {
-      clearInterval(this._recordTimer)
-      this._recordTimer = null
-    }
+    this._clearAllTimers()
   },
 
   onVoiceTextInput(e: any) {
     this.setData({ voiceText: e.detail.value })
+    // ★ 手动编辑也更新 _baseText
+    this._baseText = e.detail.value
   },
 
-  // ── 按住录音 ──
-  onRecordStart() {
-    if (this.data.isRecording) return
-
-    // 检查录音权限
-    wx.authorize({
-      scope: 'scope.record',
-      success: () => {
-        this._startRecording()
-      },
-      fail: () => {
-        wx.showToast({ title: '请授权录音权限', icon: 'none' })
-      },
-    })
-  },
-
-  _startRecording() {
-    if (!this._voiceManager) {
-      this._voiceManager = initVoiceRecognizer(this)
+  // ── 点击切换录音 ──
+  onToggleRecord() {
+    if (this.data.isRecording) {
+      this._doStopRecording()
+    } else {
+      this._doStartRecording()
     }
-
-    this.setData({
-      isRecording: true,
-      recordingDuration: 0,
-      voiceText: '',  // 清空上一次的文字
-    })
-
-    // 开始录音 + 识别
-    this._voiceManager.start({
-      lang: 'zh_CN',  // 中文
-      duration: 60000, // 最长 60 秒
-    })
-
-    // 计时器（显示录音时长）
-    let seconds = 0
-    this._recordTimer = setInterval(() => {
-      seconds++
-      this.setData({ recordingDuration: seconds })
-
-      // 60 秒自动停止
-      if (seconds >= 60) {
-        this.onRecordStop()
-      }
-    }, 1000)
   },
 
-  // ── 松开结束录音 ──
-  onRecordStop() {
+  _doStartRecording() {
+    console.log('[Voice] === START FLOW ===')
+
+    const doPrivacy = (): Promise<void> => new Promise((resolve) => {
+      if (typeof wx.requirePrivacyAuthorize === 'function') {
+        wx.requirePrivacyAuthorize({
+          success: () => { console.log('[Voice] 1/3 privacy ✅'); resolve() },
+          fail: () => { console.log('[Voice] 1/3 privacy skipped'); resolve() },
+        })
+      } else { resolve() }
+    })
+
+    const doAuthorize = (): Promise<boolean> => new Promise((resolve) => {
+      wx.authorize({
+        scope: 'scope.record',
+        success: () => { console.log('[Voice] 2/3 authorize ✅'); resolve(true) },
+        fail: () => {
+          wx.showModal({
+            title: '需要录音权限',
+            content: '请在设置中允许使用麦克风',
+            confirmText: '去设置',
+            success: (r) => { if (r.confirm) wx.openSetting() },
+          })
+          resolve(false)
+        },
+      })
+    })
+
+    doPrivacy().then(() => doAuthorize()).then((granted) => {
+      if (!granted) return
+
+      console.log('[Voice] 3/3 starting plugin...')
+      this._ensureVoiceManager()
+
+      // ★ 追加模式：不清空 voiceText，保留之前录的内容
+      this.setData({
+        isRecording: true,
+        recordingDuration: 0,
+      })
+
+      this._voiceManager.start({
+        lang: 'zh_CN',
+        duration: 60000,
+      })
+      console.log('[Voice] start() called')
+
+      let seconds = 0
+      this._recordTimer = setInterval(() => {
+        seconds++
+        this.setData({ recordingDuration: seconds })
+        if (seconds >= 60) this._doStopRecording()
+      }, 1000)
+    })
+  },
+
+  _doStopRecording() {
+    console.log('[Voice] stopping...')
     if (!this.data.isRecording) return
+
+    if (this._recordTimer) {
+      clearInterval(this._recordTimer)
+      this._recordTimer = null
+    }
 
     if (this._voiceManager) {
       this._voiceManager.stop()
+      console.log('[Voice] stop() called')
     }
 
-    // isRecording 和计时器在 onStop 回调中清理
+    this.setData({ isRecording: false })
+
+    this._stopFallbackTimer = setTimeout(() => {
+      console.warn('[Voice] onStop not fired within 3s')
+      if (!this.data.voiceText) {
+        wx.showToast({ title: '未识别到语音，请重试', icon: 'none' })
+      }
+      this._stopFallbackTimer = null
+    }, 3000)
+  },
+
+  _clearAllTimers() {
+    if (this._recordTimer) { clearInterval(this._recordTimer); this._recordTimer = null }
+    if (this._stopFallbackTimer) { clearTimeout(this._stopFallbackTimer); this._stopFallbackTimer = null }
   },
 
   // ── 提交语音/文字内容 ──
@@ -303,21 +354,17 @@ Page({
       return
     }
 
-    // 如果还在录音，先停止
     if (this.data.isRecording) {
-      this.onRecordStop()
-      // 等一下让 ASR 返回最终结果
-      await new Promise(resolve => setTimeout(resolve, 500))
+      this._doStopRecording()
+      await new Promise(resolve => setTimeout(resolve, 800))
     }
 
-    // 防重复提交
     if (this.data.voiceSubmitting) return
     this.setData({ voiceSubmitting: true })
 
-    // ★ 立即关闭弹窗
     this.setData({ showVoiceModal: false, voiceText: '' })
+    this._baseText = ''
 
-    // ★ 乐观更新：先在最近动态里插一条"处理中"
     const optimistic = {
       id: `temp_${Date.now()}`,
       category: 'other',
@@ -330,23 +377,39 @@ Page({
     })
     wx.showToast({ title: '已提交，AI 处理中', icon: 'none', duration: 1500 })
 
-    // 后台处理
     try {
       const res: any = await medsApi.voiceAdd(text)
 
-      // 成功 → 轻提示 + 刷新真实数据
-      const type = res.type || 'unknown'
+      // ★ 后端现在返回 items 数组
+      const items = res.items || []
       const icons: Record<string, string> = {
         medication: '💊', food: '🍽️', vitals: '❤️', symptom: '📝',
       }
-      wx.showToast({
-        title: `${icons[type] || '✅'} ${res.summary || '记录成功'}`,
-        icon: 'none',
-        duration: 2000,
-      })
-      this.loadHomeData()
+
+      if (items.length > 1) {
+        const labels = items.map((i: any) => `${icons[i.type] || '✅'}${i.summary}`).join(' ')
+        wx.showToast({ title: labels.slice(0, 40), icon: 'none', duration: 2500 })
+      } else if (items.length === 1) {
+        const item = items[0]
+        wx.showToast({
+          title: `${icons[item.type] || '✅'} ${item.summary || '记录成功'}`,
+          icon: 'none', duration: 2000,
+        })
+      } else {
+        wx.showToast({ title: '✅ 记录成功', icon: 'none', duration: 2000 })
+      }
+
+      // ★ 立即更新乐观条目状态（不等 loadHomeData）
+      const updated = this.data.recentActivity.map((item: any) =>
+        item.id === optimistic.id
+          ? { ...item, ai_status: 'completed' }
+          : item
+      )
+      this.setData({ recentActivity: updated })
+
+      // 再从后端刷新完整数据
+      await this.loadHomeData()
     } catch (e) {
-      // 失败 → 更新状态为 failed
       const updated = this.data.recentActivity.map((item: any) =>
         item.id === optimistic.id
           ? { ...item, ai_status: 'failed', _voiceText: text }
@@ -360,7 +423,6 @@ Page({
     }
   },
 
-  /** 重试失败的语音记录 */
   onRetryVoice(e: any) {
     const text = e.currentTarget.dataset.text
     if (!text) return

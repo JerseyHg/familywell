@@ -3,6 +3,7 @@
  * ─────────────────────────────────
  * [P1-1] recordsApi 新增 update, confirmPrescription
  * [P1-2] authApi 新增 wxLogin
+ * ★ chatApi 补全 stream / send 方法
  */
 
 const BASE_URL = 'https://tbowo.top/familywell/api'
@@ -49,7 +50,6 @@ export function request<T = any>(options: RequestOptions): Promise<T> {
           return
         }
 
-        // [P0-2] 处理速率限制
         if (res.statusCode === 429) {
           wx.showToast({ title: '操作太频繁，请稍后再试', icon: 'none' })
           reject(new Error('rate_limited'))
@@ -81,7 +81,6 @@ export const authApi = {
   login: (data: { username: string; password: string }) =>
     request({ url: '/auth/login', method: 'POST', data }),
 
-  // [P1-2] 微信登录
   wxLogin: (data: { code: string; nickname?: string; avatar_url?: string }) =>
     request({ url: '/auth/wx-login', method: 'POST', data }),
 
@@ -126,14 +125,11 @@ export const recordsApi = {
     return request({ url: `/records${query ? '?' + query : ''}` })
   },
 
-  // [P1-1] 记录详情（含 ai_raw_result 和图片URL）
   detail: (id: number) => request({ url: `/records/${id}` }),
 
-  // [P1-1] 编辑记录
   update: (id: number, data: any) =>
     request({ url: `/records/${id}`, method: 'PUT', data }),
 
-  // [P1-3] 确认处方药物
   confirmPrescription: (id: number, medications: any[]) =>
     request({
       url: `/records/${id}/confirm-prescription`,
@@ -142,7 +138,7 @@ export const recordsApi = {
     }),
 }
 
-// ─── Projects (归档项目) ───
+// ─── Projects ───
 export const projectsApi = {
   create: (data: {
     name: string;
@@ -214,12 +210,24 @@ export const familyApi = {
   create: (name?: string) =>
     request({ url: '/families', method: 'POST', data: { name } }),
 
-  getMyFamily: () => request({ url: '/families/my' }),
+  getMyFamily: () => request({ url: '/families/mine' }),
+
+  // settings.ts 用的是 mine()，加别名兼容
+  mine: () => request({ url: '/families/mine' }),
 
   join: (inviteCode: string) =>
     request({ url: '/families/join', method: 'POST', data: { invite_code: inviteCode } }),
 
-  overview: () => request({ url: '/families/overview' }),
+  overview: (familyId: number) =>
+    request({ url: `/families/${familyId}/overview` }),
+
+  // settings.ts 需要加载家庭成员列表
+  members: (familyId: number) =>
+    request({ url: `/families/${familyId}/members` }),
+
+  // settings.ts 需要移除成员
+  removeMember: (familyId: number, userId: number) =>
+    request({ url: `/families/${familyId}/members/${userId}`, method: 'DELETE' }),
 }
 
 // ─── Reminders ───
@@ -239,8 +247,156 @@ export const reminderApi = {
 }
 
 // ─── Chat ───
+// ★ 流式（SSE）+ 同步 fallback
+
+interface ChatParams {
+  question: string
+  session_id?: string
+  include_family?: boolean
+}
+
+interface ChatStreamCallbacks {
+  onCharts?: (charts: any[]) => void
+  onText?: (delta: string) => void
+  onDone?: (sessionId: string) => void
+  onError?: (err: any) => void
+}
+
 export const chatApi = {
-  // SSE 流式接口在 chat 页面中直接用 wx.request 处理
+  /**
+   * ★ SSE 流式请求
+   * 后端逐行返回 `data: {...}\n\n`，前端通过 enableChunkedTransfer 接收分块
+   */
+  stream(params: ChatParams, callbacks: ChatStreamCallbacks) {
+    const token = getToken()
+    let fullReceived = ''    // 累积收到的全部文本
+    let processedLen = 0     // 已解析到的位置
+
+    const task = wx.request({
+      url: `${BASE_URL}/chat/stream`,
+      method: 'POST',
+      data: params,
+      header: {
+        'Content-Type': 'application/json',
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+      enableChunkedTransfer: true,
+      responseType: 'text',
+
+      success(res) {
+        // 全部接收完后做一次完整解析（兜底）
+        if (typeof res.data === 'string') {
+          _parseAllSSELines(res.data, callbacks)
+        }
+      },
+
+      fail(err) {
+        callbacks.onError?.(err)
+      },
+    })
+
+    // ★ 监听分块数据到达
+    if (task && typeof task.onChunkReceived === 'function') {
+      task.onChunkReceived((resp: { data: ArrayBuffer }) => {
+        try {
+          const chunk = _arrayBufferToString(resp.data)
+          fullReceived += chunk
+
+          // 只解析新到达的部分
+          const unprocessed = fullReceived.slice(processedLen)
+          const lines = unprocessed.split('\n')
+
+          // 最后一行可能不完整，保留到下次
+          for (let i = 0; i < lines.length - 1; i++) {
+            const line = lines[i].trim()
+            processedLen += lines[i].length + 1
+
+            if (!line.startsWith('data:')) continue
+            const jsonStr = line.slice(5).trim()
+            if (!jsonStr) continue
+
+            try {
+              const evt = JSON.parse(jsonStr)
+              _handleSSEEvent(evt, callbacks)
+            } catch { /* incomplete JSON, skip */ }
+          }
+        } catch (e) {
+          console.error('[Chat SSE] chunk parse error:', e)
+        }
+      })
+    } else {
+      console.warn('[Chat] onChunkReceived not supported, will fallback on complete')
+    }
+
+    return task
+  },
+
+  /**
+   * 同步模式 fallback
+   */
+  send(params: ChatParams) {
+    return request({
+      url: '/chat',
+      method: 'POST',
+      data: params,
+    })
+  },
+}
+
+// ─── SSE 解析辅助函数 ───
+
+/** ArrayBuffer → UTF-8 字符串 */
+function _arrayBufferToString(buf: ArrayBuffer): string {
+  // 优先用 TextDecoder（较新的基础库支持）
+  if (typeof TextDecoder !== 'undefined') {
+    return new TextDecoder('utf-8').decode(buf)
+  }
+  // 兜底：逐字节拼接
+  const bytes = new Uint8Array(buf)
+  let str = ''
+  for (let i = 0; i < bytes.length; i++) {
+    str += String.fromCharCode(bytes[i])
+  }
+  try {
+    return decodeURIComponent(escape(str))
+  } catch {
+    return str
+  }
+}
+
+/** 兜底：对完整的 SSE 文本做一次全量解析 */
+function _parseAllSSELines(fullData: string, callbacks: ChatStreamCallbacks) {
+  const lines = fullData.split('\n')
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed.startsWith('data:')) continue
+    const jsonStr = trimmed.slice(5).trim()
+    if (!jsonStr) continue
+    try {
+      const evt = JSON.parse(jsonStr)
+      _handleSSEEvent(evt, callbacks)
+    } catch { /* skip */ }
+  }
+}
+
+function _handleSSEEvent(evt: any, callbacks: ChatStreamCallbacks) {
+  switch (evt.type) {
+    case 'charts':
+      callbacks.onCharts?.(evt.charts || [])
+      break
+    case 'sources':
+      // sources 暂不需要回调，可扩展
+      break
+    case 'text':
+      callbacks.onText?.(evt.content || '')
+      break
+    case 'done':
+      callbacks.onDone?.(evt.session_id || '')
+      break
+    case 'error':
+      callbacks.onError?.(evt)
+      break
+  }
 }
 
 // ─── Search ───

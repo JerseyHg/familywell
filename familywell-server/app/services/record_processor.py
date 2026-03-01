@@ -90,6 +90,13 @@ async def process_record(record_id: int):
             except Exception as emb_err:
                 logger.warning(f"Embedding failed for record {record_id}: {emb_err}")
 
+            # 9. ★ 清除该用户的热点缓存（拍照上传完成，数据已变化）
+            try:
+                from app.services.rag_service import invalidate_user_cache
+                await invalidate_user_cache(record.user_id)
+            except Exception as cache_err:
+                logger.warning(f"Cache invalidation failed for user {record.user_id}: {cache_err}")
+
         except Exception as e:
             logger.error(f"Failed to process record {record_id}: {e}")
             record.ai_status = "failed"

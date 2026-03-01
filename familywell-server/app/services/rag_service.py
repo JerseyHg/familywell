@@ -88,6 +88,32 @@ async def get_cached_answer(user_id: int, question: str) -> dict | None:
     return None
 
 
+# ════════════════════════════════════════
+# ★ 公共缓存失效函数（所有数据写入点调用）
+# ════════════════════════════════════════
+
+async def invalidate_user_cache(user_id: int):
+    """
+    清除指定用户的所有热点问题缓存。
+
+    任何数据写入后都应调用此函数，包括：
+    - 语音录入（medications.py voice-add）
+    - 拍照上传识别完成（record_processor.py）
+    - 编辑记录（records.py PUT）
+    - 确认处方（records.py confirm-prescription）
+    - 用药打卡（medications.py complete_task）
+    - 手动创建药物（medications.py create）
+    """
+    try:
+        r = await get_redis()
+        keys_to_delete = [_cache_key(user_id, q) for q in HOT_QUESTIONS]
+        if keys_to_delete:
+            deleted = await r.delete(*keys_to_delete)
+            logger.info(f"Cache invalidated for user {user_id}: {deleted} keys cleared")
+    except Exception as e:
+        # 缓存失效失败不应阻断主流程
+        logger.warning(f"Cache invalidation failed for user {user_id} (non-fatal): {e}")
+
 async def set_cached_answer(user_id: int, question: str, answer: dict):
     """将回答写入 Redis 缓存。"""
     try:
