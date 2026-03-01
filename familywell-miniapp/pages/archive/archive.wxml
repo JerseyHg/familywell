@@ -64,9 +64,7 @@
   <!-- 未归项目的记录 -->
   <view class="section-label" wx:if="{{unassignedRecords.length}}">未归项目</view>
   <view class="record-list">
-    data-id="{{item.id}}"
-    bindtap="onRecordTap"
-    <view class="record-item" wx:for="{{unassignedRecords}}" wx:key="id">
+    <view class="record-item" wx:for="{{unassignedRecords}}" wx:key="id" data-id="{{item.id}}" bindtap="onRecordTap">
       <text class="ri-icon">
         {{item.category === 'lab' ? '🔬' : item.category === 'prescription' ? '📝' : item.category === 'checkup' ? '📊' : item.category === 'insurance' ? '🛡️' : item.category === 'food' ? '🍽️' : item.category === 'bp_reading' ? '❤️' : '📄'}}
       </text>
@@ -101,9 +99,7 @@
 
   <!-- 记录列表 -->
   <view class="record-list">
-    data-id="{{item.id}}"
-    bindtap="onRecordTap"
-    <view class="record-item" wx:for="{{catRecords}}" wx:key="id">
+    <view class="record-item" wx:for="{{catRecords}}" wx:key="id" data-id="{{item.id}}" bindtap="onRecordTap">
       <text class="ri-icon">
         {{item.category === 'lab' ? '🔬' : item.category === 'prescription' ? '📝' : item.category === 'checkup' ? '📊' : item.category === 'insurance' ? '🛡️' : item.category === 'food' ? '🍽️' : item.category === 'bp_reading' ? '❤️' : '📄'}}
       </text>
