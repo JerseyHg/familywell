@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
         await conn.execute(
             __import__("sqlalchemy").text("CREATE EXTENSION IF NOT EXISTS vector")
         )
-        import app.models  # noqa
+        from app import models  # noqa
         await conn.run_sync(Base.metadata.create_all)
 
     # ── [P0-2] 初始化 Redis 连接用于速率限制 ──
