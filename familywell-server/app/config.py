@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     RATE_LIMIT_AUTH: int = 10           # 每分钟请求数（登录/注册）
     RATE_LIMIT_AI: int = 20            # 每分钟请求数（AI 相关接口）
 
+    # 火山引擎语音识别 ASR
+    VOLC_ASR_APPID: str = ""       # 火山引擎语音应用 AppID
+    VOLC_ASR_TOKEN: str = ""       # 火山引擎语音应用 Access Token
+
     class Config:
         env_file = ".env"
 

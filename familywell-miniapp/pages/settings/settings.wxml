@@ -1,6 +1,19 @@
 <view class="safe-top" />
 <view class="page-title">设置</view>
 
+<!-- ★ 未登录提示 -->
+<view class="login-hint-card" wx:if="{{!isLoggedIn}}" bindtap="goLogin">
+  <text class="login-hint-icon">🔒</text>
+  <view class="login-hint-body">
+    <text class="login-hint-title">登录后使用设置功能</text>
+    <text class="login-hint-desc">登录后可以管理个人资料、家庭、紧急信息等</text>
+  </view>
+  <text class="login-hint-btn">去登录 ›</text>
+</view>
+
+<!-- ★ 以下内容仅登录后显示 -->
+<block wx:if="{{isLoggedIn}}">
+
 <!-- ── Emergency Card ── -->
 <view class="emergency-card" bindtap="showEmergency">
   <view class="em-deco" />
@@ -87,7 +100,6 @@
 
 <!-- ── 已加入家庭：显示家庭信息 ── -->
 <block wx:if="{{family}}">
-  <!-- 家庭卡片 -->
   <view class="family-card">
     <view class="fc-top">
       <text class="fc-icon">🏠</text>
@@ -103,7 +115,6 @@
     </view>
   </view>
 
-  <!-- 成员列表 -->
   <view class="member-list">
     <view class="member-item" wx:for="{{familyMembers}}" wx:key="user_id">
       <view class="mb-left">
@@ -114,9 +125,7 @@
         </view>
       </view>
       <view class="mb-actions">
-        <!-- admin 可查看成员概况 -->
         <text class="mb-detail" wx:if="{{myRole === 'admin'}}" catchtap="onViewMember" data-uid="{{item.user_id}}" data-name="{{item.nickname}}">查看</text>
-        <!-- admin 可移除非自己的成员 -->
         <text class="mb-remove" wx:if="{{myRole === 'admin' && item.role !== 'admin'}}" catchtap="onRemoveMember" data-uid="{{item.user_id}}" data-name="{{item.nickname}}">移除</text>
       </view>
     </view>
@@ -152,7 +161,9 @@
   </view>
 </view>
 
-<!-- ── Menu: 关于 ── -->
+</block>
+
+<!-- ── Menu: 关于 (不需要登录也能看) ── -->
 <view class="section-label">关于</view>
 <view class="menu-group">
   <view class="menu-item" bindtap="onFeedback">
@@ -170,10 +181,14 @@
   </view>
 </view>
 
-<view class="logout-btn" bindtap="onLogout">退出登录</view>
-
-<!-- ★ 账号注销 -->
-<view class="delete-account-btn" bindtap="onDeleteAccount">注销账号</view>
+<!-- ★ 登录/退出按钮 根据状态显示 -->
+<block wx:if="{{isLoggedIn}}">
+  <view class="logout-btn" bindtap="onLogout">退出登录</view>
+  <view class="delete-account-btn" bindtap="onDeleteAccount">注销账号</view>
+</block>
+<block wx:else>
+  <view class="logout-btn" style="background: var(--primary); color: #fff;" bindtap="goLogin">登录</view>
+</block>
 
 <!-- ── 关于 FamilyWell 弹窗 ── -->
 <view class="modal-mask" wx:if="{{showAboutModal}}" bindtap="hideAbout">

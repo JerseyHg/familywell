@@ -300,3 +300,25 @@ page { background: var(--bg); }
   font-size: 22rpx;
   color: var(--muted, #A9A49E);
 }
+.login-hint-card {
+  margin: 24rpx 48rpx;
+  display: flex; align-items: center; gap: 20rpx;
+  padding: 32rpx;
+  background: linear-gradient(135deg, #FFF8F0, #FFF3E8);
+  border: 2rpx solid #FFD4A8;
+  border-radius: 32rpx;
+}
+.login-hint-icon { font-size: 48rpx; }
+.login-hint-body { flex: 1; }
+.login-hint-title {
+  display: block; font-size: 30rpx; font-weight: 600; color: var(--text);
+}
+.login-hint-desc {
+  display: block; font-size: 24rpx; color: var(--sub); margin-top: 4rpx;
+}
+.login-hint-btn {
+  padding: 12rpx 28rpx; border-radius: 24rpx;
+  background: var(--primary); color: #fff;
+  font-size: 26rpx; font-weight: 600;
+  white-space: nowrap;
+}

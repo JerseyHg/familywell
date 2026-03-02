@@ -4,6 +4,19 @@
   <text class="page-sub">你的健康记录，按项目整理</text>
 </view>
 
+<!-- ★ 未登录提示 -->
+<view class="login-hint-card" wx:if="{{!isLoggedIn}}" bindtap="goLogin">
+  <text class="login-hint-icon">🔒</text>
+  <view class="login-hint-body">
+    <text class="login-hint-title">登录后查看健康归档</text>
+    <text class="login-hint-desc">登录后可以查看记录、创建项目等</text>
+  </view>
+  <text class="login-hint-btn">去登录 ›</text>
+</view>
+
+<!-- ★ 以下内容仅登录后显示 -->
+<block wx:if="{{isLoggedIn}}">
+
 <!-- ── Tab 切换：项目 / 分类 ── -->
 <view class="view-tabs">
   <view class="vtab {{viewMode === 'projects' ? 'active' : ''}}" bindtap="switchView" data-mode="projects">项目</view>
@@ -174,5 +187,7 @@
     </scroll-view>
   </view>
 </view>
+
+</block>
 
 <view class="safe-bottom" />
