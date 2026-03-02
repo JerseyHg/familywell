@@ -33,6 +33,7 @@ class Medication(Base):
     start_date: Mapped[date | None] = mapped_column(Date)
     end_date: Mapped[date | None] = mapped_column(Date)
     remaining_count: Mapped[int | None] = mapped_column(Integer)
+    interval_days: Mapped[int] = mapped_column(Integer, default=1)  # ★ 每几天一次，1=每天
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 

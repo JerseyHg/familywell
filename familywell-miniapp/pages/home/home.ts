@@ -1,17 +1,20 @@
 /**
- * pages/home/home.ts — 首页（完整版）
- * ══════════════════════════════════════════════════════════
- * ★ 新增：待确认药物建议（MedicationSuggestion）
- * ★ 语音修复：WechatSI 回调用「属性赋值」（manager.onStop = func）
- * ★ 追加模式：多次录音拼接，方便补充说明
- * ★ 后端支持多类型拆分：一段话里的饮食/用药/指标各自保存
+ * pages/home/home.ts — 首页
+ * ═══════════════════════════════════════
+ * ★ 语音：多段录音、按住说话、隐藏文字
+ * ★ 拍照/录音不再弹隐私确认（已在登录页完成）
+ * ★ 打卡乐观更新
  */
 
 import { homeApi, medsApi, profileApi } from '../../services/api'
 import { batchUpload, pollBatchAIStatus } from '../../services/upload'
 
-// ── 微信同声传译插件 ──
 const plugin = requirePlugin('WechatSI')
+
+interface VoiceSegment {
+  duration: number
+  text: string
+}
 
 Page({
   data: {
@@ -20,7 +23,7 @@ Page({
     aiTip: '',
     recentActivity: [] as any[],
     alertCount: 0,
-    medSuggestions: [] as any[],   // ★ 待确认药物建议
+    medSuggestions: [] as any[],
     prompts: [
       { icon: '🍽️', text: '过去7天饮食情况' },
       { icon: '💉', text: '血压最近趋势怎样' },
@@ -31,18 +34,16 @@ Page({
 
     // 语音弹窗
     showVoiceModal: false,
-    voiceText: '',
-    voiceSubmitting: false,
+    voiceSegments: [] as VoiceSegment[],
     isRecording: false,
     recordingDuration: 0,
   },
 
-  // 非响应式私有属性
   _voiceManager: null as any,
   _voiceInited: false,
   _recordTimer: null as any,
   _stopFallbackTimer: null as any,
-  _baseText: '',               // ★ 追加模式：之前已确认的文字
+  _currentSegText: '',
 
   // ════════════════════════════════════════
   //  生命周期
@@ -92,13 +93,13 @@ Page({
     try {
       const res: any = await homeApi.getData()
 
-      // ★ 为 suggestions 添加前端交互状态
       const suggestions = (res.medication_suggestions || []).map((s: any) => ({
         ...s,
         _expanded: false,
         _times: 1,
         _medType: 'long_term',
-        _totalDays: 7,
+        _totalDays: '',
+        _interval: 1,   // ★ 默认每天
       }))
 
       this.setData({
@@ -115,7 +116,7 @@ Page({
   },
 
   // ════════════════════════════════════════
-  //  拍照上传
+  //  拍照上传（隐私已在登录时确认，不再弹窗）
   // ════════════════════════════════════════
 
   onUpload() {
@@ -132,25 +133,30 @@ Page({
   },
 
   // ════════════════════════════════════════
-  //  用药打卡
+  //  用药打卡 — 乐观更新
   // ════════════════════════════════════════
 
   onPunchTask(e: any) {
     const taskId = e.currentTarget.dataset.id
+    const tasks = this.data.pendingTasks.filter((t: any) => t.id !== taskId)
+    this.setData({ pendingTasks: tasks })
+    wx.showToast({ title: '打卡成功', icon: 'success' })
+
     medsApi.completeTask(taskId).then(() => {
-      wx.showToast({ title: '打卡成功', icon: 'success' })
+      this.loadHomeData()
+    }).catch(() => {
+      wx.showToast({ title: '打卡失败，请重试', icon: 'none' })
       this.loadHomeData()
     })
   },
 
   // ════════════════════════════════════════
-  //  ★ 药物建议：展开 / 确认 / 忽略
+  //  药物建议
   // ════════════════════════════════════════
 
   onToggleSuggestion(e: any) {
     const id = e.currentTarget.dataset.id
-    const list = this.data.medSuggestions
-    const idx = list.findIndex((s: any) => s.id === id)
+    const idx = this.data.medSuggestions.findIndex((s: any) => s.id === id)
     if (idx < 0) return
     this.setData({ [`medSuggestions[${idx}]._expanded`]: true })
   },
@@ -169,11 +175,34 @@ Page({
     this.setData({ [`medSuggestions[${idx}]._medType`]: type })
   },
 
+  // ★ 频率选择
+  onSugInterval(e: any) {
+    const { id, interval } = e.currentTarget.dataset
+    const idx = this.data.medSuggestions.findIndex((s: any) => s.id === Number(id))
+    if (idx < 0) return
+    this.setData({ [`medSuggestions[${idx}]._interval`]: Number(interval) })
+  },
+
+  onSugIntervalInput(e: any) {
+    const id = e.currentTarget.dataset.id
+    const idx = this.data.medSuggestions.findIndex((s: any) => s.id === Number(id))
+    if (idx < 0) return
+    const val = Number(e.detail.value) || 1
+    this.setData({ [`medSuggestions[${idx}]._interval`]: Math.max(1, val) })
+  },
+
+  onSugIntervalCustom(e: any) {
+    const id = e.currentTarget.dataset.id
+    const idx = this.data.medSuggestions.findIndex((s: any) => s.id === Number(id))
+    if (idx < 0) return
+    this.setData({ [`medSuggestions[${idx}]._interval`]: 4 })  // 切到自定义输入
+  },
+
   onSugDays(e: any) {
     const id = e.currentTarget.dataset.id
     const idx = this.data.medSuggestions.findIndex((s: any) => s.id === Number(id))
     if (idx < 0) return
-    this.setData({ [`medSuggestions[${idx}]._totalDays`]: Number(e.detail.value) || 7 })
+    this.setData({ [`medSuggestions[${idx}]._totalDays`]: e.detail.value })
   },
 
   async onConfirmSuggestion(e: any) {
@@ -181,12 +210,15 @@ Page({
     const sug = this.data.medSuggestions.find((s: any) => s.id === Number(id))
     if (!sug) return
 
+    const totalDays = Number(sug._totalDays) || 7
+
     try {
       await medsApi.confirmSuggestion(Number(id), {
         times_per_day: sug._times,
         med_type: sug._medType,
-        total_days: (sug._medType === 'course' || sug._medType === 'temporary') ? sug._totalDays : null,
+        total_days: (sug._medType === 'course' || sug._medType === 'temporary') ? totalDays : null,
         dosage: sug.dosage,
+        interval_days: sug._interval || 1,
       })
       wx.showToast({ title: `已添加「${sug.name}」`, icon: 'success' })
       this.loadHomeData()
@@ -198,17 +230,20 @@ Page({
   async onDismissSuggestion(e: any) {
     const id = e.currentTarget.dataset.id
     const sug = this.data.medSuggestions.find((s: any) => s.id === Number(id))
+    const remaining = this.data.medSuggestions.filter((s: any) => s.id !== Number(id))
+    this.setData({ medSuggestions: remaining })
+
     try {
       await medsApi.dismissSuggestion(Number(id))
       wx.showToast({ title: `已忽略「${sug?.name || '药物'}」`, icon: 'none' })
-      this.loadHomeData()
     } catch (err: any) {
       wx.showToast({ title: err.message || '操作失败', icon: 'none' })
+      this.loadHomeData()
     }
   },
 
   // ════════════════════════════════════════
-  //  AI 提示词 → 跳转 Chat
+  //  AI 提示词 / 最近动态
   // ════════════════════════════════════════
 
   onPromptTap(e: any) {
@@ -221,10 +256,6 @@ Page({
     })
   },
 
-  // ════════════════════════════════════════
-  //  最近动态 → 跳转记录详情
-  // ════════════════════════════════════════
-
   onActivityTap(e: any) {
     const id = e.currentTarget.dataset.id
     if (!id || String(id).startsWith('temp_')) return
@@ -232,17 +263,17 @@ Page({
   },
 
   // ════════════════════════════════════════
-  //  语音录入（WechatSI）
+  //  语音弹窗 — 多段录音，按住说话
   // ════════════════════════════════════════
 
   onVoiceAdd() {
     this.setData({
       showVoiceModal: true,
-      voiceText: '',
+      voiceSegments: [],
       isRecording: false,
       recordingDuration: 0,
     })
-    this._baseText = ''
+    this._currentSegText = ''
   },
 
   hideVoiceModal() {
@@ -254,17 +285,22 @@ Page({
 
   noop() {},
 
-  onVoiceTextInput(e: any) {
-    this.setData({ voiceText: e.detail.value })
+  onRemoveSegment(e: any) {
+    const index = e.currentTarget.dataset.index
+    const segs = [...this.data.voiceSegments]
+    segs.splice(index, 1)
+    this.setData({ voiceSegments: segs })
   },
 
-  // ── 录音 ──
-  onToggleRecord() {
-    if (this.data.isRecording) {
-      this._stopRecording()
-    } else {
-      this._startRecording()
-    }
+  // ── 按住说话 / 松开结束 ──
+  onRecordStart() {
+    if (this.data.isRecording) return
+    this._startRecording()
+  },
+
+  onRecordEnd() {
+    if (!this.data.isRecording) return
+    this._stopRecording()
   },
 
   _initVoice() {
@@ -272,7 +308,7 @@ Page({
     const manager = plugin.getRecordRecognitionManager()
 
     manager.onStart = () => {
-      console.log('[Voice] started')
+      this._currentSegText = ''
       this.setData({ isRecording: true, recordingDuration: 0 })
       this._recordTimer = setInterval(() => {
         this.setData({ recordingDuration: this.data.recordingDuration + 1 })
@@ -281,26 +317,29 @@ Page({
 
     manager.onRecognize = (res: any) => {
       if (res.result) {
-        const combined = this._baseText
-          ? this._baseText + '，' + res.result
-          : res.result
-        this.setData({ voiceText: combined })
+        this._currentSegText = res.result
       }
     }
 
     manager.onStop = (res: any) => {
-      console.log('[Voice] stopped, result:', res.result)
       clearInterval(this._recordTimer)
       clearTimeout(this._stopFallbackTimer)
+
+      const duration = this.data.recordingDuration
+      const finalText = res.result || this._currentSegText
+
       this.setData({ isRecording: false })
 
-      if (res.result) {
-        const combined = this._baseText
-          ? this._baseText + '，' + res.result
-          : res.result
-        this.setData({ voiceText: combined })
-        this._baseText = combined
+      if (finalText && duration >= 1) {
+        const seg: VoiceSegment = { duration, text: finalText }
+        this.setData({
+          voiceSegments: [...this.data.voiceSegments, seg],
+        })
+      } else if (duration < 1) {
+        wx.showToast({ title: '录音太短', icon: 'none' })
       }
+
+      this._currentSegText = ''
     }
 
     manager.onError = (err: any) => {
@@ -315,17 +354,29 @@ Page({
     this._voiceInited = true
   },
 
+  // ★ 只检查麦克风权限（隐私已在登录时确认）
   _startRecording() {
     this._initVoice()
-    if (this.data.voiceText && !this._baseText) {
-      this._baseText = this.data.voiceText
-    }
-    this._voiceManager.start({ lang: 'zh_CN' })
-    this._stopFallbackTimer = setTimeout(() => {
-      if (this.data.isRecording) {
-        this._stopRecording()
-      }
-    }, 55000)
+
+    wx.authorize({
+      scope: 'scope.record',
+      success: () => {
+        this._voiceManager.start({ lang: 'zh_CN' })
+        this._stopFallbackTimer = setTimeout(() => {
+          if (this.data.isRecording) {
+            this._stopRecording()
+          }
+        }, 55000)
+      },
+      fail: () => {
+        wx.showModal({
+          title: '需要录音权限',
+          content: '请在设置中允许使用麦克风',
+          confirmText: '去设置',
+          success: (r) => { if (r.confirm) wx.openSetting() },
+        })
+      },
+    })
   },
 
   _stopRecording() {
@@ -333,42 +384,51 @@ Page({
     this._voiceManager?.stop?.()
   },
 
-  // ── 提交 ──
+  // ── 提交：拼接 → 关窗 → 后台处理 ──
   async onSubmitVoice() {
-    const text = this.data.voiceText.trim()
-    if (!text) {
-      wx.showToast({ title: '请先录音或输入内容', icon: 'none' })
+    const segs = this.data.voiceSegments
+    if (segs.length === 0 || this.data.isRecording) {
+      wx.showToast({ title: '请先录音', icon: 'none' })
       return
     }
-    if (this.data.voiceSubmitting) return
-    this.setData({ voiceSubmitting: true })
+
+    const fullText = segs.map((s: VoiceSegment) => s.text).join('，')
+
+    const tempId = `temp_${Date.now()}`
+    const processingItem = {
+      id: tempId,
+      category: 'other',
+      title: fullText.slice(0, 20) + (fullText.length > 20 ? '…' : ''),
+      date: `${new Date().getMonth() + 1}/${new Date().getDate()}`,
+      ai_status: 'processing',
+      _voiceText: fullText,
+    }
+
+    this.setData({
+      showVoiceModal: false,
+      voiceSegments: [],
+      recentActivity: [processingItem, ...this.data.recentActivity].slice(0, 5),
+    })
 
     try {
-      const res: any = await medsApi.voiceAdd(text)
-      const items = res.items || [res]
-
-      const parts: string[] = []
-      for (const item of items) {
-        if (item.message) parts.push(item.message)
-      }
-      const msg = parts.join('\n') || '已记录'
-
-      wx.showToast({ title: msg.slice(0, 20), icon: 'success', duration: 2000 })
-      this.setData({ showVoiceModal: false, voiceText: '' })
-      this._baseText = ''
+      await medsApi.voiceAdd(fullText)
       this.loadHomeData()
     } catch (err: any) {
+      const activity = this.data.recentActivity.map((item: any) => {
+        if (item.id === tempId) {
+          return { ...item, ai_status: 'failed' }
+        }
+        return item
+      })
+      this.setData({ recentActivity: activity })
       wx.showToast({ title: err.message || '记录失败', icon: 'none' })
-    } finally {
-      this.setData({ voiceSubmitting: false })
     }
   },
 
   onRetryVoice(e: any) {
     const text = e.currentTarget.dataset.text
     if (text) {
-      this.setData({ showVoiceModal: true, voiceText: text })
-      this._baseText = ''
+      this.setData({ showVoiceModal: true, voiceSegments: [] })
     }
   },
 })

@@ -26,7 +26,16 @@ router = APIRouter(prefix="/api/medications", tags=["medications"])
 
 
 async def _generate_tasks_for_med(db: AsyncSession, med: Medication, target_date: date):
-    """Generate tasks for a single medication on a given date."""
+    """Generate tasks for a single medication on a given date.
+    ★ Respects interval_days: if interval > 1, only generate on matching days.
+    """
+    # ★ 检查是否是该药物的服药日
+    interval = med.interval_days or 1
+    if interval > 1 and med.start_date:
+        days_since_start = (target_date - med.start_date).days
+        if days_since_start < 0 or days_since_start % interval != 0:
+            return 0  # 今天不是服药日
+
     scheduled_times = med.scheduled_times or ["08:00"]
     count = 0
     for t_str in scheduled_times:
@@ -181,7 +190,16 @@ async def confirm_suggestion(
         raise HTTPException(status_code=404, detail="建议不存在或已处理")
 
     times_per_day = req.times_per_day or 1
+    interval = req.interval_days or 1
     scheduled_times = DEFAULT_TIMES.get(times_per_day, ["08:00"])
+
+    # ★ 生成频率描述
+    if interval == 1:
+        freq_text = f"每天{times_per_day}次"
+    elif interval == 2:
+        freq_text = f"隔天{times_per_day}次"
+    else:
+        freq_text = f"每{interval}天{times_per_day}次"
 
     today = date.today()
     end_date = None
@@ -194,10 +212,11 @@ async def confirm_suggestion(
         user_id=user.id,
         name=suggestion.name,
         dosage=req.dosage or suggestion.dosage,
-        frequency=f"每天{times_per_day}次",
+        frequency=freq_text,
         scheduled_times=scheduled_times,
         start_date=today,
         end_date=end_date,
+        interval_days=interval,
         is_active=True,
     )
     db.add(med)

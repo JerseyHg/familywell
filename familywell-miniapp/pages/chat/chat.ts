@@ -1,8 +1,8 @@
 /**
  * pages/chat/chat.ts — AI 健康助手
  * ═══════════════════════════════════════
- * ★ 修复：随机 placeholder 提示词（Problem 3）
- * ★ 修复：追问提示词改为 wrap 布局（Problem 5）
+ * ★ Fix 3: 随机 placeholder 提示词
+ * ★ Fix 4: 修复流式输出 — 防重复处理 + 非流式模拟打字
  */
 import { chatApi } from '../../services/api'
 
@@ -13,7 +13,6 @@ interface Message {
   charts?: any[]
 }
 
-// ★ 温和语气的随机 placeholder
 const PLACEHOLDERS = [
   '今天感觉怎么样？随时聊聊~',
   '有什么健康问题想了解的吗？',
@@ -36,7 +35,6 @@ Page({
     scrollToView: '',
     placeholder: '今天感觉怎么样？随时聊聊~',
 
-    // ✅ 欢迎页模板问题（2x4 网格）
     homePrompts: [
       { icon: '🍽️', text: '过去7天饮食情况' },
       { icon: '💊', text: '这周药吃齐了吗' },
@@ -48,7 +46,6 @@ Page({
       { icon: '🏥', text: '下次该做什么检查' },
     ],
 
-    // 追问提示词
     followupPrompts: [
       { icon: '📈', text: 'PSA 变化趋势' },
       { icon: '🏥', text: '下次该做什么检查' },
@@ -58,16 +55,16 @@ Page({
     ],
   },
 
-  // 流式文本累积
   _streamText: '',
   _streamMsgIdx: -1,
   _streamTask: null as any,
   _throttleTimer: null as any,
+  _chunkedUsed: false,          // ★ Fix 4: 标记是否已通过 chunk 处理过
+  _doneHandled: false,          // ★ Fix 4: 标记 done 事件是否已处理
 
   onShow() {
     this.getTabBar()?.setData({ active: 2 })
 
-    // ★ 每次进入页面随机选一个 placeholder
     const idx = Math.floor(Math.random() * PLACEHOLDERS.length)
     this.setData({ placeholder: PLACEHOLDERS[idx] })
 
@@ -82,8 +79,6 @@ Page({
   onHide() {
     this._streamTask?.abort?.()
   },
-
-  // ── Input handlers ──
 
   onInputChange(e: any) {
     this.setData({ inputText: e.detail.value })
@@ -106,17 +101,17 @@ Page({
 
     const question = text.trim()
 
-    // 1. 添加用户消息
     const userMsg: Message = { id: `msg_${Date.now()}`, role: 'user', text: question }
     const messages = [...this.data.messages, userMsg]
 
-    // 2. 预创建空的 AI 消息占位
     const aiMsg: Message = { id: `ai_${Date.now()}`, role: 'assistant', text: '', charts: [] }
     messages.push(aiMsg)
     const aiIdx = messages.length - 1
 
     this._streamText = ''
     this._streamMsgIdx = aiIdx
+    this._chunkedUsed = false    // ★ 重置
+    this._doneHandled = false    // ★ 重置
 
     this.setData({
       messages,
@@ -125,7 +120,6 @@ Page({
       scrollToView: `msg-${aiIdx}`,
     })
 
-    // 3. 发起流式请求
     this._streamTask = chatApi.stream(
       {
         question,
@@ -134,16 +128,22 @@ Page({
       },
       {
         onCharts: (charts) => {
+          this._chunkedUsed = true
           this.setData({ [`messages[${aiIdx}].charts`]: charts })
           this._scrollToBottom()
         },
 
         onText: (delta) => {
+          this._chunkedUsed = true
           this._streamText += delta
           this._throttledUpdateText()
         },
 
         onDone: (sessionId) => {
+          // ★ Fix 4: 防止 success 回调重复触发 done
+          if (this._doneHandled) return
+          this._doneHandled = true
+
           if (this._throttleTimer) {
             clearTimeout(this._throttleTimer)
             this._throttleTimer = null
@@ -168,9 +168,6 @@ Page({
     )
   },
 
-  /**
-   * 根据用户最后一个问题，动态切换追问提示词
-   */
   _updateFollowupPrompts(lastQuestion: string) {
     const q = lastQuestion.toLowerCase()
 
@@ -231,6 +228,9 @@ Page({
     }, 80)
   },
 
+  /**
+   * ★ Fix 4: 同步 fallback 加模拟打字效果
+   */
   async _fallbackSync(question: string, aiIdx: number) {
     try {
       const res: any = await chatApi.send({
@@ -239,18 +239,53 @@ Page({
         include_family: false,
       })
 
+      // 先设置 charts
+      if (res.charts && res.charts.length) {
+        this.setData({ [`messages[${aiIdx}].charts`]: res.charts })
+      }
+
+      // ★ 模拟逐字输出
+      const fullText = res.answer || ''
+      await this._simulateTyping(aiIdx, fullText)
+
       this.setData({
-        [`messages[${aiIdx}].text`]: res.answer || '',
-        [`messages[${aiIdx}].charts`]: res.charts || [],
         sessionId: res.session_id || this.data.sessionId,
         typing: false,
       })
+      this._updateFollowupPrompts(question)
     } catch (err2) {
       this.setData({
         [`messages[${aiIdx}].text`]: '抱歉，AI 助手暂时无法回答，请稍后再试。',
         typing: false,
       })
     }
+  },
+
+  /**
+   * ★ 模拟打字效果：每次输出一小段文字
+   */
+  _simulateTyping(aiIdx: number, fullText: string): Promise<void> {
+    return new Promise((resolve) => {
+      let pos = 0
+      const chunkSize = 3  // 每次显示 3 个字符
+      const interval = 30  // 30ms 间隔
+
+      const tick = () => {
+        if (pos >= fullText.length) {
+          this.setData({ [`messages[${aiIdx}].text`]: fullText })
+          this._scrollToBottom()
+          resolve()
+          return
+        }
+
+        pos = Math.min(pos + chunkSize, fullText.length)
+        this.setData({ [`messages[${aiIdx}].text`]: fullText.slice(0, pos) })
+        this._scrollToBottom()
+        setTimeout(tick, interval)
+      }
+
+      tick()
+    })
   },
 
   _scrollToBottom() {
@@ -265,7 +300,6 @@ Page({
       sessionId: '',
       typing: false,
     })
-    // 新对话也换一个 placeholder
     const idx = Math.floor(Math.random() * PLACEHOLDERS.length)
     this.setData({ placeholder: PLACEHOLDERS[idx] })
   },

@@ -1,6 +1,6 @@
 <!--
   pages/login/login.wxml — 登录页
-  [P1-2] 新增微信一键登录界面
+  ★ 新增隐私协议 checkbox，登录前完成隐私确认
 -->
 <view class="login-page">
   <view class="safe-top" />
@@ -15,13 +15,24 @@
   <view class="login-body" wx:if="{{mode === 'wechat'}}">
     <view class="wx-login-card">
       <view
-        class="wx-login-btn"
+        class="wx-login-btn {{!privacyAgreed ? 'disabled' : ''}}"
         bindtap="onWxLogin"
       >
         <text class="wx-icon">💬</text>
         <text class="wx-text">{{wxLoading ? '登录中...' : '微信一键登录'}}</text>
       </view>
       <text class="wx-hint">首次使用将自动创建账号</text>
+
+      <!-- ★ 隐私协议 checkbox -->
+      <view class="privacy-row" catchtap="noop">
+        <view class="privacy-check {{privacyAgreed ? 'checked' : ''}}" catchtap="onTogglePrivacy">
+          <text wx:if="{{privacyAgreed}}">✓</text>
+        </view>
+        <view class="privacy-text">
+          <text>我已阅读并同意</text>
+          <text class="privacy-link" catchtap="onOpenPrivacy">《用户隐私保护指引》</text>
+        </view>
+      </view>
     </view>
 
     <view class="switch-row">
@@ -32,7 +43,6 @@
   <!-- ═══ 账号密码模式 ═══ -->
   <view class="login-body" wx:if="{{mode !== 'wechat'}}">
     <view class="form-card">
-      <!-- 模式切换 -->
       <view class="mode-tabs">
         <view
           class="mode-tab {{mode === 'account-login' ? 'active' : ''}}"
@@ -77,8 +87,19 @@
         />
       </view>
 
+      <!-- ★ 账号模式也要勾选隐私 -->
+      <view class="privacy-row" catchtap="noop">
+        <view class="privacy-check {{privacyAgreed ? 'checked' : ''}}" catchtap="onTogglePrivacy">
+          <text wx:if="{{privacyAgreed}}">✓</text>
+        </view>
+        <view class="privacy-text">
+          <text>我已阅读并同意</text>
+          <text class="privacy-link" catchtap="onOpenPrivacy">《用户隐私保护指引》</text>
+        </view>
+      </view>
+
       <button
-        class="submit-btn"
+        class="submit-btn {{!privacyAgreed ? 'disabled' : ''}}"
         bindtap="onSubmit"
         loading="{{loading}}"
       >

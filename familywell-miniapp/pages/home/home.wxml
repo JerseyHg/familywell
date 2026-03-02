@@ -1,6 +1,6 @@
-<!-- pages/home/home.wxml — 首页（完整版）
-  ★ 新增：待确认药物建议区域
-  ★ 修复：medication_log 分类图标
+<!-- pages/home/home.wxml — 首页
+  ★ 语音弹窗：固定布局，波形在按钮区域内，不挤压
+  ★ 拍照/录音不再弹隐私确认
 -->
 
 <!-- ── Greeting ── -->
@@ -28,61 +28,69 @@
   </view>
 </view>
 
-<!-- ── 语音输入弹窗 ── -->
+<!-- ══════════════════════════════════════════
+     语音弹窗 — 固定布局
+     ══════════════════════════════════════════ -->
 <view class="modal-mask" wx:if="{{showVoiceModal}}" bindtap="hideVoiceModal">
   <view class="voice-modal" catchtap="noop">
+
+    <!-- 顶部标题 -->
     <view class="vm-header">
       <text class="vm-title">🎙️ 语音记录</text>
       <view class="vm-close" bindtap="hideVoiceModal">✕</view>
     </view>
-    <view class="vm-body">
-      <text class="vm-hint">说说你的情况，AI 会自动识别并分类记录</text>
-      <text class="vm-example">💊 用药："医生开了氨氯地平5mg，每天一次长期吃"
-🍽️ 饮食："中午吃了一碗米饭、红烧鱼、炒青菜"
-❤️ 指标："今天血压 135/85，心率 72"
-📝 症状："最近头疼，晚上睡不好"
-🔀 混合："吃了米饭和鱼，顺便把降压药吃了"</text>
 
-      <!-- 录音状态指示 -->
-      <view class="vm-record-area">
-        <textarea
-          class="vm-textarea"
-          placeholder="点击下方按钮录音，或直接输入文字...&#10;可多次录音，内容会自动追加"
-          value="{{voiceText}}"
-          bindinput="onVoiceTextInput"
-          maxlength="500"
-          auto-height
-        />
-
-        <!-- 录音中指示 -->
-        <view class="vm-recording" wx:if="{{isRecording}}">
-          <view class="recording-wave">
-            <view class="wave-bar" wx:for="{{[1,2,3,4,5,4,3,2,1]}}" wx:key="*this"
-              style="animation-delay: {{index * 0.1}}s; height: {{item * 12 + 20}}rpx;"
-            />
+    <!-- 中间内容区：固定高度，段列表可滚动 -->
+    <view class="vm-content">
+      <!-- 有录音段 -->
+      <scroll-view scroll-y class="vm-scroll" wx:if="{{voiceSegments.length > 0}}">
+        <view class="voice-seg" wx:for="{{voiceSegments}}" wx:key="index">
+          <view class="seg-left">
+            <text class="seg-icon">🔊</text>
+            <text class="seg-label">语音 {{index + 1}}</text>
+            <text class="seg-dur">{{item.duration}}秒</text>
           </view>
-          <text class="recording-text">正在听...</text>
-          <text class="recording-duration">{{recordingDuration}}s</text>
+          <view class="seg-remove" data-index="{{index}}" catchtap="onRemoveSegment">✕</view>
         </view>
-      </view>
+      </scroll-view>
 
-      <!-- 底部操作区 -->
-      <view class="vm-actions">
-        <!-- 录音按钮 -->
-        <view
-          class="vm-record-btn {{isRecording ? 'recording' : ''}}"
-          catchtap="onToggleRecord"
-        >
-          <text class="record-icon">{{isRecording ? '⏹' : '🎙️'}}</text>
-          <text class="record-label">{{isRecording ? '点击结束' : (voiceText ? '继续补充' : '点击录音')}}</text>
-        </view>
-
-        <!-- 提交按钮 -->
-        <view class="vm-submit-btn {{voiceText ? 'active' : ''}}" bindtap="onSubmitVoice">
-          <text>AI 识别并记录</text>
-        </view>
+      <!-- 空状态 -->
+      <view class="vm-empty" wx:if="{{voiceSegments.length === 0 && !isRecording}}">
+        <text class="empty-hint">按住下方按钮开始录音</text>
+        <text class="empty-sub">支持多段录音，分别描述不同内容</text>
       </view>
     </view>
+
+    <!-- 底部操作区：始终固定 -->
+    <view class="vm-footer">
+      <!-- 录音按钮（按住说话） -->
+      <view
+        class="vm-record-btn {{isRecording ? 'recording' : ''}}"
+        catchtouchstart="onRecordStart"
+        catchtouchend="onRecordEnd"
+        catchtouchcancel="onRecordEnd"
+      >
+        <block wx:if="{{isRecording}}">
+          <view class="recording-wave">
+            <view class="wave-bar" wx:for="{{[1,2,3,4,5,4,3,2,1]}}" wx:key="*this" style="animation-delay: {{index * 0.1}}s;" />
+          </view>
+          <text class="record-label recording">松开结束 · {{recordingDuration}}s</text>
+        </block>
+        <block wx:else>
+          <text class="record-icon">🎙️</text>
+          <text class="record-label">按住说话</text>
+        </block>
+      </view>
+
+      <!-- 提交按钮 -->
+      <view
+        class="vm-submit-btn {{voiceSegments.length > 0 && !isRecording ? 'active' : ''}}"
+        bindtap="onSubmitVoice"
+      >
+        <text>✨ AI 识别并记录{{voiceSegments.length > 0 ? '（' + voiceSegments.length + '段）' : ''}}</text>
+      </view>
+    </view>
+
   </view>
 </view>
 
@@ -92,9 +100,7 @@
   <text class="atb-text">{{aiTip}}</text>
 </view>
 
-<!-- ══════════════════════════════════════════
-     ★ 待确认药物建议
-     ══════════════════════════════════════════ -->
+<!-- ★ 待确认药物建议 -->
 <view class="suggestion-section" wx:if="{{medSuggestions.length > 0}}">
   <view class="suggestion-header">
     <text class="suggestion-title">💊 发现新药物，需要你确认</text>
@@ -106,10 +112,24 @@
       <text class="sug-source">来源：{{item.created_at}} 语音记录</text>
     </view>
 
-    <!-- 确认表单（展开时显示） -->
     <view class="sug-form" wx:if="{{item._expanded}}">
       <view class="sug-form-row">
-        <text class="sfr-label">每天几次</text>
+        <text class="sfr-label">服药频率</text>
+        <view class="sfr-options">
+          <view class="sfr-opt {{item._interval === 1 ? 'active' : ''}}" data-id="{{item.id}}" data-interval="1" bindtap="onSugInterval">每天</view>
+          <view class="sfr-opt {{item._interval === 2 ? 'active' : ''}}" data-id="{{item.id}}" data-interval="2" bindtap="onSugInterval">隔天</view>
+          <view class="sfr-opt {{item._interval === 3 ? 'active' : ''}}" data-id="{{item.id}}" data-interval="3" bindtap="onSugInterval">每3天</view>
+        </view>
+      </view>
+      <view class="sug-form-row" wx:if="{{item._interval >= 4}}">
+        <text class="sfr-label">每几天</text>
+        <input class="sfr-input" type="number" placeholder="输入天数" value="{{item._interval}}" data-id="{{item.id}}" bindinput="onSugIntervalInput" />
+      </view>
+      <view class="sug-form-row" wx:if="{{item._interval <= 3}}">
+        <text class="sfr-label" style="font-size:22rpx;color:var(--text2);" catchtap="onSugIntervalCustom" data-id="{{item.id}}">自定义天数 →</text>
+      </view>
+      <view class="sug-form-row">
+        <text class="sfr-label">每次几服</text>
         <view class="sfr-options">
           <view class="sfr-opt {{item._times === 1 ? 'active' : ''}}" data-id="{{item.id}}" data-times="1" bindtap="onSugTimes">1次</view>
           <view class="sfr-opt {{item._times === 2 ? 'active' : ''}}" data-id="{{item.id}}" data-times="2" bindtap="onSugTimes">2次</view>
@@ -126,7 +146,7 @@
       </view>
       <view class="sug-form-row" wx:if="{{item._medType === 'course' || item._medType === 'temporary'}}">
         <text class="sfr-label">共几天</text>
-        <input class="sfr-input" type="number" placeholder="天数" value="{{item._totalDays}}" data-id="{{item.id}}" bindinput="onSugDays" />
+        <input class="sfr-input" type="number" placeholder="输入天数" value="{{item._totalDays}}" data-id="{{item.id}}" bindinput="onSugDays" />
       </view>
     </view>
 

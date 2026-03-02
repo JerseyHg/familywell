@@ -1,4 +1,6 @@
-/* pages/login/login.wxss */
+/* pages/login/login.wxss
+   ★ 新增隐私协议 checkbox 样式
+*/
 
 page { background: var(--bg); }
 .safe-top { height: calc(80px + env(safe-area-inset-top)); }
@@ -9,12 +11,8 @@ page { background: var(--bg); }
   padding: 40rpx 0;
 }
 .app-logo { font-size: 80rpx; margin-bottom: 16rpx; }
-.app-name {
-  font-size: 48rpx; font-weight: 800; color: var(--text);
-}
-.app-desc {
-  font-size: 26rpx; color: var(--sub); margin-top: 8rpx;
-}
+.app-name { font-size: 48rpx; font-weight: 800; color: var(--text); }
+.app-desc { font-size: 26rpx; color: var(--sub); margin-top: 8rpx; }
 
 .login-body { padding: 0 48rpx; }
 
@@ -30,6 +28,11 @@ page { background: var(--bg); }
   background: #07C160;
   color: #fff; font-size: 32rpx; font-weight: 600;
   box-shadow: 0 8rpx 32rpx rgba(7,193,96,0.3);
+  transition: opacity 0.2s;
+}
+.wx-login-btn.disabled {
+  opacity: 0.5;
+  box-shadow: none;
 }
 .wx-icon { font-size: 40rpx; }
 .wx-hint {
@@ -37,13 +40,37 @@ page { background: var(--bg); }
   font-size: 24rpx; color: var(--muted);
 }
 
+/* ★ 隐私协议 checkbox */
+.privacy-row {
+  display: flex; align-items: center; gap: 12rpx;
+  margin-top: 32rpx;
+}
+.privacy-check {
+  width: 36rpx; height: 36rpx;
+  border: 3rpx solid var(--border, #D1CCC5);
+  border-radius: 8rpx;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24rpx; color: transparent;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.privacy-check.checked {
+  background: var(--primary, #2D8B6F);
+  border-color: var(--primary, #2D8B6F);
+  color: #fff;
+}
+.privacy-text {
+  font-size: 24rpx; color: var(--sub, #8B8680);
+  line-height: 1.4;
+}
+.privacy-link {
+  color: var(--primary, #2D8B6F);
+  font-weight: 500;
+}
+
 /* ── Mode Switch ── */
-.switch-row {
-  text-align: center; padding: 40rpx;
-}
-.switch-text {
-  font-size: 26rpx; color: var(--primary);
-}
+.switch-row { text-align: center; padding: 40rpx; }
+.switch-text { font-size: 26rpx; color: var(--primary); }
 
 /* ── Account Form ── */
 .form-card {
@@ -91,5 +118,9 @@ page { background: var(--bg); }
   font-size: 30rpx !important; font-weight: 600 !important;
   border: none !important;
   line-height: 1.5 !important;
+  transition: opacity 0.2s;
+}
+.submit-btn.disabled {
+  opacity: 0.5 !important;
 }
 .submit-btn::after { display: none; }

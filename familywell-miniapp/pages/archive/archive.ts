@@ -4,6 +4,7 @@ const CATEGORY_MAP: Record<string, string> = {
   checkup: '体检',
   lab: '化验',
   prescription: '处方',
+  medication_log: '服药记录',   // ★ 新增
   insurance: '保险',
   food: '饮食',
   bp_reading: '血压',
@@ -15,7 +16,7 @@ const CATEGORY_MAP: Record<string, string> = {
 const CATEGORIES = [
   { key: '', icon: '📋', label: '全部' },
   { key: 'checkup,lab', icon: '🏥', label: '医疗' },
-  { key: 'prescription', icon: '💊', label: '用药' },
+  { key: 'prescription,medication_log', icon: '💊', label: '用药' },   // ★ 加入 medication_log
   { key: 'food', icon: '🍽️', label: '饮食' },
   { key: 'insurance', icon: '🛡️', label: '保险' },
   { key: 'bp_reading,weight', icon: '❤️', label: '健康数据' },
@@ -73,7 +74,6 @@ Page({
   },
 
   onShow() {
-    // 更新 TabBar 高亮
     const tabBar = this.getTabBar?.()
     if (tabBar) tabBar.setData({ active: 1 })
 
@@ -121,19 +121,15 @@ Page({
   async loadCategoryRecords() {
     try {
       const catKey = this.data.activeCat
-      // catKey 可能是 'checkup,lab' 这种多值，取第一个用于 API
-      // 或为空表示全部
       const params: any = { size: 50 }
       if (catKey) {
-        // 如果有逗号，说明是合并分类，需要多次请求或不传 category
-        // 简单方案：分别请求再合并
+        // 合并分类：分别请求再合并
         const keys = catKey.split(',')
         let allItems: any[] = []
         for (const k of keys) {
           const res: any = await recordsApi.list({ category: k, size: 50 })
           allItems = allItems.concat(res.items || [])
         }
-        // 按时间排序
         allItems.sort((a: any, b: any) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )

@@ -2,7 +2,7 @@
  * services/api.ts — API 请求封装
  * ─────────────────────────────────
  * ★ medsApi 新增 confirmSuggestion / dismissSuggestion
- * ★ chatApi 补全 stream / send 方法
+ * ★ Fix 4: stream success 回调不再重复处理 chunk 已处理的内容
  */
 
 const BASE_URL = 'https://tbowo.top/familywell/api'
@@ -188,12 +188,13 @@ export const medsApi = {
   voiceAdd: (text: string) =>
     request({ url: '/medications/voice-add', method: 'POST', data: { text } }),
 
-  // ★ 药物建议：确认 / 忽略
+  // ★ 药物建议
   confirmSuggestion: (id: number, data: {
     times_per_day?: number;
     med_type?: string;
     total_days?: number | null;
     dosage?: string | null;
+    interval_days?: number;
   }) =>
     request({ url: `/medications/suggestions/${id}/confirm`, method: 'POST', data }),
 
@@ -255,7 +256,6 @@ export const reminderApi = {
 }
 
 // ─── Chat ───
-// ★ 流式（SSE）+ 同步 fallback
 
 interface ChatParams {
   question: string
@@ -273,12 +273,13 @@ interface ChatStreamCallbacks {
 export const chatApi = {
   /**
    * ★ SSE 流式请求
-   * 后端逐行返回 `data: {...}\n\n`，前端通过 enableChunkedTransfer 接收分块
+   * Fix 4: success 回调仅在 chunk 未处理时才作为 fallback
    */
   stream(params: ChatParams, callbacks: ChatStreamCallbacks) {
     const token = getToken()
     let fullReceived = ''
     let processedLen = 0
+    let chunkedUsed = false   // ★ 标记 chunk 是否已经处理过数据
 
     const task = wx.request({
       url: `${BASE_URL}/chat/stream`,
@@ -292,6 +293,10 @@ export const chatApi = {
       responseType: 'text',
 
       success(res) {
+        // ★ Fix 4: 如果 chunk 已经处理过，不再重复解析
+        if (chunkedUsed) return
+
+        // chunk 没工作（老版基础库），用完整响应做一次性解析
         if (typeof res.data === 'string') {
           _parseAllSSELines(res.data, callbacks)
         }
@@ -306,6 +311,7 @@ export const chatApi = {
     if (task && typeof task.onChunkReceived === 'function') {
       task.onChunkReceived((resp: { data: ArrayBuffer }) => {
         try {
+          chunkedUsed = true  // ★ 标记已使用 chunk
           const chunk = _arrayBufferToString(resp.data)
           fullReceived += chunk
 

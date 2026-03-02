@@ -10,6 +10,7 @@ class MedicationCreate(BaseModel):
     start_date: date | None = None
     end_date: date | None = None
     remaining_count: int | None = None
+    interval_days: int | None = 1   # ★ 每几天一次
 
 
 class MedicationUpdate(BaseModel):
@@ -20,6 +21,7 @@ class MedicationUpdate(BaseModel):
     end_date: date | None = None
     remaining_count: int | None = None
     is_active: bool | None = None
+    interval_days: int | None = None   # ★
 
 
 class MedicationResponse(BaseModel):
@@ -31,6 +33,7 @@ class MedicationResponse(BaseModel):
     start_date: date | None
     end_date: date | None
     remaining_count: int | None
+    interval_days: int | None = 1      # ★
     is_active: bool
 
     class Config:
@@ -57,3 +60,4 @@ class SuggestionConfirmRequest(BaseModel):
     med_type: str | None = "long_term"   # long_term | course | temporary
     total_days: int | None = None        # 疗程/临时用药的总天数
     dosage: str | None = None            # 用户可补充/修改剂量
+    interval_days: int | None = 1        # ★ 每几天一次，1=每天，2=隔天，3=每3天…

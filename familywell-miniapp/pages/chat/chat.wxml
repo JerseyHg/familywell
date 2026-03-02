@@ -66,10 +66,7 @@
                 <!-- ── pie: 营养摄入 ── -->
                 <view class="chart-body" wx:if="{{chart.type === 'pie'}}">
                   <view class="pie-wrapper">
-                    <view class="pie-chart" style="background: conic-gradient(
-                      {{chart.data[0].color}} 0% {{chart.data[0].value / (chart.data[0].value + chart.data[1].value + chart.data[2].value) * 100}}%,
-                      {{chart.data[1].color}} {{chart.data[0].value / (chart.data[0].value + chart.data[1].value + chart.data[2].value) * 100}}% {{(chart.data[0].value + chart.data[1].value) / (chart.data[0].value + chart.data[1].value + chart.data[2].value) * 100}}%,
-                      {{chart.data[2].color}} {{(chart.data[0].value + chart.data[1].value) / (chart.data[0].value + chart.data[1].value + chart.data[2].value) * 100}}% 100%);" />
+                    <view class="pie-chart" style="background: conic-gradient({{chart.data[0].color}} 0% {{chart.data[0].value / (chart.data[0].value + chart.data[1].value + chart.data[2].value) * 100}}%, {{chart.data[1].color}} {{chart.data[0].value / (chart.data[0].value + chart.data[1].value + chart.data[2].value) * 100}}% {{(chart.data[0].value + chart.data[1].value) / (chart.data[0].value + chart.data[1].value + chart.data[2].value) * 100}}%, {{chart.data[2].color}} {{(chart.data[0].value + chart.data[1].value) / (chart.data[0].value + chart.data[1].value + chart.data[2].value) * 100}}% 100%);" />
                     <view class="pie-center">
                       <text class="pie-cal">{{chart.summary.total_calories}}</text>
                       <text class="pie-cal-unit">千卡</text>

@@ -1,31 +1,66 @@
 /**
  * pages/login/login.ts — 登录页
- * ─────────────────────────────────
- * [P1-2] 新增微信一键登录
- *
- * 改造思路：
- * - 默认展示"微信一键登录"按钮（推荐方式）
- * - 底部保留"使用账号密码登录"入口（备用方式）
- * - 微信登录流程：wx.login() → code → 后端换 openid → 返回 JWT
+ * ═══════════════════════════════════════
+ * ★ 新增：隐私协议 checkbox + wx.requirePrivacyAuthorize
+ *   登录时一次性完成隐私确认，后续使用不再弹窗
  */
 import { authApi } from '../../services/api'
 
 Page({
   data: {
-    // 登录模式：'wechat' | 'account-login' | 'account-register'
-    mode: 'wechat' as string,
-
-    // 账号密码表单
+    mode: 'wechat' as 'wechat' | 'account-login' | 'account-register',
     username: '',
     password: '',
     nickname: '',
     loading: false,
-
-    // 微信登录
     wxLoading: false,
+    privacyAgreed: false,   // ★ 隐私协议是否勾选
+  },
+
+  noop() {},
+
+  // ── 隐私协议 ──
+
+  onTogglePrivacy() {
+    this.setData({ privacyAgreed: !this.data.privacyAgreed })
+  },
+
+  onOpenPrivacy() {
+    // 调用微信官方隐私协议弹窗（展示你在 mp 后台配置的隐私保护指引）
+    if (typeof wx.openPrivacyContract === 'function') {
+      wx.openPrivacyContract({
+        fail: () => {
+          wx.showToast({ title: '暂时无法打开', icon: 'none' })
+        },
+      })
+    } else {
+      wx.showToast({ title: '请升级微信版本查看', icon: 'none' })
+    }
+  },
+
+  /**
+   * ★ 统一隐私确认：调用 wx.requirePrivacyAuthorize
+   * 成功后微信不再弹系统级隐私确认框
+   */
+  _ensurePrivacy(): Promise<boolean> {
+    return new Promise((resolve) => {
+      if (typeof wx.requirePrivacyAuthorize === 'function') {
+        wx.requirePrivacyAuthorize({
+          success: () => resolve(true),
+          fail: () => {
+            wx.showToast({ title: '需要同意隐私协议才能使用', icon: 'none' })
+            resolve(false)
+          },
+        })
+      } else {
+        // 低版本基础库不需要隐私确认
+        resolve(true)
+      }
+    })
   },
 
   // ── 模式切换 ──
+
   switchToAccount() {
     this.setData({ mode: 'account-login' })
   },
@@ -38,32 +73,32 @@ Page({
     this.setData({ mode: e.currentTarget.dataset.mode })
   },
 
-  // ── 账号密码表单 ──
-  onUsernameInput(e: any) {
-    this.setData({ username: e.detail.value })
-  },
+  onUsernameInput(e: any) { this.setData({ username: e.detail.value }) },
+  onPasswordInput(e: any) { this.setData({ password: e.detail.value }) },
+  onNicknameInput(e: any) { this.setData({ nickname: e.detail.value }) },
 
-  onPasswordInput(e: any) {
-    this.setData({ password: e.detail.value })
-  },
+  // ── 微信登录 ──
 
-  onNicknameInput(e: any) {
-    this.setData({ nickname: e.detail.value })
-  },
-
-  // ── [P1-2] 微信一键登录 ──
   async onWxLogin() {
+    if (!this.data.privacyAgreed) {
+      wx.showToast({ title: '请先同意隐私协议', icon: 'none' })
+      return
+    }
     if (this.data.wxLoading) return
     this.setData({ wxLoading: true })
 
     try {
-      // 1. 获取微信 code
+      // ★ 先完成微信隐私确认
+      const privacyOk = await this._ensurePrivacy()
+      if (!privacyOk) {
+        this.setData({ wxLoading: false })
+        return
+      }
+
+      // 获取微信 code
       const loginRes = await new Promise<WechatMiniprogram.LoginSuccessCallbackResult>(
         (resolve, reject) => {
-          wx.login({
-            success: resolve,
-            fail: reject,
-          })
+          wx.login({ success: resolve, fail: reject })
         }
       )
 
@@ -71,15 +106,9 @@ Page({
         throw new Error('获取微信 code 失败')
       }
 
-      // 2. （可选）获取微信头像昵称 — 需用户主动点击 button
-      // 这里先不获取，用户可以在建档时补充
+      // 调用后端
+      const res: any = await authApi.wxLogin({ code: loginRes.code })
 
-      // 3. 调用后端微信登录接口
-      const res: any = await authApi.wxLogin({
-        code: loginRes.code,
-      })
-
-      // 4. 存储 token
       wx.setStorageSync('token', res.access_token)
       wx.setStorageSync('user', res.user)
 
@@ -87,27 +116,28 @@ Page({
 
       setTimeout(() => {
         if (res.user.is_new) {
-          // 新用户 → 引导填资料
           wx.redirectTo({ url: '/pages/onboarding/onboarding' })
         } else {
-          // 老用户 → 直接进首页
           wx.switchTab({ url: '/pages/home/home' })
         }
       }, 500)
 
     } catch (err: any) {
       console.error('WeChat login failed:', err)
-      wx.showToast({
-        title: err.message || '微信登录失败',
-        icon: 'none',
-      })
+      wx.showToast({ title: err.message || '微信登录失败', icon: 'none' })
     } finally {
       this.setData({ wxLoading: false })
     }
   },
 
-  // ── 账号密码登录/注册（保持原逻辑）──
+  // ── 账号密码登录/注册 ──
+
   async onSubmit() {
+    if (!this.data.privacyAgreed) {
+      wx.showToast({ title: '请先同意隐私协议', icon: 'none' })
+      return
+    }
+
     const { mode, username, password, nickname } = this.data
 
     if (!username.trim() || !password.trim()) {
@@ -123,6 +153,13 @@ Page({
     this.setData({ loading: true })
 
     try {
+      // ★ 先完成隐私确认
+      const privacyOk = await this._ensurePrivacy()
+      if (!privacyOk) {
+        this.setData({ loading: false })
+        return
+      }
+
       let res: any
 
       if (mode === 'account-login') {
@@ -148,10 +185,7 @@ Page({
       }, 500)
 
     } catch (err: any) {
-      wx.showToast({
-        title: err.message || '操作失败',
-        icon: 'none',
-      })
+      wx.showToast({ title: err.message || '操作失败', icon: 'none' })
     } finally {
       this.setData({ loading: false })
     }
