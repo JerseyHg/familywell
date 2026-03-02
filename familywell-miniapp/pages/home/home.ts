@@ -4,6 +4,7 @@
  * ★ 审核整改：不强制登录，左上角显示"请登录"/用户名
  * ★ 语音改造：去掉WechatSI文字转换，直接录音→上传COS→后端LLM分析
  * ★ 打卡乐观更新
+ * ★ Fix: 移除语音上传/分析弹窗，增加录音按钮防抖
  */
 
 import { homeApi, medsApi, profileApi } from '../../services/api'
@@ -43,6 +44,8 @@ Page({
   _recordTimer: null as any,
   _stopFallbackTimer: null as any,
   _recordStartTime: 0,
+  _recordTouchTime: 0,       // ★ 防抖：记录触摸开始时间
+  _recordDebouncing: false,   // ★ 防抖锁
 
   // ════════════════════════════════════════
   //  生命周期
@@ -67,41 +70,52 @@ Page({
     this.setData({
       isLoggedIn,
       avatarText: user?.nickname ? user.nickname.slice(0, 1) : '👤',
-      'profile.nickname': user?.nickname || '',
     })
 
-    this.getTabBar()?.setData({ active: 0 })
-
     if (isLoggedIn) {
-      this.checkOnboarding()
       this.loadHomeData()
     }
+
+    const tabBar = this.getTabBar?.()
+    if (tabBar) tabBar.setData({ active: 0 })
   },
 
-  onPullDownRefresh() {
-    if (this.data.isLoggedIn) {
-      this.loadHomeData().then(() => wx.stopPullDownRefresh())
-    } else {
-      wx.stopPullDownRefresh()
+  // ════════════════════════════════════════
+  //  数据加载
+  // ════════════════════════════════════════
+
+  async loadHomeData() {
+    try {
+      const res: any = await homeApi.getData()
+      const profile = res.profile || {}
+      const tags: string[] = []
+      if (profile.blood_type) tags.push(`${profile.blood_type}型`)
+      if (profile.medical_history?.length) tags.push(...profile.medical_history.slice(0, 2))
+
+      this.setData({
+        profile: {
+          nickname: profile.nickname || profile.real_name || '用户',
+          age: profile.age,
+          tags,
+        },
+        pendingTasks: (res.pending_tasks || []).map((t: any) => ({
+          ...t,
+          completing: false,
+        })),
+        aiTip: res.ai_tip || '',
+        recentActivity: (res.recent_activity || []).slice(0, 5),
+        alertCount: res.alert_count || 0,
+        medSuggestions: res.medication_suggestions || [],
+      })
+    } catch (err) {
+      console.error('loadHomeData error:', err)
     }
   },
 
   // ════════════════════════════════════════
-  //  登录相关
+  //  导航 & 操作
   // ════════════════════════════════════════
 
-  /** ★ 点击左上角登录区域 */
-  onLoginTap() {
-    if (this.data.isLoggedIn) {
-      // 已登录 → 跳转设置页（或者不做任何事）
-      wx.switchTab({ url: '/pages/settings/settings' })
-    } else {
-      // 未登录 → 跳转登录页
-      wx.navigateTo({ url: '/pages/login/login' })
-    }
-  },
-
-  /** ★ 需要登录时的统一检查 */
   _requireLogin(): boolean {
     if (!this.data.isLoggedIn) {
       wx.showModal({
@@ -110,9 +124,7 @@ Page({
         confirmText: '去登录',
         cancelText: '取消',
         success: (res) => {
-          if (res.confirm) {
-            wx.navigateTo({ url: '/pages/login/login' })
-          }
+          if (res.confirm) wx.navigateTo({ url: '/pages/login/login' })
         },
       })
       return false
@@ -120,92 +132,54 @@ Page({
     return true
   },
 
-  // ════════════════════════════════════════
-  //  数据加载
-  // ════════════════════════════════════════
+  onPhotoAdd() {
+    if (!this._requireLogin()) return
 
-  async checkOnboarding() {
-    try {
-      const profile: any = await profileApi.get()
-      if (!profile.onboarding_completed) {
-        wx.redirectTo({ url: '/pages/onboarding/onboarding' })
-      }
-    } catch {}
+    batchUpload({ maxCount: 9 })
+      .then(({ recordIds }) => {
+        pollBatchAIStatus(recordIds, () => this.loadHomeData())
+      })
+      .catch(() => {})
   },
 
-  async loadHomeData() {
-    try {
-      const [homeData, profileData]: any[] = await Promise.all([
-        homeApi.getData(),
-        profileApi.get(),
-      ])
+  onPromptTap(e: any) {
+    const text = e.currentTarget.dataset.text
+    const app = getApp()
+    app.globalData = app.globalData || {}
+    app.globalData.chatInitQuestion = text
+    wx.switchTab({ url: '/pages/chat/chat' })
+  },
 
-      const profile = {
-        nickname: profileData.real_name || profileData.nickname || wx.getStorageSync('user')?.nickname || '',
-        age: profileData.age,
-        tags: [] as string[],
-      }
-      if (profileData.blood_type) profile.tags.push(`${profileData.blood_type}型血`)
-      if (profileData.allergies?.length) profile.tags.push(`过敏: ${profileData.allergies.join('、')}`)
-
-      this.setData({
-        profile,
-        avatarText: profile.nickname ? profile.nickname.slice(0, 1) : '👤',
-        pendingTasks: homeData.pending_tasks || [],
-        aiTip: homeData.ai_tip || '',
-        recentActivity: (homeData.recent_activity || []).map((r: any) => ({
-          id: r.id,
-          category: r.category,
-          title: r.title || '未命名',
-          date: r.record_date ? r.record_date.slice(5).replace('-', '/') : '',
-          ai_status: r.ai_status,
-        })),
-        alertCount: homeData.alert_count || 0,
-        medSuggestions: homeData.med_suggestions || [],
-      })
-    } catch (err: any) {
-      console.error('loadHomeData error:', err)
+  onActivityTap(e: any) {
+    const item = e.currentTarget.dataset.item
+    if (item?.id && !String(item.id).startsWith('temp_')) {
+      wx.navigateTo({ url: `/pages/record-detail/record-detail?id=${item.id}` })
     }
   },
 
-  // ════════════════════════════════════════
-  //  拍照上传
-  // ════════════════════════════════════════
-
-  async onUpload() {
-    if (!this._requireLogin()) return
-
-    try {
-      const result = await batchUpload({ maxCount: 9 })
-      if (result.recordIds.length > 0) {
-        pollBatchAIStatus(result.recordIds, () => this.loadHomeData())
-      }
-    } catch {}
+  goLogin() {
+    wx.navigateTo({ url: '/pages/login/login' })
   },
 
   // ════════════════════════════════════════
-  //  用药打卡
+  //  打卡 — 乐观更新
   // ════════════════════════════════════════
 
-  async onToggleTask(e: any) {
+  async onCompleteTask(e: any) {
     const taskId = e.currentTarget.dataset.id
-    const completed = e.currentTarget.dataset.completed
+    const idx = this.data.pendingTasks.findIndex((t: any) => t.id === taskId)
+    if (idx === -1) return
 
-    if (completed) return
-
-    // 乐观更新
-    const tasks = this.data.pendingTasks.map((t: any) => {
-      if (t.id === taskId) return { ...t, completed: true }
-      return t
-    })
-    this.setData({ pendingTasks: tasks })
+    this.setData({ [`pendingTasks[${idx}].completing`]: true })
 
     try {
       await medsApi.completeTask(taskId)
+      const tasks = this.data.pendingTasks.filter((_: any, i: number) => i !== idx)
+      this.setData({ pendingTasks: tasks })
       wx.showToast({ title: '✅ 已打卡', icon: 'none' })
-    } catch (err: any) {
-      this.loadHomeData()
-      wx.showToast({ title: err.message || '打卡失败', icon: 'none' })
+    } catch {
+      this.setData({ [`pendingTasks[${idx}].completing`]: false })
+      wx.showToast({ title: '打卡失败', icon: 'none' })
     }
   },
 
@@ -213,68 +187,27 @@ Page({
   //  药物建议确认/忽略
   // ════════════════════════════════════════
 
-  async onConfirmSuggestion(e: any) {
-    const id = e.currentTarget.dataset.id
-    const sug = this.data.medSuggestions.find((s: any) => s.id === Number(id))
-    if (!sug) return
-
-    const intervalDays = sug.interval_days || (sug.med_type === 'every_other_day' ? 2 : 1)
-    const totalDays = sug.total_days || (sug.med_type === 'long_term' ? null : 7)
-
-    try {
-      await medsApi.confirmSuggestion(Number(id), {
-        times_per_day: sug.times_per_day || 1,
-        med_type: sug.med_type || 'long_term',
-        total_days: totalDays,
-        dosage: sug.dosage,
-        interval_days: intervalDays,
-      })
-      wx.showToast({ title: `已添加「${sug.name}」`, icon: 'success' })
-      this.loadHomeData()
-    } catch (err: any) {
-      wx.showToast({ title: err.message || '确认失败', icon: 'none' })
-    }
+  onConfirmSuggestion(e: any) {
+    const item = e.currentTarget.dataset.item
+    if (!item?.id) return
+    wx.navigateTo({ url: `/pages/confirm-med/confirm-med?id=${item.id}&name=${encodeURIComponent(item.name || '')}` })
   },
 
   async onDismissSuggestion(e: any) {
-    const id = e.currentTarget.dataset.id
-    const sug = this.data.medSuggestions.find((s: any) => s.id === Number(id))
-    const remaining = this.data.medSuggestions.filter((s: any) => s.id !== Number(id))
-    this.setData({ medSuggestions: remaining })
-
+    const item = e.currentTarget.dataset.item
+    if (!item?.id) return
     try {
-      await medsApi.dismissSuggestion(Number(id))
-      wx.showToast({ title: `已忽略「${sug?.name || '药物'}」`, icon: 'none' })
-    } catch (err: any) {
-      wx.showToast({ title: err.message || '操作失败', icon: 'none' })
-      this.loadHomeData()
+      await medsApi.dismissSuggestion(item.id)
+      const sug = this.data.medSuggestions.filter((s: any) => s.id !== item.id)
+      this.setData({ medSuggestions: sug })
+      wx.showToast({ title: '已忽略', icon: 'none' })
+    } catch {
+      wx.showToast({ title: '操作失败', icon: 'none' })
     }
   },
 
   // ════════════════════════════════════════
-  //  AI 提示词 / 最近动态
-  // ════════════════════════════════════════
-
-  onPromptTap(e: any) {
-    if (!this._requireLogin()) return
-    const text = e.currentTarget.dataset.text
-    wx.switchTab({
-      url: '/pages/chat/chat',
-      success: () => {
-        getApp().globalData.chatInitQuestion = text
-      },
-    })
-  },
-
-  onActivityTap(e: any) {
-    const id = e.currentTarget.dataset.id
-    if (!id || String(id).startsWith('temp_')) return
-    wx.navigateTo({ url: `/pages/record-detail/record-detail?id=${id}` })
-  },
-
-  // ════════════════════════════════════════
-  //  语音弹窗 — 多段录音，按住说话
-  //  ★ 改造：使用 RecorderManager，不转文字
+  //  ★ 语音弹窗 — 直接录音→上传COS→后端LLM分析
   // ════════════════════════════════════════
 
   onVoiceAdd() {
@@ -304,13 +237,31 @@ Page({
     this.setData({ voiceSegments: segs })
   },
 
-  // ── 按住说话 / 松开结束 ──
+  // ── 按住说话 / 松开结束（★ 增加防抖：至少按住 300ms 才开始录音）──
   onRecordStart() {
-    if (this.data.isRecording) return
-    this._startRecording()
+    if (this.data.isRecording || this._recordDebouncing) return
+    this._recordTouchTime = Date.now()
+    this._recordDebouncing = true
+
+    // ★ 延迟 300ms 再真正开始录音，避免误触
+    setTimeout(() => {
+      this._recordDebouncing = false
+      // 如果 300ms 内已经松手了，不启动录音
+      if (this._recordTouchTime === 0) return
+      this._startRecording()
+    }, 300)
   },
 
   onRecordEnd() {
+    const holdTime = Date.now() - this._recordTouchTime
+    this._recordTouchTime = 0
+
+    // ★ 如果按住不到 300ms，取消防抖中的录音
+    if (holdTime < 300) {
+      this._recordDebouncing = false
+      return
+    }
+
     if (!this.data.isRecording) return
     this._stopRecording()
   },
@@ -398,7 +349,7 @@ Page({
     this._recorder?.stop()
   },
 
-  // ── ★ 提交：上传音频到COS → 后端LLM分析 ──
+  // ── ★ 提交：上传音频到COS → 后端LLM分析（无弹窗） ──
   async onSubmitVoice() {
     const segs = this.data.voiceSegments
     if (segs.length === 0 || this.data.isRecording) {
@@ -407,11 +358,12 @@ Page({
     }
 
     const tempId = `temp_${Date.now()}`
+    const now = new Date()
     const processingItem = {
       id: tempId,
       category: 'other',
       title: '语音记录处理中...',
-      date: `${new Date().getMonth() + 1}/${new Date().getDate()}`,
+      date: `${now.getMonth() + 1}/${now.getDate()}`,
       ai_status: 'processing',
     }
 
@@ -421,10 +373,9 @@ Page({
       recentActivity: [processingItem, ...this.data.recentActivity].slice(0, 5),
     })
 
-    wx.showLoading({ title: '上传语音中...', mask: true })
-
+    // ★ 不再显示 wx.showLoading 弹窗，后台静默处理
     try {
-      // ★ 逐个上传音频文件到 COS
+      // 逐个上传音频文件到 COS
       const audioKeys: string[] = []
       for (let i = 0; i < segs.length; i++) {
         const seg = segs[i]
@@ -432,13 +383,8 @@ Page({
         audioKeys.push(result.fileKey)
       }
 
-      wx.hideLoading()
-      wx.showLoading({ title: 'AI 分析中...', mask: true })
-
-      // ★ 调用后端语音分析接口
+      // 调用后端语音分析接口
       const res: any = await medsApi.voiceAddAudio(audioKeys)
-
-      wx.hideLoading()
 
       // 显示结果
       const typeIcons: Record<string, string> = {
@@ -455,7 +401,7 @@ Page({
 
       this.loadHomeData()
     } catch (err: any) {
-      wx.hideLoading()
+      // ★ 不再 wx.hideLoading
       const activity = this.data.recentActivity.map((item: any) => {
         if (item.id === tempId) {
           return { ...item, ai_status: 'failed' }

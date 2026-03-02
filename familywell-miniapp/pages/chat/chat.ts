@@ -6,13 +6,16 @@
  * ★ Fix 2: 完整图表模板在 wxml 中
  * ★ Fix 3: 流式输出 — chunk 模式正常逐字 + success 兜底也模拟逐字
  * ★ Fix 4: 平滑滚动
+ * ★ Fix 5: 语音输入录音 + 防抖
  */
 import { chatApi } from '../../services/api'
+import { uploadAudioToCOS } from '../../services/upload'
 
 interface Message {
   id: string
   role: 'user' | 'assistant'
   text: string
+  isVoice?: boolean
   charts?: any[]
 }
 
@@ -41,6 +44,11 @@ Page({
     scrollToView: '',
     placeholder: '今天感觉怎么样？随时聊聊~',
 
+    // ★ 语音/文字模式切换
+    inputMode: 'voice' as 'voice' | 'text',
+    isRecording: false,
+    recordingDuration: 0,
+
     homePrompts: [
       { icon: '🍽️', text: '过去7天饮食情况' },
       { icon: '💊', text: '这周药吃齐了吗' },
@@ -67,6 +75,14 @@ Page({
   _throttleTimer: null as any,
   _typingTimer: null as any,
 
+  // ★ 语音录音相关
+  _recorder: null as WechatMiniprogram.RecorderManager | null,
+  _recordTimer: null as any,
+  _stopFallbackTimer: null as any,
+  _recordStartTime: 0,
+  _recordTouchTime: 0,       // ★ 防抖：记录触摸开始时间
+  _recordDebouncing: false,   // ★ 防抖锁
+
   onShow() {
     this.getTabBar()?.setData({ active: 2 })
 
@@ -88,6 +104,12 @@ Page({
   onHide() {
     this._streamTask?.abort?.()
     this._clearTimers()
+    // 停止录音
+    if (this.data.isRecording) {
+      this._recorder?.stop()
+      clearInterval(this._recordTimer)
+      this.setData({ isRecording: false })
+    }
   },
 
   // ★ 登录守卫
@@ -127,7 +149,211 @@ Page({
   },
 
   // ══════════════════════════════
-  //  核心：流式发送
+  //  ★ 语音/文字模式切换
+  // ══════════════════════════════
+
+  onToggleInputMode() {
+    const mode = this.data.inputMode === 'voice' ? 'text' : 'voice'
+    this.setData({ inputMode: mode })
+  },
+
+  // ══════════════════════════════
+  //  ★ 语音录音（chat 页按住说话→松开发送）
+  // ══════════════════════════════
+
+  /** 初始化录音管理器 */
+  _initChatRecorder() {
+    if (this._recorder) return
+
+    const recorder = wx.getRecorderManager()
+
+    recorder.onStart(() => {
+      this._recordStartTime = Date.now()
+      this.setData({ isRecording: true, recordingDuration: 0 })
+      this._recordTimer = setInterval(() => {
+        this.setData({ recordingDuration: this.data.recordingDuration + 1 })
+      }, 1000)
+    })
+
+    recorder.onStop((res) => {
+      clearInterval(this._recordTimer)
+      clearTimeout(this._stopFallbackTimer)
+
+      const duration = Math.round((Date.now() - this._recordStartTime) / 1000)
+      this.setData({ isRecording: false, recordingDuration: 0 })
+
+      if (duration >= 1 && res.tempFilePath) {
+        // ★ 直接上传并发送语音消息
+        this._sendVoiceMessage(res.tempFilePath)
+      } else if (duration < 1) {
+        wx.showToast({ title: '录音太短', icon: 'none' })
+      }
+    })
+
+    recorder.onError((err: any) => {
+      console.error('[Chat Voice] recorder error:', err)
+      clearInterval(this._recordTimer)
+      clearTimeout(this._stopFallbackTimer)
+      this.setData({ isRecording: false, recordingDuration: 0 })
+      wx.showToast({ title: '录音失败，请重试', icon: 'none' })
+    })
+
+    this._recorder = recorder
+  },
+
+  /** ★ 按住开始录音（防抖：至少 300ms）*/
+  onVoiceRecordStart() {
+    if (this.data.isRecording || this.data.typing || this._recordDebouncing) return
+    if (!this._requireLogin()) return
+
+    this._recordTouchTime = Date.now()
+    this._recordDebouncing = true
+
+    // ★ 延迟 300ms 再真正开始录音，避免误触
+    setTimeout(() => {
+      this._recordDebouncing = false
+      if (this._recordTouchTime === 0) return
+      this._startChatRecording()
+    }, 300)
+  },
+
+  /** ★ 松开结束录音 */
+  onVoiceRecordEnd() {
+    const holdTime = Date.now() - this._recordTouchTime
+    this._recordTouchTime = 0
+
+    // ★ 如果按住不到 300ms，取消防抖中的录音
+    if (holdTime < 300) {
+      this._recordDebouncing = false
+      return
+    }
+
+    if (!this.data.isRecording) return
+    clearTimeout(this._stopFallbackTimer)
+    this._recorder?.stop()
+  },
+
+  _startChatRecording() {
+    this._initChatRecorder()
+
+    wx.authorize({
+      scope: 'scope.record',
+      success: () => {
+        this._recorder!.start({
+          format: 'mp3',
+          sampleRate: 16000,
+          numberOfChannels: 1,
+          encodeBitRate: 48000,
+          duration: 60000,
+        })
+
+        // 55 秒自动停止
+        this._stopFallbackTimer = setTimeout(() => {
+          if (this.data.isRecording) {
+            this._recorder?.stop()
+          }
+        }, 55000)
+      },
+      fail: () => {
+        wx.showModal({
+          title: '需要录音权限',
+          content: '请在设置中允许使用麦克风',
+          confirmText: '去设置',
+          success: (r) => { if (r.confirm) wx.openSetting() },
+        })
+      },
+    })
+  },
+
+  /** ★ 上传语音 → 后端语音对话 */
+  async _sendVoiceMessage(tempFilePath: string) {
+    // 在消息列表中显示用户的语音消息
+    const userMsg: Message = {
+      id: `msg_${Date.now()}`,
+      role: 'user',
+      text: '语音提问',
+      isVoice: true,
+    }
+    const messages = [...this.data.messages, userMsg]
+
+    const aiMsg: Message = { id: `ai_${Date.now()}`, role: 'assistant', text: '', charts: [] }
+    messages.push(aiMsg)
+    const aiIdx = messages.length - 1
+
+    this._streamText = ''
+    this._streamMsgIdx = aiIdx
+    this._clearTimers()
+
+    this.setData({
+      messages,
+      typing: true,
+      scrollToView: `msg-${aiIdx}`,
+    })
+
+    try {
+      // 上传音频到 COS
+      const { fileKey } = await uploadAudioToCOS(tempFilePath)
+
+      // ★ 使用语音流式对话接口
+      this._streamTask = chatApi.streamVoice(
+        {
+          audio_keys: [fileKey],
+          session_id: this.data.sessionId || undefined,
+          include_family: false,
+        },
+        {
+          onCharts: (charts: any[]) => {
+            const processed = this._processCharts(charts)
+            this.setData({ [`messages[${aiIdx}].charts`]: processed })
+            this._scrollToBottom()
+          },
+
+          onText: (delta: string) => {
+            this._streamText += delta
+            this._throttledUpdateText()
+          },
+
+          onDone: (sessionId: string) => {
+            this._clearTimers()
+            if (this._streamText) {
+              this.setData({
+                [`messages[${aiIdx}].text`]: this._streamText,
+                typing: false,
+                sessionId: sessionId || this.data.sessionId,
+              })
+            } else {
+              this.setData({ typing: false })
+            }
+            this._scrollToBottom()
+          },
+
+          onError: (err: any) => {
+            this._clearTimers()
+            console.error('Voice stream error:', err)
+            const errText = this._streamText || '抱歉，语音识别出错了，请重试'
+            this.setData({
+              [`messages[${aiIdx}].text`]: errText,
+              typing: false,
+            })
+          },
+
+          onFallback: (fullText: string, sessionId: string) => {
+            this._clearTimers()
+            this._simulateTyping(fullText, aiIdx, sessionId)
+          },
+        },
+      )
+    } catch (err) {
+      console.error('Voice upload error:', err)
+      this.setData({
+        [`messages[${aiIdx}].text`]: '语音上传失败，请重试',
+        typing: false,
+      })
+    }
+  },
+
+  // ══════════════════════════════
+  //  核心：流式发送（文字）
   // ══════════════════════════════
 
   sendMessage(text: string) {

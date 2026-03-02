@@ -1,6 +1,7 @@
 /* ══════════════════════════════
    FamilyWell — Chat Page Styles
    ★ 改造：语音输入为主，文字输入为辅
+   ★ Fix: input-bar 不再被遮挡
    ══════════════════════════════ */
 
 page { background: var(--bg); height: 100vh; overflow: hidden; }
@@ -9,7 +10,8 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
   display: flex;
   flex-direction: column;
   height: 100vh;
-  padding-bottom: calc(env(safe-area-inset-bottom) + 100rpx);
+  /* ★ Fix: 不在外层加大 padding-bottom，改由 input-bar 自带安全区 */
+  padding-bottom: 0;
   box-sizing: border-box;
   overflow: hidden;
   width: 100vw;
@@ -157,47 +159,28 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
   width: 100%;
   box-sizing: border-box;
 }
-.chart-header { display: flex; align-items: center; gap: 10rpx; margin-bottom: 16rpx; }
+.chart-header { display: flex; align-items: center; gap: 12rpx; margin-bottom: 16rpx; }
 .chart-icon { font-size: 28rpx; }
 .chart-title { font-size: 26rpx; font-weight: 600; color: var(--text); }
+.chart-period { font-size: 20rpx; color: var(--muted); margin-left: auto; }
 
-/* bar_stack */
-.bar-row { display: flex; gap: 12rpx; align-items: flex-end; height: 200rpx; }
-.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8rpx; }
-.bar-stack { display: flex; flex-direction: column-reverse; width: 100%; gap: 2rpx; }
-.bar-seg { width: 100%; border-radius: 4rpx; min-height: 4rpx; }
-.bar-label { font-size: 18rpx; color: var(--muted); white-space: nowrap; }
-.chart-legend { display: flex; gap: 16rpx; margin-top: 12rpx; flex-wrap: wrap; }
-.legend-item { display: flex; align-items: center; gap: 6rpx; }
-.legend-dot { width: 16rpx; height: 16rpx; border-radius: 4rpx; }
-.legend-text { font-size: 20rpx; color: var(--sub); }
+/* bar chart */
+.bar-chart { display: flex; flex-direction: column; gap: 12rpx; }
+.bar-row { display: flex; align-items: center; gap: 12rpx; }
+.bar-label { font-size: 22rpx; color: var(--sub); width: 80rpx; flex-shrink: 0; }
+.bar-bg { flex: 1; height: 24rpx; background: var(--bg); border-radius: 12rpx; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 12rpx; transition: width 0.6s; }
+.bar-value { font-size: 22rpx; color: var(--text); width: 80rpx; text-align: right; }
 
-/* line */
-.line-chart { display: flex; flex-direction: column; gap: 12rpx; }
-.line-row { display: flex; align-items: center; gap: 12rpx; }
-.line-label { font-size: 22rpx; color: var(--sub); width: 80rpx; flex-shrink: 0; }
-.line-bar-bg { flex: 1; height: 20rpx; background: var(--bg); border-radius: 10rpx; overflow: hidden; }
-.line-bar-fill { height: 100%; border-radius: 10rpx; transition: width 0.3s; }
-.line-value { font-size: 22rpx; color: var(--text); width: 80rpx; text-align: right; flex-shrink: 0; }
+/* pie chart */
+.pie-chart { display: flex; flex-direction: column; gap: 12rpx; }
+.pie-row { display: flex; align-items: center; gap: 12rpx; }
+.pie-dot { width: 16rpx; height: 16rpx; border-radius: 8rpx; flex-shrink: 0; }
+.pie-label { font-size: 22rpx; color: var(--sub); flex: 1; }
+.pie-value { font-size: 22rpx; color: var(--text); }
+.pie-pct { font-size: 20rpx; color: var(--muted); width: 60rpx; text-align: right; }
 
-/* donut */
-.donut-list { display: flex; flex-direction: column; gap: 10rpx; }
-.donut-item { display: flex; align-items: center; gap: 12rpx; }
-.donut-color { width: 20rpx; height: 20rpx; border-radius: 4rpx; flex-shrink: 0; }
-.donut-label { font-size: 24rpx; color: var(--sub); flex: 1; }
-.donut-value { font-size: 24rpx; color: var(--text); font-weight: 500; }
-
-/* indicator_card */
-.ind-grid { display: flex; flex-wrap: wrap; gap: 16rpx; }
-.ind-item {
-  flex: 1; min-width: 40%;
-  display: flex; flex-direction: column; align-items: center;
-  padding: 16rpx; background: var(--bg); border-radius: 12rpx;
-}
-.ind-value { font-size: 36rpx; font-weight: 700; }
-.ind-label { font-size: 20rpx; color: var(--muted); margin-top: 4rpx; }
-
-/* med_adherence */
+/* adherence */
 .med-row { display: flex; align-items: center; gap: 12rpx; margin-bottom: 12rpx; }
 .med-name { font-size: 24rpx; color: var(--sub); width: 120rpx; flex-shrink: 0; }
 .med-bar-bg { flex: 1; height: 24rpx; background: var(--bg); border-radius: 12rpx; overflow: hidden; }
@@ -245,10 +228,12 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 
 /* ══════════════════════════════
    ★ Input Bar — 语音+文字双模式
+   ★ Fix: 安全区内边距放在 input-bar 上
    ══════════════════════════════ */
 .input-bar {
   display: flex; align-items: center; gap: 16rpx;
-  padding: 16rpx 32rpx 16rpx;
+  /* ★ Fix: 底部增加安全区内边距 */
+  padding: 16rpx 32rpx calc(16rpx + env(safe-area-inset-bottom));
   background: var(--card);
   border-top: 1rpx solid var(--border);
   flex-shrink: 0;

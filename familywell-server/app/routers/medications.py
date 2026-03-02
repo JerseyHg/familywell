@@ -1046,7 +1046,7 @@ async def voice_add_audio(
                     protein_g=data.get("protein_g"),
                     fat_g=data.get("fat_g"),
                     carb_g=data.get("carb_g"),
-                    log_date=today,
+                    logged_at=today,
                 )
                 db.add(log)
                 result_items.append({"type": "food", "summary": summary or "饮食已记录"})

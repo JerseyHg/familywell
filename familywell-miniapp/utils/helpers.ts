@@ -1,19 +1,29 @@
 /**
+ * utils/helpers.ts — 工具函数
+ * ★ Fix: 所有日期/时间显示使用本地时间，避免 UTC 导致用户看到错误日期
+ */
+
+/**
  * Format date string to display
+ * ★ Fix: 使用本地时区进行日期比较
  */
 export function formatDate(dateStr: string, style: 'short' | 'full' = 'short'): string {
   if (!dateStr) return ''
   const d = new Date(dateStr)
   const now = new Date()
+
+  // ★ 使用本地日期进行比较（而不是 getTime() 的 UTC 差值）
+  const dLocal = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const nowLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const diffDays = Math.round((nowLocal.getTime() - dLocal.getTime()) / 86400000)
+
   const month = d.getMonth() + 1
   const day = d.getDate()
 
   if (style === 'short') {
-    // Today → "今天", Yesterday → "昨天", else "M/D"
-    const diff = Math.floor((now.getTime() - d.getTime()) / 86400000)
-    if (diff === 0) return '今天'
-    if (diff === 1) return '昨天'
-    if (diff === 2) return '前天'
+    if (diffDays === 0) return '今天'
+    if (diffDays === 1) return '昨天'
+    if (diffDays === 2) return '前天'
     return `${month}/${day}`
   }
 
@@ -38,18 +48,28 @@ export function getWeekday(dateStr: string): string {
 
 /**
  * Get today's date string "YYYY-MM-DD"
+ * ★ Fix: 使用本地时间而不是 UTC（toISOString 会转为 UTC，
+ *   在东八区等时区会导致跨日问题，如 23:30 北京时间会被当作第二天）
  */
 export function today(): string {
-  return new Date().toISOString().slice(0, 10)
+  const d = new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 /**
  * Get date N days ago
+ * ★ Fix: 同样使用本地时间
  */
 export function daysAgo(n: number): string {
   const d = new Date()
   d.setDate(d.getDate() - n)
-  return d.toISOString().slice(0, 10)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 /**
@@ -64,6 +84,32 @@ export function calcAge(birthday: string): number {
     age--
   }
   return age
+}
+
+/**
+ * ★ 新增：格式化 ISO 时间字符串为本地时间显示
+ * 如 "2026-03-02T15:30:00Z" → "15:30"（东八区 → "23:30"）
+ */
+export function formatLocalTime(isoStr: string): string {
+  if (!isoStr) return ''
+  const d = new Date(isoStr)
+  const hours = String(d.getHours()).padStart(2, '0')
+  const minutes = String(d.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+/**
+ * ★ 新增：格式化 ISO 时间字符串为本地日期+时间
+ * 如 "2026-03-02T15:30:00Z" → "3/2 23:30"
+ */
+export function formatLocalDateTime(isoStr: string): string {
+  if (!isoStr) return ''
+  const d = new Date(isoStr)
+  const month = d.getMonth() + 1
+  const day = d.getDate()
+  const hours = String(d.getHours()).padStart(2, '0')
+  const minutes = String(d.getMinutes()).padStart(2, '0')
+  return `${month}/${day} ${hours}:${minutes}`
 }
 
 /**
