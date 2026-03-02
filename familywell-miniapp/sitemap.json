@@ -1,3 +1,7 @@
 {
-  "rules": [{ "action": "allow", "page": "*" }]
+  "rules": [
+    { "action": "allow", "page": "pages/home/home" },
+    { "action": "allow", "page": "pages/chat/chat" },
+    { "action": "disallow", "page": "*" }
+  ]
 }

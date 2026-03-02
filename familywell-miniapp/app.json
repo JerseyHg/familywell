@@ -25,11 +25,39 @@
     "backgroundColor": "#FFFFFF",
     "borderStyle": "white",
     "list": [
-      { "pagePath": "pages/home/home", "text": "首页" },
-      { "pagePath": "pages/archive/archive", "text": "归档" },
-      { "pagePath": "pages/chat/chat", "text": "助手" },
-      { "pagePath": "pages/settings/settings", "text": "设置" }
+      {
+        "pagePath": "pages/home/home",
+        "text": "首页",
+        "iconPath": "assets/icons/home.png",
+        "selectedIconPath": "assets/icons/home-active.png"
+      },
+      {
+        "pagePath": "pages/archive/archive",
+        "text": "归档",
+        "iconPath": "assets/icons/archive.png",
+        "selectedIconPath": "assets/icons/archive-active.png"
+      },
+      {
+        "pagePath": "pages/chat/chat",
+        "text": "助手",
+        "iconPath": "assets/icons/chat.png",
+        "selectedIconPath": "assets/icons/chat-active.png"
+      },
+      {
+        "pagePath": "pages/settings/settings",
+        "text": "设置",
+        "iconPath": "assets/icons/settings.png",
+        "selectedIconPath": "assets/icons/settings-active.png"
+      }
     ]
+  },
+  "permission": {
+    "scope.record": {
+      "desc": "用于语音录入日常信息信息"
+    },
+    "scope.camera": {
+      "desc": "用于拍照上传后端文件处理"
+    }
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json",
