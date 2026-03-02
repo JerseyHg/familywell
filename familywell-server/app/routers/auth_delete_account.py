@@ -74,7 +74,16 @@ async def delete_account(
         )
         file_keys = [row[0] for row in result.all()]
 
-        # ── 2. 删除用药任务 → 药物 ──
+        # ── 2. 删除用药建议 → 用药任务 → 药物 ──
+        # 先删 medication_suggestion（外键引用 medication）
+        try:
+            from app.models.medication import MedicationSuggestion
+            await db.execute(
+                delete(MedicationSuggestion).where(MedicationSuggestion.user_id == user_id)
+            )
+        except Exception:
+            pass
+
         med_ids_result = await db.execute(
             select(Medication.id).where(Medication.user_id == user_id)
         )
@@ -156,15 +165,6 @@ async def delete_account(
                         FamilyMember.user_id == user_id,
                     )
                 )
-
-        # ── 8. 删除 MedicationSuggestion（如果有这个表）──
-        try:
-            from app.models.medication import MedicationSuggestion
-            await db.execute(
-                delete(MedicationSuggestion).where(MedicationSuggestion.user_id == user_id)
-            )
-        except Exception:
-            pass  # 表可能不存在
 
         # ── 9. 删除用户 profile ──
         await db.execute(delete(UserProfile).where(UserProfile.user_id == user_id))
