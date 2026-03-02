@@ -1060,7 +1060,7 @@ async def voice_add_audio(
                         indicator_type=ind.get("type", "other"),
                         value=ind.get("value"),
                         unit=ind.get("unit", ""),
-                        recorded_at=today,
+                        logged_at=today,
                     )
                     db.add(hi)
                 result_items.append({"type": "vitals", "summary": summary or "指标已记录"})

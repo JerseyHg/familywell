@@ -127,8 +127,9 @@ Page({
 
   async loadProjects() {
     try {
-      const projects: any = await projectsApi.list()
-      const active = (projects || [])
+      const res: any = await projectsApi.list()
+      const projects = Array.isArray(res) ? res : (res.data || res.items || [])
+      const active = projects
         .filter((p: any) => !p.is_archived)
         .map((p: any) => ({
           ...p,
