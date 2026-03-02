@@ -171,6 +171,4 @@
 
 <!-- ★ 账号注销 -->
 <view class="delete-account-btn" bindtap="onDeleteAccount">注销账号</view>
-
-<view class="logout-btn" bindtap="onLogout">退出登录</view>
 <view class="safe-bottom" />

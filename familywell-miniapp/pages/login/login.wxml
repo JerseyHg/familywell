@@ -1,6 +1,6 @@
 <!--
   pages/login/login.wxml — 登录页
-  ★ 新增隐私协议 checkbox，登录前完成隐私确认
+  ★ 隐私协议 checkbox + 用户服务协议链接
 -->
 <view class="login-page">
   <view class="safe-top" />
@@ -35,6 +35,7 @@
           <text class="privacy-link" catchtap="onOpenPrivacy">《隐私保护指引》</text>
         </view>
       </view>
+    </view>
 
     <view class="switch-row">
       <text class="switch-text" bindtap="switchToAccount">使用账号密码登录 →</text>
