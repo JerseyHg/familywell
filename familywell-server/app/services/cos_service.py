@@ -54,10 +54,9 @@ def get_file_url(file_key: str) -> str:
 
 def generate_presigned_url(file_key: str, expires: int = 1800) -> str:
     """生成 COS 预签名下载 URL（让火山 ASR 能下载音频）"""
-    url = cos_client.get_presigned_url(
+    return _client.get_presigned_url(
         Method='GET',
         Bucket=settings.COS_BUCKET,
         Key=file_key,
         Expired=expires,
     )
-    return url
