@@ -23,17 +23,18 @@
       </view>
       <text class="wx-hint">首次使用将自动创建账号</text>
 
-      <!-- ★ 隐私协议 checkbox -->
+      <!-- ★ 隐私协议 + 服务协议 checkbox -->
       <view class="privacy-row" catchtap="noop">
         <view class="privacy-check {{privacyAgreed ? 'checked' : ''}}" catchtap="onTogglePrivacy">
           <text wx:if="{{privacyAgreed}}">✓</text>
         </view>
         <view class="privacy-text">
           <text>我已阅读并同意</text>
-          <text class="privacy-link" catchtap="onOpenPrivacy">《用户隐私保护指引》</text>
+          <text class="privacy-link" catchtap="goAgreement" data-type="service">《用户服务协议》</text>
+          <text>和</text>
+          <text class="privacy-link" catchtap="onOpenPrivacy">《隐私保护指引》</text>
         </view>
       </view>
-    </view>
 
     <view class="switch-row">
       <text class="switch-text" bindtap="switchToAccount">使用账号密码登录 →</text>
@@ -87,14 +88,16 @@
         />
       </view>
 
-      <!-- ★ 账号模式也要勾选隐私 -->
+      <!-- ★ 账号模式也要勾选隐私 + 服务协议 -->
       <view class="privacy-row" catchtap="noop">
         <view class="privacy-check {{privacyAgreed ? 'checked' : ''}}" catchtap="onTogglePrivacy">
           <text wx:if="{{privacyAgreed}}">✓</text>
         </view>
         <view class="privacy-text">
           <text>我已阅读并同意</text>
-          <text class="privacy-link" catchtap="onOpenPrivacy">《用户隐私保护指引》</text>
+          <text class="privacy-link" catchtap="goAgreement" data-type="service">《用户服务协议》</text>
+          <text>和</text>
+          <text class="privacy-link" catchtap="onOpenPrivacy">《隐私保护指引》</text>
         </view>
       </view>
 

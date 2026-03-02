@@ -83,6 +83,10 @@ export const authApi = {
   wxLogin: (data: { code: string; nickname?: string; avatar_url?: string }) =>
     request({ url: '/auth/wx-login', method: 'POST', data }),
 
+  /** ★ 账号注销 */
+  deleteAccount: () =>
+      request({ url: '/auth/account', method: 'DELETE' }),
+
   me: () => request({ url: '/auth/me' }),
 }
 

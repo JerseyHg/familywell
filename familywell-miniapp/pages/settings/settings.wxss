@@ -228,3 +228,14 @@ page { background: var(--bg); }
   color: var(--accent); font-size: 30rpx; font-weight: 600;
   box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
 }
+
+/* ★ 注销账号按钮 */
+.delete-account-btn {
+  margin: 24rpx 48rpx 0;
+  padding: 24rpx;
+  text-align: center;
+  font-size: 28rpx;
+  color: #999;
+  border-radius: 20rpx;
+  background: transparent;
+}

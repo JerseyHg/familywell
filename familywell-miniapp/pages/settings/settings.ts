@@ -1,4 +1,4 @@
-import { profileApi, familyApi, recordsApi } from '../../services/api'
+import { profileApi, familyApi, recordsApi, authApi} from '../../services/api'
 
 Page({
   data: {
@@ -220,6 +220,54 @@ Page({
           wx.removeStorageSync('token')
           wx.removeStorageSync('userInfo')
           wx.redirectTo({ url: '/pages/login/login' })
+        }
+      },
+    })
+  },
+
+  // ── ★ 跳转协议页 ──
+  goAgreement(e: any) {
+    const type = e.currentTarget.dataset.type || 'service'
+    wx.navigateTo({ url: `/pages/agreement/agreement?type=${type}` })
+  },
+
+  // ── ★ 注销账号 ──
+  onDeleteAccount() {
+    wx.showModal({
+      title: '注销账号',
+      content: '注销后，您的所有健康档案、用药记录、对话历史等数据将被永久删除且无法恢复。确定要注销吗？',
+      confirmText: '确定注销',
+      confirmColor: '#E85D3A',
+      success: (res) => {
+        if (res.confirm) {
+          // 二次确认
+          wx.showModal({
+            title: '再次确认',
+            content: '此操作不可逆，所有数据将被永久删除。是否继续？',
+            confirmText: '永久删除',
+            confirmColor: '#E85D3A',
+            success: async (res2) => {
+              if (res2.confirm) {
+                try {
+                  wx.showLoading({ title: '注销中...', mask: true })
+                  await authApi.deleteAccount()
+                  wx.hideLoading()
+
+                  wx.removeStorageSync('token')
+                  wx.removeStorageSync('user')
+                  wx.removeStorageSync('userInfo')
+
+                  wx.showToast({ title: '账号已注销', icon: 'success' })
+                  setTimeout(() => {
+                    wx.redirectTo({ url: '/pages/login/login' })
+                  }, 1000)
+                } catch (err: any) {
+                  wx.hideLoading()
+                  wx.showToast({ title: err.message || '注销失败', icon: 'none' })
+                }
+              }
+            },
+          })
         }
       },
     })

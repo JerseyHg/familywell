@@ -1,0 +1,96 @@
+<!--
+  pages/agreement/agreement.wxml — 用户服务协议 / 隐私政策
+  通过 type 参数区分：service = 服务协议，privacy = 隐私政策
+-->
+<view class="agreement-page">
+  <view class="safe-top" />
+
+  <!-- ═══ 服务协议 ═══ -->
+  <view class="content" wx:if="{{type === 'service'}}">
+    <view class="doc-title">FamilyWell 用户服务协议</view>
+    <view class="doc-date">更新日期：2025 年 3 月 1 日 ｜ 生效日期：2025 年 3 月 1 日</view>
+
+    <view class="section">
+      <text class="section-title">一、总则</text>
+      <text class="section-body">欢迎使用 FamilyWell 家庭健康档案管理小程序（以下简称"本产品"）。本产品由 FamilyWell 团队（以下简称"我们"）开发和运营。在使用本产品之前，请您仔细阅读并充分理解本协议的全部内容。您注册、登录或使用本产品即视为您已阅读、理解并同意接受本协议的所有条款。</text>
+    </view>
+
+    <view class="section">
+      <text class="section-title">二、服务内容</text>
+      <text class="section-body">本产品提供以下服务：\n\n1. 健康档案管理：通过拍照上传体检报告、化验单、处方单、保险单等文档，利用 AI 技术自动识别、分类、归档。\n\n2. AI 健康助手：基于您上传的健康数据，通过对话式交互回答您的健康相关问题，并提供数据可视化展示。\n\n3. 用药管理：记录和跟踪用药情况，提供用药提醒和依从性分析。\n\n4. 家庭健康管理：支持创建家庭，管理者可查看家庭成员的健康概览。</text>
+    </view>
+
+    <view class="section">
+      <text class="section-title">三、AI 服务免责声明</text>
+      <text class="section-body">1. 本产品使用人工智能技术对上传的文档进行识别和分析。AI 识别结果仅供参考，可能存在误差，请以医疗机构出具的正式报告为准。\n\n2. AI 健康助手提供的回答仅基于您上传的数据进行分析和整理，不构成任何医疗诊断、治疗方案或健康建议。\n\n3. 本产品不是医疗器械，不能替代专业医疗诊断。如您有健康问题，请及时就医并遵循专业医生的意见。\n\n4. 对于因参考 AI 生成内容而导致的任何直接或间接损失，我们不承担责任。</text>
+    </view>
+
+    <view class="section">
+      <text class="section-title">四、用户行为规范</text>
+      <text class="section-body">1. 您应确保上传的内容真实、合法，不得上传违法违规或侵犯他人权益的内容。\n\n2. 您应妥善保管账号信息，因账号保管不善导致的损失由您自行承担。\n\n3. 您不得利用本产品从事任何违法违规活动。\n\n4. 您不得对本产品进行反向工程、反编译或其他试图获取源代码的行为。</text>
+    </view>
+
+    <view class="section">
+      <text class="section-title">五、数据安全</text>
+      <text class="section-body">1. 我们采用加密传输和存储技术保护您的健康数据安全。\n\n2. 未经您的明确授权，我们不会向任何第三方披露您的个人健康数据。\n\n3. 家庭模式下，管理者可查看家庭成员的健康概览，成员加入家庭即视为授权。\n\n4. 您可以随时在"设置"页面申请导出或删除您的数据。\n\n5. 您有权随时注销账号，注销后我们将在合理期限内删除您的所有个人数据。</text>
+    </view>
+
+    <view class="section">
+      <text class="section-title">六、知识产权</text>
+      <text class="section-body">1. 本产品的所有界面设计、程序代码、AI 模型等知识产权归我们所有。\n\n2. 您上传的原始文档（如体检报告）的知识产权归您或原始出具方所有。\n\n3. AI 对您的数据进行分析生成的摘要、图表等衍生内容，您可以自由使用。</text>
+    </view>
+
+    <view class="section">
+      <text class="section-title">七、服务变更与终止</text>
+      <text class="section-body">1. 我们有权根据业务发展需要调整服务内容，重大变更将提前通知您。\n\n2. 如您违反本协议，我们有权限制或终止对您的服务。\n\n3. 您可以随时停止使用本产品并注销账号。</text>
+    </view>
+
+    <view class="section">
+      <text class="section-title">八、其他</text>
+      <text class="section-body">1. 本协议的解释、效力和执行均适用中华人民共和国法律。\n\n2. 如本协议有任何条款无效，不影响其他条款的效力。\n\n3. 我们有权对本协议进行修订，修订后的协议将在本产品内公布。</text>
+    </view>
+  </view>
+
+  <!-- ═══ 隐私政策 ═══ -->
+  <view class="content" wx:if="{{type === 'privacy'}}">
+    <view class="doc-title">FamilyWell 隐私政策</view>
+    <view class="doc-date">更新日期：2025 年 3 月 1 日 ｜ 生效日期：2025 年 3 月 1 日</view>
+
+    <view class="section">
+      <text class="section-title">一、我们收集的信息</text>
+      <text class="section-body">为向您提供健康档案管理服务，我们需要收集以下信息：\n\n1. 账号信息：微信 OpenID（微信登录时），或用户名、密码（账号登录时）。\n\n2. 个人资料：姓名、性别、出生日期、血型、既往病史、过敏史、紧急联系人等（由您主动填写）。\n\n3. 健康档案：您上传的体检报告、化验单、处方单、食物照片、血压记录等。\n\n4. 用药信息：药品名称、剂量、频率、用药记录等。\n\n5. 对话记录：您与 AI 健康助手的问答历史。\n\n6. 设备信息：设备型号、操作系统版本（用于适配和问题排查）。</text>
+    </view>
+
+    <view class="section">
+      <text class="section-title">二、信息的使用</text>
+      <text class="section-body">1. 提供核心服务：AI 文档识别、数据归档、健康分析、用药管理。\n\n2. 个性化体验：基于您的健康数据提供个性化的 AI 回答和提醒。\n\n3. 服务改进：分析脱敏后的使用数据以优化产品功能和 AI 准确率。\n\n4. 安全保障：防范恶意攻击和异常使用。</text>
+    </view>
+
+    <view class="section">
+      <text class="section-title">三、信息的存储与保护</text>
+      <text class="section-body">1. 您的数据存储在经过安全认证的云服务器上，传输过程使用 HTTPS 加密。\n\n2. 上传的文件存储在腾讯云 COS 私有存储桶中，采用私有读写权限。\n\n3. 数据库中的敏感信息进行了加密处理。\n\n4. 我们实施严格的访问控制，仅授权人员可接触用户数据。</text>
+    </view>
+
+    <view class="section">
+      <text class="section-title">四、信息的共享</text>
+      <text class="section-body">1. 我们不会向任何第三方出售您的个人信息。\n\n2. 为实现 AI 识别和问答功能，您上传的内容会发送至 AI 服务提供商进行处理，但不会被用于训练模型。\n\n3. 仅在法律法规要求或政府主管部门依法要求时，我们才可能披露您的信息。\n\n4. 家庭模式下，家庭管理者可查看家庭成员的健康概览数据。</text>
+    </view>
+
+    <view class="section">
+      <text class="section-title">五、您的权利</text>
+      <text class="section-body">1. 查阅权：您可以随时查看您的所有健康档案和个人信息。\n\n2. 更正权：您可以编辑和更正您的个人资料和健康记录。\n\n3. 删除权：您可以删除单条记录，也可以通过注销账号删除所有数据。\n\n4. 导出权：您可以申请导出您的健康数据。\n\n5. 撤回同意：您可以随时撤回对本隐私政策的同意并注销账号。</text>
+    </view>
+
+    <view class="section">
+      <text class="section-title">六、未成年人保护</text>
+      <text class="section-body">本产品主要面向成年人。如果您是未满 18 周岁的未成年人，请在监护人的陪同和指导下使用本产品，并由监护人代为操作。</text>
+    </view>
+
+    <view class="section">
+      <text class="section-title">七、联系我们</text>
+      <text class="section-body">如您对本隐私政策有任何疑问、意见或建议，可通过小程序内"设置 > 帮助与反馈"功能与我们联系。</text>
+    </view>
+  </view>
+
+  <view class="safe-bottom" />
+</view>

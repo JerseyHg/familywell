@@ -7,7 +7,8 @@
     "pages/settings/settings",
     "pages/login/login",
     "pages/onboarding/onboarding",
-    "pages/record-detail/record-detail"
+    "pages/record-detail/record-detail",
+    "pages/agreement/agreement"
   ],
   "window": {
     "navigationBarBackgroundColor": "#F6F7F5",

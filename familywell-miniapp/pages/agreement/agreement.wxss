@@ -1,0 +1,44 @@
+/* pages/agreement/agreement.wxss */
+
+page { background: var(--bg, #F6F7F5); }
+.safe-top { height: calc(44px + env(safe-area-inset-top)); }
+.safe-bottom { height: calc(60rpx + env(safe-area-inset-bottom)); }
+
+.content {
+  padding: 32rpx 40rpx;
+}
+
+.doc-title {
+  font-size: 40rpx;
+  font-weight: 800;
+  color: var(--text, #2C2925);
+  text-align: center;
+  margin-bottom: 16rpx;
+}
+
+.doc-date {
+  font-size: 24rpx;
+  color: var(--muted, #A9A49E);
+  text-align: center;
+  margin-bottom: 48rpx;
+}
+
+.section {
+  margin-bottom: 40rpx;
+}
+
+.section-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--text, #2C2925);
+  margin-bottom: 16rpx;
+}
+
+.section-body {
+  display: block;
+  font-size: 28rpx;
+  color: var(--sub, #6B665F);
+  line-height: 1.8;
+  white-space: pre-wrap;
+}

@@ -277,3 +277,24 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 }
 .send-btn.active { background: var(--primary); }
 .send-arrow { color: #fff; font-size: 32rpx; font-weight: 700; }
+
+/* ★ AI 免责声明 */
+.ai-disclaimer-badge {
+  font-size: 20rpx;
+  color: var(--muted, #A9A49E);
+  background: rgba(45, 139, 111, 0.08);
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+  margin-top: 8rpx;
+  display: inline-block;
+}
+
+.ai-disclaimer {
+  padding: 8rpx 0 0;
+}
+
+.disclaimer-text {
+  font-size: 20rpx;
+  color: var(--muted, #A9A49E);
+  line-height: 1.4;
+}

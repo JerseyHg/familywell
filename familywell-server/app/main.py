@@ -14,6 +14,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.database import engine, Base
 from app.config import get_settings
 from app.services.cron_service import run_daily_tasks
+from app.routers.auth_delete_account import router as delete_account_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -116,6 +117,7 @@ app.include_router(home.router)
 app.include_router(chat.router)
 app.include_router(search.router)
 app.include_router(projects.router)
+app.include_router(delete_account_router)
 
 
 @app.get("/")

@@ -190,4 +190,10 @@ Page({
       this.setData({ loading: false })
     }
   },
+
+  /** ★ 跳转到服务协议 / 隐私政策页面 */
+  goAgreement(e: any) {
+    const type = e.currentTarget.dataset.type || 'service'
+    wx.navigateTo({ url: `/pages/agreement/agreement?type=${type}` })
+  },
 })
