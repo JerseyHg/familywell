@@ -1,8 +1,8 @@
 /**
  * services/api.ts — API 请求封装
  * ─────────────────────────────────
- * ★ medsApi 新增 confirmSuggestion / dismissSuggestion
- * ★ Fix 4: stream success 回调不再重复处理 chunk 已处理的内容
+ * ★ 新增 medsApi.voiceAddAudio：语音文件直接分析（不转文字）
+ * ★ 新增 chatApi.streamVoice：语音提问流式聊天
  */
 
 const BASE_URL = 'https://tbowo.top/familywell/api'
@@ -83,9 +83,8 @@ export const authApi = {
   wxLogin: (data: { code: string; nickname?: string; avatar_url?: string }) =>
     request({ url: '/auth/wx-login', method: 'POST', data }),
 
-  /** ★ 账号注销 */
   deleteAccount: () =>
-      request({ url: '/auth/account', method: 'DELETE' }),
+    request({ url: '/auth/account', method: 'DELETE' }),
 
   me: () => request({ url: '/auth/me' }),
 }
@@ -189,10 +188,14 @@ export const medsApi = {
   completeTask: (taskId: number) =>
     request({ url: `/medications/tasks/${taskId}/complete`, method: 'PUT' }),
 
+  /** 原有：文字语音记录 */
   voiceAdd: (text: string) =>
     request({ url: '/medications/voice-add', method: 'POST', data: { text } }),
 
-  // ★ 药物建议
+  /** ★ 新增：音频文件直接分析（不转文字，后端LLM直接处理音频） */
+  voiceAddAudio: (audioKeys: string[]) =>
+    request({ url: '/medications/voice-add-audio', method: 'POST', data: { audio_keys: audioKeys } }),
+
   confirmSuggestion: (id: number, data: {
     times_per_day?: number;
     med_type?: string;
@@ -267,95 +270,35 @@ interface ChatParams {
   include_family?: boolean
 }
 
+/** ★ 语音聊天参数 */
+interface ChatVoiceParams {
+  audio_keys: string[]
+  session_id?: string
+  include_family?: boolean
+}
+
 interface ChatStreamCallbacks {
   onCharts?: (charts: any[]) => void
   onText?: (delta: string) => void
   onDone?: (sessionId: string) => void
   onError?: (err: any) => void
-  // ★ success 兜底：chunk 没生效时，收集完整数据后一次性回调
   onFallbackComplete?: (fullText: string, charts: any[], sessionId: string) => void
 }
 
 export const chatApi = {
   /**
-   * ★ SSE 流式请求
-   * Fix 4: success 回调仅在 chunk 未处理时才作为 fallback
+   * ★ SSE 流式请求（文字提问）
    */
   stream(params: ChatParams, callbacks: ChatStreamCallbacks) {
-    const token = getToken()
-    let fullReceived = ''
-    let processedLen = 0
-    let chunkedUsed = false   // ★ 标记 chunk 是否已经处理过数据
+    return _doStreamRequest(`${BASE_URL}/chat/stream`, params, callbacks)
+  },
 
-    const task = wx.request({
-      url: `${BASE_URL}/chat/stream`,
-      method: 'POST',
-      data: params,
-      header: {
-        'Content-Type': 'application/json',
-        Authorization: token ? `Bearer ${token}` : '',
-      },
-      enableChunkedTransfer: true,
-      responseType: 'text',
-
-      success(res) {
-        // ★ chunk 已经处理过，不再重复
-        if (chunkedUsed) return
-
-        // ★ chunk 没工作 → 收集完整数据，调 onFallbackComplete 做模拟打字
-        if (typeof res.data === 'string') {
-          const collected = _collectSSEData(res.data)
-          if (callbacks.onFallbackComplete) {
-            callbacks.onFallbackComplete(
-              collected.fullText,
-              collected.charts,
-              collected.sessionId,
-            )
-          } else {
-            // 没有 fallback 回调，走老路
-            _parseAllSSELines(res.data, callbacks)
-          }
-        }
-      },
-
-      fail(err) {
-        callbacks.onError?.(err)
-      },
-    })
-
-    // ★ 监听分块数据到达
-    if (task && typeof task.onChunkReceived === 'function') {
-      task.onChunkReceived((resp: { data: ArrayBuffer }) => {
-        try {
-          chunkedUsed = true  // ★ 标记已使用 chunk
-          const chunk = _arrayBufferToString(resp.data)
-          fullReceived += chunk
-
-          const unprocessed = fullReceived.slice(processedLen)
-          const lines = unprocessed.split('\n')
-
-          for (let i = 0; i < lines.length - 1; i++) {
-            const line = lines[i].trim()
-            processedLen += lines[i].length + 1
-
-            if (!line.startsWith('data:')) continue
-            const jsonStr = line.slice(5).trim()
-            if (!jsonStr) continue
-
-            try {
-              const evt = JSON.parse(jsonStr)
-              _handleSSEEvent(evt, callbacks)
-            } catch { /* incomplete JSON, skip */ }
-          }
-        } catch (e) {
-          console.error('[Chat SSE] chunk parse error:', e)
-        }
-      })
-    } else {
-      console.warn('[Chat] onChunkReceived not supported, will fallback on complete')
-    }
-
-    return task
+  /**
+   * ★ 新增：SSE 流式请求（语音提问）
+   * 后端接收 audio_keys，下载音频，LLM 分析后流式返回
+   */
+  streamVoice(params: ChatVoiceParams, callbacks: ChatStreamCallbacks) {
+    return _doStreamRequest(`${BASE_URL}/chat/stream-voice`, params, callbacks)
   },
 
   /**
@@ -368,6 +311,78 @@ export const chatApi = {
       data: params,
     })
   },
+}
+
+/** 通用 SSE 流式请求实现 */
+function _doStreamRequest(url: string, params: any, callbacks: ChatStreamCallbacks) {
+  const token = getToken()
+  let fullReceived = ''
+  let processedLen = 0
+  let chunkedUsed = false
+
+  const task = wx.request({
+    url,
+    method: 'POST',
+    data: params,
+    header: {
+      'Content-Type': 'application/json',
+      Authorization: token ? `Bearer ${token}` : '',
+    },
+    enableChunkedTransfer: true,
+    responseType: 'text',
+
+    success(res) {
+      if (chunkedUsed) return
+
+      if (typeof res.data === 'string') {
+        const collected = _collectSSEData(res.data)
+        if (callbacks.onFallbackComplete) {
+          callbacks.onFallbackComplete(
+            collected.fullText,
+            collected.charts,
+            collected.sessionId,
+          )
+        } else {
+          _parseAllSSELines(res.data, callbacks)
+        }
+      }
+    },
+
+    fail(err) {
+      callbacks.onError?.(err)
+    },
+  })
+
+  if (task && typeof task.onChunkReceived === 'function') {
+    task.onChunkReceived((resp: { data: ArrayBuffer }) => {
+      try {
+        chunkedUsed = true
+        const chunk = _arrayBufferToString(resp.data)
+        fullReceived += chunk
+
+        const unprocessed = fullReceived.slice(processedLen)
+        const lines = unprocessed.split('\n')
+
+        for (let i = 0; i < lines.length - 1; i++) {
+          const line = lines[i].trim()
+          processedLen += lines[i].length + 1
+
+          if (!line.startsWith('data:')) continue
+          const jsonStr = line.slice(5).trim()
+          if (!jsonStr) continue
+
+          try {
+            const evt = JSON.parse(jsonStr)
+            _handleSSEEvent(evt, callbacks)
+          } catch { /* incomplete JSON, skip */ }
+        }
+      } catch (e) {
+        console.error('[Chat SSE] chunk parse error:', e)
+      }
+    })
+  }
+
+  return task
 }
 
 // ─── SSE 解析辅助函数 ───
@@ -388,9 +403,6 @@ function _arrayBufferToString(buf: ArrayBuffer): string {
   }
 }
 
-/**
- * ★ 收集完整 SSE 数据（不触发回调），用于 success 兜底做模拟打字
- */
 function _collectSSEData(fullData: string): { fullText: string; charts: any[]; sessionId: string } {
   let fullText = ''
   let charts: any[] = []

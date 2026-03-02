@@ -1,8 +1,8 @@
 /**
  * pages/login/login.ts — 登录页
  * ═══════════════════════════════════════
- * ★ 新增：隐私协议 checkbox + wx.requirePrivacyAuthorize
- *   登录时一次性完成隐私确认，后续使用不再弹窗
+ * ★ 审核整改：登录后返回上一页（而不是固定跳转首页）
+ * ★ 隐私协议 checkbox + wx.requirePrivacyAuthorize
  */
 import { authApi } from '../../services/api'
 
@@ -14,7 +14,7 @@ Page({
     nickname: '',
     loading: false,
     wxLoading: false,
-    privacyAgreed: false,   // ★ 隐私协议是否勾选
+    privacyAgreed: false,
   },
 
   noop() {},
@@ -26,7 +26,6 @@ Page({
   },
 
   onOpenPrivacy() {
-    // 调用微信官方隐私协议弹窗（展示你在 mp 后台配置的隐私保护指引）
     if (typeof wx.openPrivacyContract === 'function') {
       wx.openPrivacyContract({
         fail: () => {
@@ -38,10 +37,6 @@ Page({
     }
   },
 
-  /**
-   * ★ 统一隐私确认：调用 wx.requirePrivacyAuthorize
-   * 成功后微信不再弹系统级隐私确认框
-   */
   _ensurePrivacy(): Promise<boolean> {
     return new Promise((resolve) => {
       if (typeof wx.requirePrivacyAuthorize === 'function') {
@@ -53,7 +48,6 @@ Page({
           },
         })
       } else {
-        // 低版本基础库不需要隐私确认
         resolve(true)
       }
     })
@@ -77,6 +71,26 @@ Page({
   onPasswordInput(e: any) { this.setData({ password: e.detail.value }) },
   onNicknameInput(e: any) { this.setData({ nickname: e.detail.value }) },
 
+  /**
+   * ★ 登录成功后的跳转逻辑
+   * - 新用户 → 引导页
+   * - 老用户 → 返回上一页（如果有页面栈）或跳转首页
+   */
+  _navigateAfterLogin(isNew: boolean) {
+    if (isNew) {
+      wx.redirectTo({ url: '/pages/onboarding/onboarding' })
+      return
+    }
+
+    // ★ 审核整改：优先 navigateBack 回到首页
+    const pages = getCurrentPages()
+    if (pages.length > 1) {
+      wx.navigateBack()
+    } else {
+      wx.switchTab({ url: '/pages/home/home' })
+    }
+  },
+
   // ── 微信登录 ──
 
   async onWxLogin() {
@@ -88,14 +102,12 @@ Page({
     this.setData({ wxLoading: true })
 
     try {
-      // ★ 先完成微信隐私确认
       const privacyOk = await this._ensurePrivacy()
       if (!privacyOk) {
         this.setData({ wxLoading: false })
         return
       }
 
-      // 获取微信 code
       const loginRes = await new Promise<WechatMiniprogram.LoginSuccessCallbackResult>(
         (resolve, reject) => {
           wx.login({ success: resolve, fail: reject })
@@ -106,7 +118,6 @@ Page({
         throw new Error('获取微信 code 失败')
       }
 
-      // 调用后端
       const res: any = await authApi.wxLogin({ code: loginRes.code })
 
       wx.setStorageSync('token', res.access_token)
@@ -115,11 +126,7 @@ Page({
       wx.showToast({ title: '登录成功', icon: 'success' })
 
       setTimeout(() => {
-        if (res.user.is_new) {
-          wx.redirectTo({ url: '/pages/onboarding/onboarding' })
-        } else {
-          wx.switchTab({ url: '/pages/home/home' })
-        }
+        this._navigateAfterLogin(res.user.is_new)
       }, 500)
 
     } catch (err: any) {
@@ -153,7 +160,6 @@ Page({
     this.setData({ loading: true })
 
     try {
-      // ★ 先完成隐私确认
       const privacyOk = await this._ensurePrivacy()
       if (!privacyOk) {
         this.setData({ loading: false })
@@ -177,11 +183,7 @@ Page({
       })
 
       setTimeout(() => {
-        if (mode === 'account-register') {
-          wx.redirectTo({ url: '/pages/onboarding/onboarding' })
-        } else {
-          wx.switchTab({ url: '/pages/home/home' })
-        }
+        this._navigateAfterLogin(mode === 'account-register')
       }, 500)
 
     } catch (err: any) {
@@ -191,7 +193,6 @@ Page({
     }
   },
 
-  /** ★ 跳转到服务协议 / 隐私政策页面 */
   goAgreement(e: any) {
     const type = e.currentTarget.dataset.type || 'service'
     wx.navigateTo({ url: `/pages/agreement/agreement?type=${type}` })

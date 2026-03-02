@@ -20,6 +20,7 @@ from app.models.family import Family, FamilyMember
 from app.models.embedding import ChatHistory
 from app.utils.deps import get_current_user
 from app.services import rag_service
+from app.routers.voice_audio import VoiceAudioRequest, transcribe_audio_keys
 
 router = APIRouter(prefix="/api/chat", tags=["Chat"])
 
@@ -44,6 +45,12 @@ class SessionItem(BaseModel):
     last_message: str
     message_count: int
     updated_at: str
+
+class ChatVoiceRequest(BaseModel):
+    """语音聊天请求"""
+    audio_keys: list[str] = Field(..., min_length=1)
+    session_id: str | None = None
+    include_family: bool = False
 
 
 # ─── Endpoints ───
@@ -90,6 +97,85 @@ async def chat_stream(
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",   # 让 Nginx 不缓冲 SSE
+        },
+    )
+
+@router.post("/stream-voice")
+async def chat_stream_voice(
+    req: ChatVoiceRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    ★ 语音流式模式 — 接收音频文件，转文字后进行 RAG 问答。
+
+    流程：
+    1. 从 COS 下载音频 → base64
+    2. 调用 LLM 将音频转为文字
+    3. 用转录的文字进行 RAG 问答
+    4. SSE 流式返回（和 text 模式完全一致）
+    """
+    import logging
+    from app.routers.voice_audio import transcribe_audio_keys
+
+    logger = logging.getLogger(__name__)
+
+    session_id = req.session_id or str(uuid.uuid4())[:16]
+
+    # ★ Step 1: 音频转文字
+    try:
+        question = await transcribe_audio_keys(req.audio_keys)
+        if not question.strip():
+            async def error_gen():
+                yield f'data: {{"type":"text","content":"抱歉，未能识别语音内容，请重试"}}\n\n'
+                yield f'data: {{"type":"done","session_id":"{session_id}"}}\n\n'
+            return StreamingResponse(
+                error_gen(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no",
+                },
+            )
+        logger.info(f"Voice chat transcribed for user={user.id}: {question[:100]}...")
+    except Exception as e:
+        logger.error(f"Voice chat transcription failed: {e}")
+        async def error_gen():
+            yield f'data: {{"type":"text","content":"语音识别失败，请重试：{str(e)}"}}\n\n'
+            yield f'data: {{"type":"done","session_id":"{session_id}"}}\n\n'
+        return StreamingResponse(
+            error_gen(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
+    # ★ Step 2: 和文字模式完全一致的 RAG 问答
+    family_user_ids = None
+    if req.include_family:
+        family_user_ids = await _get_family_user_ids(db, user.id)
+
+    async def event_generator():
+        async for sse_line in rag_service.chat_stream(
+            db=db,
+            user_id=user.id,
+            session_id=session_id,
+            question=question,
+            family_user_ids=family_user_ids,
+        ):
+            yield sse_line
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
         },
     )
 

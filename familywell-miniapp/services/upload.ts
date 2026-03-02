@@ -1,3 +1,9 @@
+/**
+ * services/upload.ts — 文件上传服务
+ * ═══════════════════════════════════════
+ * ★ 新增 uploadAudioToCOS：上传音频文件到 COS
+ */
+
 import { recordsApi } from './api'
 
 /**
@@ -50,9 +56,6 @@ export function chooseAndUpload(): Promise<{ recordId: number }> {
 /**
  * ★ Batch upload flow:
  * Choose up to 9 images → upload each → create records → return all recordIds
- *
- * @param options.maxCount  最多选几张，默认 9
- * @param options.projectId 可选，自动归入某个项目
  */
 export function batchUpload(options?: {
   maxCount?: number
@@ -82,16 +85,13 @@ export function batchUpload(options?: {
           const fileName = filePath.split('/').pop() || `photo_${i}.jpg`
 
           try {
-            // 1. Get presigned URL
             const urlRes: any = await recordsApi.getUploadUrl({
               file_name: fileName,
               content_type: 'image/jpeg',
             })
 
-            // 2. Upload to COS
             await uploadToCOS(filePath, urlRes.upload_url)
 
-            // 3. Create record (with optional project_id)
             const createData: any = {
               file_key: urlRes.file_key,
               file_type: 'image',
@@ -135,7 +135,38 @@ export function batchUpload(options?: {
 }
 
 
-function uploadToCOS(filePath: string, uploadUrl: string): Promise<void> {
+/**
+ * ★ 新增：上传音频文件到 COS
+ * 1. 获取预签名 URL
+ * 2. 读取音频文件 → PUT 到 COS
+ * 3. 返回 file_key
+ */
+export async function uploadAudioToCOS(
+  tempFilePath: string
+): Promise<{ fileKey: string }> {
+  const fileName = `voice_${Date.now()}.mp3`
+
+  // 1. 获取预签名上传 URL
+  const urlRes: any = await recordsApi.getUploadUrl({
+    file_name: fileName,
+    content_type: 'audio/mpeg',
+  })
+
+  // 2. 上传到 COS
+  await uploadToCOS(tempFilePath, urlRes.upload_url, 'audio/mpeg')
+
+  return { fileKey: urlRes.file_key }
+}
+
+
+/**
+ * 通用 COS 上传函数（支持图片和音频）
+ */
+function uploadToCOS(
+  filePath: string,
+  uploadUrl: string,
+  contentType: string = 'image/jpeg'
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const fs = wx.getFileSystemManager()
     fs.readFile({
@@ -145,7 +176,7 @@ function uploadToCOS(filePath: string, uploadUrl: string): Promise<void> {
           url: uploadUrl,
           method: 'PUT',
           header: {
-            'Content-Type': 'image/jpeg',
+            'Content-Type': contentType,
           },
           data: res.data,
           success: (resp) => {
@@ -195,36 +226,47 @@ export function pollAIStatus(
     })
   }
 
-  // Start first poll after 2 seconds
   setTimeout(poll, 2000)
 }
 
 /**
- * Poll multiple records at once
+ * Poll batch AI status
  */
 export function pollBatchAIStatus(
   recordIds: number[],
   onAllComplete: () => void,
-  onError?: (err: any) => void,
+  maxAttempts = 30,
 ) {
-  let remaining = new Set(recordIds)
+  const pending = new Set(recordIds)
+  let attempts = 0
 
-  for (const id of recordIds) {
-    pollAIStatus(
-      id,
-      () => {
-        remaining.delete(id)
-        if (remaining.size === 0) {
-          onAllComplete()
+  const poll = () => {
+    if (pending.size === 0) {
+      onAllComplete()
+      return
+    }
+    attempts++
+    if (attempts > maxAttempts) {
+      onAllComplete()
+      return
+    }
+
+    const checks = Array.from(pending).map((id) =>
+      recordsApi.getStatus(id).then((res: any) => {
+        if (res.ai_status === 'completed' || res.ai_status === 'failed') {
+          pending.delete(id)
         }
-      },
-      (err) => {
-        remaining.delete(id)
-        console.warn(`Record ${id} failed:`, err)
-        if (remaining.size === 0) {
-          onAllComplete()
-        }
-      },
+      }).catch(() => {})
     )
+
+    Promise.all(checks).then(() => {
+      if (pending.size === 0) {
+        onAllComplete()
+      } else {
+        setTimeout(poll, 3000)
+      }
+    })
   }
+
+  setTimeout(poll, 3000)
 }

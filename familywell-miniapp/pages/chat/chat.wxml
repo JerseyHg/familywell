@@ -52,7 +52,12 @@
 
         <!-- User bubble -->
         <view class="user-bubble" wx:if="{{item.role === 'user'}}">
-          <text>{{item.text}}</text>
+          <!-- 如果是语音消息，显示语音图标 -->
+          <view class="voice-msg-indicator" wx:if="{{item.isVoice}}">
+            <text class="voice-msg-icon">🎙️</text>
+            <text>语音提问</text>
+          </view>
+          <text wx:else>{{item.text}}</text>
         </view>
 
         <!-- Assistant bubble -->
@@ -65,7 +70,7 @@
               <text class="ai-bubble-text">{{item.text}}</text>
             </view>
 
-            <!-- ★ Fix 2: 完整图表渲染模板 -->
+            <!-- ★ 图表渲染模板 -->
             <block wx:for="{{item.charts}}" wx:for-item="chart" wx:for-index="ci" wx:key="ci">
               <view class="chart-card">
                 <view class="chart-header">
@@ -73,7 +78,7 @@
                   <text class="chart-title">{{chart.title}}</text>
                 </view>
 
-                <!-- ── bar_stack: 堆叠柱状图 ── -->
+                <!-- bar_stack -->
                 <view class="chart-body" wx:if="{{chart.type === 'bar_stack'}}">
                   <view class="bar-row">
                     <view class="bar-col" wx:for="{{chart.data}}" wx:for-item="d" wx:key="label">
@@ -86,97 +91,60 @@
                       <text class="bar-label">{{d.label}}</text>
                     </view>
                   </view>
-                  <view class="chart-legend">
-                    <view class="legend-item" wx:for="{{chart.keys}}" wx:for-index="ki" wx:key="*this">
-                      <view class="legend-dot" style="background: {{chart.colors[ki]}}" />
-                      <text>{{item}}</text>
+                  <view class="chart-legend" wx:if="{{chart.keys.length > 1}}">
+                    <view class="legend-item" wx:for="{{chart.keys}}" wx:for-item="k" wx:for-index="ki" wx:key="k">
+                      <view class="legend-dot" style="background: {{chart.colors[ki]}};" />
+                      <text class="legend-text">{{k}}</text>
                     </view>
                   </view>
                 </view>
 
-                <!-- ── pie: 饼图（饮食） ── -->
-                <view class="chart-body" wx:if="{{chart.type === 'pie'}}">
-                  <view class="pie-wrapper">
-                    <view class="pie-chart" style="background: {{chart._gradient || 'conic-gradient(#ccc 0% 100%)'}};" />
-                    <view class="pie-center">
-                      <text class="pie-cal">{{chart.summary.avg_calories}}</text>
-                      <text class="pie-cal-unit">千卡/天</text>
-                    </view>
-                  </view>
-                  <view class="pie-legend">
-                    <view class="pie-legend-item" wx:for="{{chart.data}}" wx:for-item="seg" wx:key="name">
-                      <view class="pie-legend-dot" style="background: {{seg.color}};" />
-                      <text class="pie-legend-name">{{seg.name}}</text>
-                      <text class="pie-legend-val">{{seg.value}}g ({{seg.pct}}%)</text>
-                    </view>
-                  </view>
-                  <view class="pie-footer">
-                    <text class="pf-item">🔥 总热量 {{chart.summary.total_calories}} 千卡</text>
-                    <text class="pf-item">🍽️ 共 {{chart.summary.total_meals}} 餐 / {{chart.summary.days}} 天</text>
-                  </view>
-                </view>
-
-                <!-- ── dual_line: 血压双柱 ── -->
-                <view class="chart-body" wx:if="{{chart.type === 'dual_line'}}">
-                  <view class="bar-row">
-                    <view class="bar-col" wx:for="{{chart.data}}" wx:for-item="d" wx:key="label">
-                      <view class="dual-bars">
-                        <view class="bar-seg single" style="height: {{(d.systolic || 0) / 2.5}}rpx; background: #E85D3A;" />
-                        <view class="bar-seg single" style="height: {{(d.diastolic || 0) / 2.5}}rpx; background: #2D8B6F;" />
+                <!-- line -->
+                <view class="chart-body" wx:if="{{chart.type === 'line'}}">
+                  <view class="line-chart">
+                    <view class="line-row" wx:for="{{chart.data}}" wx:for-item="d" wx:key="label">
+                      <text class="line-label">{{d.label}}</text>
+                      <view class="line-bar-bg">
+                        <view class="line-bar-fill" style="width: {{d.pct || 50}}%; background: {{chart.colors[0] || '#2D8B6F'}};" />
                       </view>
-                      <text class="bar-label">{{d.label}}</text>
-                    </view>
-                  </view>
-                  <view class="chart-legend">
-                    <view class="legend-item"><view class="legend-dot" style="background: #E85D3A" /><text>收缩压</text></view>
-                    <view class="legend-item"><view class="legend-dot" style="background: #2D8B6F" /><text>舒张压</text></view>
-                  </view>
-                </view>
-
-                <!-- ── trend: 单指标趋势 ── -->
-                <view class="chart-body" wx:if="{{chart.type === 'trend'}}">
-                  <view class="trend-header">
-                    <text class="trend-latest">{{chart.summary.latest}}</text>
-                    <text class="trend-unit">{{chart.summary.unit}}</text>
-                    <text class="trend-change {{chart.summary.change_pct > 0 ? 'up' : 'down'}}">
-                      {{chart.summary.change_pct > 0 ? '+' : ''}}{{chart.summary.change_pct}}%
-                    </text>
-                  </view>
-                  <view class="bar-row">
-                    <view class="bar-col" wx:for="{{chart.data}}" wx:for-item="d" wx:key="label">
-                      <view class="dot" style="margin-bottom: {{d.value * 20}}rpx;" />
-                      <text class="bar-label">{{d.label}}</text>
+                      <text class="line-value">{{d.value}}{{chart.unit || ''}}</text>
                     </view>
                   </view>
                 </view>
 
-                <!-- ── adherence: 用药依从性 ── -->
-                <view class="chart-body" wx:if="{{chart.type === 'adherence'}}">
-                  <view class="adherence-header">
-                    <view class="adherence-ring">
-                      <text class="ring-num">{{chart.summary.rate}}%</text>
-                    </view>
-                    <view class="adherence-stats">
-                      <text class="ad-stat">完成 {{chart.summary.done}}/{{chart.summary.total}} 次</text>
-                      <text class="ad-stat missed" wx:if="{{chart.summary.missed > 0}}">漏服 {{chart.summary.missed}} 次</text>
+                <!-- donut -->
+                <view class="chart-body" wx:if="{{chart.type === 'donut'}}">
+                  <view class="donut-list">
+                    <view class="donut-item" wx:for="{{chart.data}}" wx:for-item="d" wx:for-index="di" wx:key="label">
+                      <view class="donut-color" style="background: {{chart.colors[di % chart.colors.length]}};" />
+                      <text class="donut-label">{{d.label}}</text>
+                      <text class="donut-value">{{d.value}}{{chart.unit || ''}} ({{d.pct || '—'}}%)</text>
                     </view>
                   </view>
-                  <view class="bar-row compact">
-                    <view class="bar-col" wx:for="{{chart.data}}" wx:for-item="d" wx:key="label">
-                      <view class="bar-seg single" style="height: {{d.rate * 0.8}}rpx; background: {{d.rate >= 100 ? '#2D8B6F' : d.rate >= 50 ? '#F5A623' : '#E85D3A'}};" />
-                      <text class="bar-label">{{d.label}}</text>
+                </view>
+
+                <!-- indicator_card -->
+                <view class="chart-body" wx:if="{{chart.type === 'indicator_card'}}">
+                  <view class="ind-grid">
+                    <view class="ind-item" wx:for="{{chart.data}}" wx:for-item="d" wx:key="label">
+                      <text class="ind-value" style="color: {{d.status === 'danger' ? '#E55B5B' : d.status === 'warning' ? '#F5A623' : '#2D8B6F'}};">{{d.value}}{{d.unit || ''}}</text>
+                      <text class="ind-label">{{d.label}}</text>
                     </view>
                   </view>
-                  <view class="med-progress" wx:for="{{chart.medications}}" wx:for-item="med" wx:key="name">
+                </view>
+
+                <!-- med_adherence -->
+                <view class="chart-body" wx:if="{{chart.type === 'med_adherence'}}">
+                  <view class="med-row" wx:for="{{chart.data}}" wx:for-item="med" wx:key="name">
                     <text class="med-name">{{med.name}}</text>
                     <view class="med-bar-bg">
-                      <view class="med-bar-fill" style="width: {{med.done / med.total * 100}}%; background: {{med.done === med.total ? '#2D8B6F' : '#F5A623'}};" />
+                      <view class="med-bar-fill" style="width: {{med.pct}}%; background: {{med.pct >= 80 ? '#2D8B6F' : '#F5A623'}};" />
                     </view>
                     <text class="med-ratio">{{med.done}}/{{med.total}}</text>
                   </view>
                 </view>
 
-                <!-- ── alerts: 待处理事项 ── -->
+                <!-- alerts -->
                 <view class="chart-body" wx:if="{{chart.type === 'alerts'}}">
                   <view class="alert-item" wx:for="{{chart.data}}" wx:for-item="a" wx:key="title">
                     <text class="alert-icon">{{a.type === 'med_low_stock' ? '💊' : a.type === 'insurance_expiry' ? '🛡️' : a.type === 'checkup_due' ? '📊' : '⚠️'}}</text>
@@ -187,7 +155,7 @@
                   </view>
                 </view>
 
-                <!-- ── insurance: 保险概览 ── -->
+                <!-- insurance -->
                 <view class="chart-body" wx:if="{{chart.type === 'insurance'}}">
                   <view class="ins-item" wx:for="{{chart.data}}" wx:for-item="ins" wx:key="provider">
                     <view class="ins-header-row">
@@ -222,9 +190,7 @@
         <view class="ai-avatar-sm">🤖</view>
         <view class="ai-bubble typing-bubble">
           <view class="typing-dots">
-            <view class="dot-anim" />
-            <view class="dot-anim" />
-            <view class="dot-anim" />
+            <view class="dot-anim" /><view class="dot-anim" /><view class="dot-anim" />
           </view>
         </view>
       </view>
@@ -248,22 +214,54 @@
     <view class="scroll-bottom" id="scroll-bottom" />
   </scroll-view>
 
-  <!-- ── Input Bar ── -->
+  <!-- ══════════════════════════════════════
+       ★ 输入栏：语音输入为主，文字输入为辅
+       ══════════════════════════════════════ -->
   <view class="input-bar">
-    <view class="input-wrap">
-      <input
-        class="input-field"
-        value="{{inputText}}"
-        bindinput="onInputChange"
-        bindconfirm="onInputConfirm"
-        placeholder="{{placeholder}}"
-        confirm-type="send"
-        adjust-position="{{true}}"
-      />
+    <!-- 切换模式按钮 -->
+    <view class="mode-toggle" bindtap="onToggleInputMode">
+      <text wx:if="{{inputMode === 'voice'}}">⌨️</text>
+      <text wx:else>🎙️</text>
     </view>
-    <view class="send-btn {{inputText.length > 0 ? 'active' : ''}}" bindtap="onInputConfirm">
-      <text class="send-arrow">➤</text>
-    </view>
+
+    <!-- 文字输入模式 -->
+    <block wx:if="{{inputMode === 'text'}}">
+      <view class="input-wrap">
+        <input
+          class="input-field"
+          value="{{inputText}}"
+          bindinput="onInputChange"
+          bindconfirm="onInputConfirm"
+          placeholder="{{placeholder}}"
+          confirm-type="send"
+          adjust-position="{{true}}"
+        />
+      </view>
+      <view class="send-btn {{inputText.length > 0 ? 'active' : ''}}" bindtap="onInputConfirm">
+        <text class="send-arrow">➤</text>
+      </view>
+    </block>
+
+    <!-- ★ 语音输入模式 -->
+    <block wx:if="{{inputMode === 'voice'}}">
+      <view
+        class="voice-input-btn {{isRecording ? 'recording' : ''}}"
+        catchtouchstart="onVoiceRecordStart"
+        catchtouchend="onVoiceRecordEnd"
+        catchtouchcancel="onVoiceRecordEnd"
+      >
+        <block wx:if="{{isRecording}}">
+          <view class="voice-recording-wave">
+            <view class="v-wave-bar" wx:for="{{[1,2,3,4,5,4,3,2,1]}}" wx:key="*this" style="animation-delay: {{index * 0.08}}s;" />
+          </view>
+          <text class="voice-input-label recording">松开发送 · {{recordingDuration}}s</text>
+        </block>
+        <block wx:else>
+          <text class="voice-input-icon">🎙️</text>
+          <text class="voice-input-label">按住说话</text>
+        </block>
+      </view>
+    </block>
   </view>
 
 </view>

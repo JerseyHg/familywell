@@ -1,23 +1,23 @@
 /**
  * pages/home/home.ts — 首页
  * ═══════════════════════════════════════
- * ★ 语音：多段录音、按住说话、隐藏文字
- * ★ 拍照/录音不再弹隐私确认（已在登录页完成）
+ * ★ 审核整改：不强制登录，左上角显示"请登录"/用户名
+ * ★ 语音改造：去掉WechatSI文字转换，直接录音→上传COS→后端LLM分析
  * ★ 打卡乐观更新
  */
 
 import { homeApi, medsApi, profileApi } from '../../services/api'
-import { batchUpload, pollBatchAIStatus } from '../../services/upload'
-
-const plugin = requirePlugin('WechatSI')
+import { batchUpload, pollBatchAIStatus, uploadAudioToCOS } from '../../services/upload'
 
 interface VoiceSegment {
   duration: number
-  text: string
+  tempFilePath: string   // ★ 改为存储音频文件路径，不再存 text
 }
 
 Page({
   data: {
+    isLoggedIn: false,
+    avatarText: '👤',
     profile: { nickname: '', age: null, tags: [] as string[] },
     pendingTasks: [] as any[],
     aiTip: '',
@@ -39,11 +39,10 @@ Page({
     recordingDuration: 0,
   },
 
-  _voiceManager: null as any,
-  _voiceInited: false,
+  _recorder: null as WechatMiniprogram.RecorderManager | null,
   _recordTimer: null as any,
   _stopFallbackTimer: null as any,
-  _currentSegText: '',
+  _recordStartTime: 0,
 
   // ════════════════════════════════════════
   //  生命周期
@@ -60,18 +59,65 @@ Page({
   },
 
   onShow() {
+    // ★ 审核整改：不再强制跳转登录页，只更新登录状态
     const token = wx.getStorageSync('token')
-    if (!token) {
-      wx.redirectTo({ url: '/pages/login/login' })
-      return
-    }
+    const user = wx.getStorageSync('user')
+    const isLoggedIn = !!token
+
+    this.setData({
+      isLoggedIn,
+      avatarText: user?.nickname ? user.nickname.slice(0, 1) : '👤',
+      'profile.nickname': user?.nickname || '',
+    })
+
     this.getTabBar()?.setData({ active: 0 })
-    this.checkOnboarding()
-    this.loadHomeData()
+
+    if (isLoggedIn) {
+      this.checkOnboarding()
+      this.loadHomeData()
+    }
   },
 
   onPullDownRefresh() {
-    this.loadHomeData().then(() => wx.stopPullDownRefresh())
+    if (this.data.isLoggedIn) {
+      this.loadHomeData().then(() => wx.stopPullDownRefresh())
+    } else {
+      wx.stopPullDownRefresh()
+    }
+  },
+
+  // ════════════════════════════════════════
+  //  登录相关
+  // ════════════════════════════════════════
+
+  /** ★ 点击左上角登录区域 */
+  onLoginTap() {
+    if (this.data.isLoggedIn) {
+      // 已登录 → 跳转设置页（或者不做任何事）
+      wx.switchTab({ url: '/pages/settings/settings' })
+    } else {
+      // 未登录 → 跳转登录页
+      wx.navigateTo({ url: '/pages/login/login' })
+    }
+  },
+
+  /** ★ 需要登录时的统一检查 */
+  _requireLogin(): boolean {
+    if (!this.data.isLoggedIn) {
+      wx.showModal({
+        title: '需要登录',
+        content: '请先登录后再使用此功能',
+        confirmText: '去登录',
+        cancelText: '取消',
+        success: (res) => {
+          if (res.confirm) {
+            wx.navigateTo({ url: '/pages/login/login' })
+          }
+        },
+      })
+      return false
+    }
+    return true
   },
 
   // ════════════════════════════════════════
@@ -81,160 +127,105 @@ Page({
   async checkOnboarding() {
     try {
       const profile: any = await profileApi.get()
-      if (profile && !profile.onboarding_completed) {
+      if (!profile.onboarding_completed) {
         wx.redirectTo({ url: '/pages/onboarding/onboarding' })
       }
-    } catch (e) {
-      console.warn('Profile check failed:', e)
-    }
+    } catch {}
   },
 
   async loadHomeData() {
     try {
-      const res: any = await homeApi.getData()
+      const [homeData, profileData]: any[] = await Promise.all([
+        homeApi.getData(),
+        profileApi.get(),
+      ])
 
-      const suggestions = (res.medication_suggestions || []).map((s: any) => ({
-        ...s,
-        _expanded: false,
-        _times: 1,
-        _medType: 'long_term',
-        _totalDays: '',
-        _interval: 1,   // ★ 默认每天
-        _intervalStr: '',  // ★ 自定义输入时的字符串
-      }))
+      const profile = {
+        nickname: profileData.real_name || profileData.nickname || wx.getStorageSync('user')?.nickname || '',
+        age: profileData.age,
+        tags: [] as string[],
+      }
+      if (profileData.blood_type) profile.tags.push(`${profileData.blood_type}型血`)
+      if (profileData.allergies?.length) profile.tags.push(`过敏: ${profileData.allergies.join('、')}`)
 
       this.setData({
-        profile: res.profile,
-        pendingTasks: res.pending_tasks || [],
-        aiTip: res.ai_tip || '',
-        recentActivity: res.recent_activity || [],
-        alertCount: res.alert_count || 0,
-        medSuggestions: suggestions,
+        profile,
+        avatarText: profile.nickname ? profile.nickname.slice(0, 1) : '👤',
+        pendingTasks: homeData.pending_tasks || [],
+        aiTip: homeData.ai_tip || '',
+        recentActivity: (homeData.recent_activity || []).map((r: any) => ({
+          id: r.id,
+          category: r.category,
+          title: r.title || '未命名',
+          date: r.record_date ? r.record_date.slice(5).replace('-', '/') : '',
+          ai_status: r.ai_status,
+        })),
+        alertCount: homeData.alert_count || 0,
+        medSuggestions: homeData.med_suggestions || [],
       })
-    } catch (err) {
-      console.error('Failed to load home data:', err)
+    } catch (err: any) {
+      console.error('loadHomeData error:', err)
     }
   },
 
   // ════════════════════════════════════════
-  //  拍照上传（隐私已在登录时确认，不再弹窗）
+  //  拍照上传
   // ════════════════════════════════════════
 
-  onUpload() {
-    batchUpload().then(({ recordIds }) => {
-      pollBatchAIStatus(
-        recordIds,
-        () => {
-          wx.showToast({ title: '识别完成', icon: 'success' })
-          this.loadHomeData()
-        },
-        () => wx.showToast({ title: '部分识别失败', icon: 'none' }),
-      )
-    }).catch(() => {})
+  async onUpload() {
+    if (!this._requireLogin()) return
+
+    try {
+      const result = await batchUpload({ maxCount: 9 })
+      if (result.recordIds.length > 0) {
+        pollBatchAIStatus(result.recordIds, () => this.loadHomeData())
+      }
+    } catch {}
   },
 
   // ════════════════════════════════════════
-  //  用药打卡 — 乐观更新
+  //  用药打卡
   // ════════════════════════════════════════
 
-  onPunchTask(e: any) {
+  async onToggleTask(e: any) {
     const taskId = e.currentTarget.dataset.id
-    const tasks = this.data.pendingTasks.filter((t: any) => t.id !== taskId)
+    const completed = e.currentTarget.dataset.completed
+
+    if (completed) return
+
+    // 乐观更新
+    const tasks = this.data.pendingTasks.map((t: any) => {
+      if (t.id === taskId) return { ...t, completed: true }
+      return t
+    })
     this.setData({ pendingTasks: tasks })
-    wx.showToast({ title: '打卡成功', icon: 'success' })
 
-    medsApi.completeTask(taskId).then(() => {
+    try {
+      await medsApi.completeTask(taskId)
+      wx.showToast({ title: '✅ 已打卡', icon: 'none' })
+    } catch (err: any) {
       this.loadHomeData()
-    }).catch(() => {
-      wx.showToast({ title: '打卡失败，请重试', icon: 'none' })
-      this.loadHomeData()
-    })
+      wx.showToast({ title: err.message || '打卡失败', icon: 'none' })
+    }
   },
 
   // ════════════════════════════════════════
-  //  药物建议
+  //  药物建议确认/忽略
   // ════════════════════════════════════════
-
-  onToggleSuggestion(e: any) {
-    const id = e.currentTarget.dataset.id
-    const idx = this.data.medSuggestions.findIndex((s: any) => s.id === id)
-    if (idx < 0) return
-    this.setData({ [`medSuggestions[${idx}]._expanded`]: true })
-  },
-
-  onSugTimes(e: any) {
-    const { id, times } = e.currentTarget.dataset
-    const idx = this.data.medSuggestions.findIndex((s: any) => s.id === Number(id))
-    if (idx < 0) return
-    this.setData({ [`medSuggestions[${idx}]._times`]: Number(times) })
-  },
-
-  onSugType(e: any) {
-    const { id, type } = e.currentTarget.dataset
-    const idx = this.data.medSuggestions.findIndex((s: any) => s.id === Number(id))
-    if (idx < 0) return
-    this.setData({ [`medSuggestions[${idx}]._medType`]: type })
-  },
-
-  // ★ 频率选择
-  onSugInterval(e: any) {
-    const { id, interval } = e.currentTarget.dataset
-    const idx = this.data.medSuggestions.findIndex((s: any) => s.id === Number(id))
-    if (idx < 0) return
-    const n = Number(interval)
-    this.setData({
-      [`medSuggestions[${idx}]._interval`]: n,
-      [`medSuggestions[${idx}]._intervalStr`]: '',   // 清空自定义输入
-    })
-  },
-
-  onSugIntervalInput(e: any) {
-    const id = e.currentTarget.dataset.id
-    const idx = this.data.medSuggestions.findIndex((s: any) => s.id === Number(id))
-    if (idx < 0) return
-    const raw = e.detail.value    // ★ 允许清空
-    const num = Number(raw)
-    this.setData({
-      [`medSuggestions[${idx}]._intervalStr`]: raw,
-      [`medSuggestions[${idx}]._interval`]: (num >= 1) ? num : 4,  // 保持 >=4 让面板显示
-    })
-  },
-
-  onSugIntervalCustom(e: any) {
-    const id = e.currentTarget.dataset.id
-    const idx = this.data.medSuggestions.findIndex((s: any) => s.id === Number(id))
-    if (idx < 0) return
-    this.setData({
-      [`medSuggestions[${idx}]._interval`]: 4,
-      [`medSuggestions[${idx}]._intervalStr`]: '',   // ★ 空白让用户输入
-    })
-  },
-
-  onSugDays(e: any) {
-    const id = e.currentTarget.dataset.id
-    const idx = this.data.medSuggestions.findIndex((s: any) => s.id === Number(id))
-    if (idx < 0) return
-    this.setData({ [`medSuggestions[${idx}]._totalDays`]: e.detail.value })
-  },
 
   async onConfirmSuggestion(e: any) {
     const id = e.currentTarget.dataset.id
     const sug = this.data.medSuggestions.find((s: any) => s.id === Number(id))
     if (!sug) return
 
-    const totalDays = Number(sug._totalDays) || 7
+    const intervalDays = sug.interval_days || (sug.med_type === 'every_other_day' ? 2 : 1)
+    const totalDays = sug.total_days || (sug.med_type === 'long_term' ? null : 7)
 
     try {
-      // ★ 自定义频率时从字符串读取
-      let intervalDays = sug._interval || 1
-      if (sug._interval >= 4 && sug._intervalStr) {
-        intervalDays = Math.max(1, Number(sug._intervalStr) || 1)
-      }
-
       await medsApi.confirmSuggestion(Number(id), {
-        times_per_day: sug._times,
-        med_type: sug._medType,
-        total_days: (sug._medType === 'course' || sug._medType === 'temporary') ? totalDays : null,
+        times_per_day: sug.times_per_day || 1,
+        med_type: sug.med_type || 'long_term',
+        total_days: totalDays,
         dosage: sug.dosage,
         interval_days: intervalDays,
       })
@@ -265,6 +256,7 @@ Page({
   // ════════════════════════════════════════
 
   onPromptTap(e: any) {
+    if (!this._requireLogin()) return
     const text = e.currentTarget.dataset.text
     wx.switchTab({
       url: '/pages/chat/chat',
@@ -282,21 +274,23 @@ Page({
 
   // ════════════════════════════════════════
   //  语音弹窗 — 多段录音，按住说话
+  //  ★ 改造：使用 RecorderManager，不转文字
   // ════════════════════════════════════════
 
   onVoiceAdd() {
+    if (!this._requireLogin()) return
+
     this.setData({
       showVoiceModal: true,
       voiceSegments: [],
       isRecording: false,
       recordingDuration: 0,
     })
-    this._currentSegText = ''
   },
 
   hideVoiceModal() {
     if (this.data.isRecording) {
-      this._voiceManager?.stop?.()
+      this._recorder?.stop()
     }
     this.setData({ showVoiceModal: false })
   },
@@ -321,65 +315,67 @@ Page({
     this._stopRecording()
   },
 
-  _initVoice() {
-    if (this._voiceInited) return
-    const manager = plugin.getRecordRecognitionManager()
+  /** ★ 初始化 RecorderManager（替代 WechatSI 插件） */
+  _initRecorder() {
+    if (this._recorder) return
 
-    manager.onStart = () => {
-      this._currentSegText = ''
+    const recorder = wx.getRecorderManager()
+
+    recorder.onStart(() => {
+      this._recordStartTime = Date.now()
       this.setData({ isRecording: true, recordingDuration: 0 })
       this._recordTimer = setInterval(() => {
         this.setData({ recordingDuration: this.data.recordingDuration + 1 })
       }, 1000)
-    }
+    })
 
-    manager.onRecognize = (res: any) => {
-      if (res.result) {
-        this._currentSegText = res.result
-      }
-    }
-
-    manager.onStop = (res: any) => {
+    recorder.onStop((res) => {
       clearInterval(this._recordTimer)
       clearTimeout(this._stopFallbackTimer)
 
-      const duration = this.data.recordingDuration
-      const finalText = res.result || this._currentSegText
-
+      const duration = Math.round((Date.now() - this._recordStartTime) / 1000)
       this.setData({ isRecording: false })
 
-      if (finalText && duration >= 1) {
-        const seg: VoiceSegment = { duration, text: finalText }
+      if (duration >= 1 && res.tempFilePath) {
+        const seg: VoiceSegment = {
+          duration,
+          tempFilePath: res.tempFilePath,
+        }
         this.setData({
           voiceSegments: [...this.data.voiceSegments, seg],
         })
       } else if (duration < 1) {
         wx.showToast({ title: '录音太短', icon: 'none' })
       }
+    })
 
-      this._currentSegText = ''
-    }
-
-    manager.onError = (err: any) => {
-      console.error('[Voice] error:', err)
+    recorder.onError((err: any) => {
+      console.error('[Voice] recorder error:', err)
       clearInterval(this._recordTimer)
       clearTimeout(this._stopFallbackTimer)
       this.setData({ isRecording: false })
       wx.showToast({ title: '录音失败，请重试', icon: 'none' })
-    }
+    })
 
-    this._voiceManager = manager
-    this._voiceInited = true
+    this._recorder = recorder
   },
 
-  // ★ 只检查麦克风权限（隐私已在登录时确认）
+  /** ★ 开始录音：使用 RecorderManager */
   _startRecording() {
-    this._initVoice()
+    this._initRecorder()
 
     wx.authorize({
       scope: 'scope.record',
       success: () => {
-        this._voiceManager.start({ lang: 'zh_CN' })
+        this._recorder!.start({
+          format: 'mp3',
+          sampleRate: 16000,
+          numberOfChannels: 1,
+          encodeBitRate: 48000,
+          duration: 60000,  // 最长 60 秒
+        })
+
+        // 55 秒自动停止
         this._stopFallbackTimer = setTimeout(() => {
           if (this.data.isRecording) {
             this._stopRecording()
@@ -399,10 +395,10 @@ Page({
 
   _stopRecording() {
     clearTimeout(this._stopFallbackTimer)
-    this._voiceManager?.stop?.()
+    this._recorder?.stop()
   },
 
-  // ── 提交：拼接 → 关窗 → 后台处理 ──
+  // ── ★ 提交：上传音频到COS → 后端LLM分析 ──
   async onSubmitVoice() {
     const segs = this.data.voiceSegments
     if (segs.length === 0 || this.data.isRecording) {
@@ -410,16 +406,13 @@ Page({
       return
     }
 
-    const fullText = segs.map((s: VoiceSegment) => s.text).join('，')
-
     const tempId = `temp_${Date.now()}`
     const processingItem = {
       id: tempId,
       category: 'other',
-      title: fullText.slice(0, 20) + (fullText.length > 20 ? '…' : ''),
+      title: '语音记录处理中...',
       date: `${new Date().getMonth() + 1}/${new Date().getDate()}`,
       ai_status: 'processing',
-      _voiceText: fullText,
     }
 
     this.setData({
@@ -428,10 +421,26 @@ Page({
       recentActivity: [processingItem, ...this.data.recentActivity].slice(0, 5),
     })
 
-    try {
-      const res: any = await medsApi.voiceAdd(fullText)
+    wx.showLoading({ title: '上传语音中...', mask: true })
 
-      // ★ 显示各类型结果的 icon
+    try {
+      // ★ 逐个上传音频文件到 COS
+      const audioKeys: string[] = []
+      for (let i = 0; i < segs.length; i++) {
+        const seg = segs[i]
+        const result = await uploadAudioToCOS(seg.tempFilePath)
+        audioKeys.push(result.fileKey)
+      }
+
+      wx.hideLoading()
+      wx.showLoading({ title: 'AI 分析中...', mask: true })
+
+      // ★ 调用后端语音分析接口
+      const res: any = await medsApi.voiceAddAudio(audioKeys)
+
+      wx.hideLoading()
+
+      // 显示结果
       const typeIcons: Record<string, string> = {
         medication: '💊', food: '🍽️', vitals: '❤️', symptom: '📝',
         insurance: '🛡️', memo: '📋',
@@ -440,10 +449,13 @@ Page({
       if (items.length > 0) {
         const labels = items.map((i: any) => `${typeIcons[i.type] || '✅'}${i.summary || ''}`).join(' ')
         wx.showToast({ title: labels.slice(0, 40) || '✅ 记录成功', icon: 'none', duration: 2500 })
+      } else {
+        wx.showToast({ title: '✅ 记录成功', icon: 'none' })
       }
 
       this.loadHomeData()
     } catch (err: any) {
+      wx.hideLoading()
       const activity = this.data.recentActivity.map((item: any) => {
         if (item.id === tempId) {
           return { ...item, ai_status: 'failed' }
@@ -456,9 +468,6 @@ Page({
   },
 
   onRetryVoice(e: any) {
-    const text = e.currentTarget.dataset.text
-    if (text) {
-      this.setData({ showVoiceModal: true, voiceSegments: [] })
-    }
+    this.setData({ showVoiceModal: true, voiceSegments: [] })
   },
 })

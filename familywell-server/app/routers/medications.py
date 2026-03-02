@@ -22,6 +22,8 @@ from app.schemas.medication import (
 )
 from app.utils.deps import get_current_user
 
+from app.routers.voice_audio import VoiceAudioRequest, transcribe_audio_keys
+
 router = APIRouter(prefix="/api/medications", tags=["medications"])
 
 
@@ -872,3 +874,220 @@ async def complete_task(
         pass
 
     return {"status": "completed", "completed_at": task.completed_at.isoformat()}
+
+
+class VoiceAudioRequest(_BaseModel):
+    """语音音频分析请求"""
+    audio_keys: list[str]
+
+
+@router.post("/voice-add-audio")
+async def voice_add_audio(
+    req: VoiceAudioRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    ★ 新端点：直接接收音频文件进行分析。
+    流程：
+    1. 从 COS 下载音频 → base64
+    2. 调用 LLM 转录为文字（利用多模态能力）
+    3. 复用原有的 voice-add 多类型拆分逻辑
+    """
+    from app.routers.voice_audio import transcribe_audio_keys
+
+    if not req.audio_keys:
+        raise HTTPException(status_code=400, detail="请提供至少一个音频文件")
+
+    try:
+        # ★ Step 1: 下载音频并用 LLM 转文字
+        full_text = await transcribe_audio_keys(req.audio_keys)
+
+        if not full_text.strip():
+            raise HTTPException(status_code=400, detail="未能识别语音内容，请重试")
+
+        logger.info(f"Audio transcribed for user={user.id}: {full_text[:100]}...")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Audio transcription failed for user={user.id}: {e}")
+        raise HTTPException(status_code=500, detail=f"语音识别失败: {str(e)}")
+
+    # ★ Step 2: 复用原有的文字分析逻辑
+    # 以下代码与 voice_add_medication 中的逻辑完全一致
+
+    from app.config import get_settings
+    from app.models.record import Record
+    from app.models.health_indicator import HealthIndicator
+    from app.models.nutrition import NutritionLog
+    from openai import AsyncOpenAI
+
+    _settings = get_settings()
+    client = AsyncOpenAI(
+        api_key=_settings.DOUBAO_API_KEY,
+        base_url=_settings.DOUBAO_BASE_URL,
+    )
+
+    # 调用 LLM 分析文本
+    try:
+        resp = await client.chat.completions.create(
+            model=_settings.DOUBAO_MODEL,
+            messages=[{"role": "user", "content": VOICE_MULTI_PROMPT + full_text}],
+            max_tokens=2000,
+            temperature=0.2,
+        )
+        raw = resp.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1]
+        if raw.endswith("```"):
+            raw = raw.rsplit("```", 1)[0]
+        parsed = json.loads(raw.strip())
+    except Exception as e:
+        logger.error(f"Voice audio LLM parse failed: {e}")
+        raise HTTPException(status_code=500, detail="AI 分析失败，请重试")
+
+    items = parsed.get("items", [])
+    if not items:
+        raise HTTPException(status_code=400, detail="未能识别有效内容")
+
+    # ★ Step 3: 创建 Record（归档可见）
+    from datetime import date as date_type
+    today = date_type.today()
+
+    record = Record(
+        user_id=user.id,
+        file_key=req.audio_keys[0] if req.audio_keys else None,
+        file_type="audio",
+        source="voice",
+        category="medication_log",
+        ai_status="completed",
+        ai_raw_result={
+            "category": "medication_log",
+            "title": f"语音记录 - {today.strftime('%m/%d')}",
+            "raw_text": full_text,
+            "items": items,
+        },
+        record_date=today,
+        title=f"语音记录 - {today.strftime('%m/%d')}",
+    )
+    db.add(record)
+    await db.flush()
+
+    # ★ Step 4: 按类型分发处理（复用原有逻辑）
+    result_items = []
+
+    for item in items:
+        item_type = item.get("type", "memo")
+        data = item.get("data", {})
+        summary = item.get("summary", "")
+
+        try:
+            if item_type == "medication":
+                meds = data.get("medications", [])
+                for med_info in meds:
+                    med_name = med_info.get("name", "").strip()
+                    if not med_name:
+                        continue
+
+                    # 查找已有药物
+                    existing = await db.execute(
+                        select(Medication).where(
+                            Medication.user_id == user.id,
+                            Medication.name == med_name,
+                            Medication.is_active == True,
+                        )
+                    )
+                    existing_med = existing.scalar_one_or_none()
+
+                    if existing_med:
+                        # 自动打卡
+                        from datetime import datetime, time as time_type
+                        now = datetime.now()
+                        task_result = await db.execute(
+                            select(MedicationTask).where(
+                                MedicationTask.medication_id == existing_med.id,
+                                MedicationTask.scheduled_date == today,
+                                MedicationTask.completed == False,
+                            )
+                        )
+                        uncompleted = task_result.scalars().first()
+                        if uncompleted:
+                            uncompleted.completed = True
+                            uncompleted.completed_at = now
+                            summary = f"✅ {med_name} 已打卡"
+                        else:
+                            summary = f"💊 {med_name} 今日已全部服用"
+                    else:
+                        # 创建药物建议
+                        sug = MedicationSuggestion(
+                            user_id=user.id,
+                            record_id=record.id,
+                            name=med_name,
+                            dosage=med_info.get("dosage"),
+                            med_type=med_info.get("med_type", "long_term"),
+                            times_per_day=med_info.get("times_per_day", 1),
+                            total_days=med_info.get("total_days"),
+                            reason=f"语音记录提取",
+                        )
+                        db.add(sug)
+                        summary = f"💊 新药物「{med_name}」待确认"
+
+                result_items.append({"type": "medication", "summary": summary})
+
+            elif item_type == "food":
+                from app.models.nutrition import NutritionLog
+                log = NutritionLog(
+                    user_id=user.id,
+                    record_id=record.id,
+                    meal_type=data.get("meal_type", "snack"),
+                    food_items=data.get("food_items", []),
+                    calories=data.get("calories"),
+                    protein_g=data.get("protein_g"),
+                    fat_g=data.get("fat_g"),
+                    carb_g=data.get("carb_g"),
+                    log_date=today,
+                )
+                db.add(log)
+                result_items.append({"type": "food", "summary": summary or "饮食已记录"})
+
+            elif item_type == "vitals":
+                indicators = data.get("indicators", [])
+                for ind in indicators:
+                    hi = HealthIndicator(
+                        user_id=user.id,
+                        record_id=record.id,
+                        indicator_type=ind.get("type", "other"),
+                        value=ind.get("value"),
+                        unit=ind.get("unit", ""),
+                        recorded_at=today,
+                    )
+                    db.add(hi)
+                result_items.append({"type": "vitals", "summary": summary or "指标已记录"})
+
+            else:
+                result_items.append({"type": item_type, "summary": summary or "已记录"})
+
+        except Exception as e:
+            logger.error(f"Voice audio item processing error: {e}")
+            result_items.append({"type": item_type, "summary": f"处理失败: {str(e)}"})
+
+    await db.commit()
+
+    # 清除缓存
+    try:
+        from app.services.rag_service import invalidate_user_cache
+        await invalidate_user_cache(user.id)
+    except Exception:
+        pass
+
+    # 生成 Embedding
+    try:
+        from app.services.embedding_service import generate_record_embeddings
+        from app.database import async_session_factory
+        async with async_session_factory() as embed_db:
+            await generate_record_embeddings(embed_db, record.id)
+    except Exception as e:
+        logger.warning(f"Embedding generation failed: {e}")
+
+    return {"items": result_items, "text": full_text}

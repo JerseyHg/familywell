@@ -1,4 +1,5 @@
 /* pages/home/home.wxss — 首页样式
+   ★ 审核整改：左上角登录区域
    ★ 语音弹窗：固定三段布局（header / content / footer）
 */
 
@@ -7,10 +8,105 @@ page { background: var(--bg, #F4F1EB); }
 .safe-top { height: calc(44px + env(safe-area-inset-top)); }
 .safe-bottom { height: 180rpx; }
 
-/* ── Header ── */
-.header { padding: 40rpx 40rpx 20rpx; }
+/* ══════════════════════════════════════
+   Header + Login Area
+   ══════════════════════════════════════ */
+
+.header { padding: 20rpx 40rpx 20rpx; }
+
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-bottom: 16rpx;
+}
+
+.login-area {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 10rpx 24rpx 10rpx 12rpx;
+  background: #fff;
+  border-radius: 40rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.06);
+}
+
+.login-icon {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 50%;
+  background: var(--border, #E8E4DD);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+}
+
+.login-text {
+  font-size: 26rpx;
+  color: var(--primary, #2D8B6F);
+  font-weight: 500;
+}
+
+.login-arrow {
+  font-size: 28rpx;
+  color: var(--text2, #8B8680);
+  margin-left: 4rpx;
+}
+
+.user-avatar-sm {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2D8B6F, #4DB892);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  color: #fff;
+  font-weight: 600;
+}
+
+.user-name {
+  font-size: 26rpx;
+  color: var(--text, #2C2820);
+  font-weight: 500;
+}
+
 .greeting { font-size: 28rpx; color: var(--text2, #8B8680); display: block; }
 .title { font-size: 40rpx; font-weight: 700; color: var(--text, #2C2820); display: block; margin-top: 8rpx; }
+
+/* ══════════════════════════════════════
+   Login Hint Card (未登录提示)
+   ══════════════════════════════════════ */
+
+.login-hint-card {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin: 20rpx 32rpx;
+  padding: 28rpx 32rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.05);
+}
+
+.login-hint-icon { font-size: 48rpx; }
+
+.login-hint-body { flex: 1; display: flex; flex-direction: column; }
+
+.login-hint-title { font-size: 28rpx; font-weight: 600; color: var(--text, #2C2820); }
+.login-hint-desc { font-size: 22rpx; color: var(--text2, #8B8680); margin-top: 4rpx; }
+
+.login-hint-btn {
+  padding: 14rpx 32rpx;
+  background: var(--primary, #2D8B6F);
+  color: #fff;
+  border-radius: 32rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  white-space: nowrap;
+}
 
 /* ── Action Row ── */
 .action-row { display: flex; gap: 20rpx; padding: 12rpx 32rpx; }
@@ -23,6 +119,93 @@ page { background: var(--bg, #F4F1EB); }
 .ab-text { display: flex; flex-direction: column; }
 .ab-title { font-size: 30rpx; font-weight: 600; color: var(--text); }
 .ab-desc { font-size: 22rpx; color: var(--text2); margin-top: 4rpx; }
+
+/* ── Sections ── */
+.section { padding: 12rpx 32rpx; }
+.section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+.section-title { font-size: 30rpx; font-weight: 600; color: var(--text); }
+.section-badge {
+  font-size: 22rpx; color: #E55B5B; background: #FEE; padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+}
+
+/* ── AI Tip ── */
+.tip-card {
+  display: flex; gap: 16rpx; align-items: flex-start;
+  background: #fff; border-radius: 16rpx; padding: 24rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+}
+.tip-icon { font-size: 28rpx; flex-shrink: 0; }
+.tip-text { font-size: 26rpx; color: var(--text2); line-height: 1.5; }
+
+/* ── Med Suggestions ── */
+.med-sug-card {
+  background: #fff; border-radius: 16rpx; padding: 24rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+  margin-bottom: 12rpx;
+}
+.sug-info { margin-bottom: 16rpx; }
+.sug-name { font-size: 30rpx; font-weight: 600; color: var(--text); display: block; }
+.sug-detail { font-size: 24rpx; color: var(--text2); display: block; margin-top: 4rpx; }
+.sug-actions { display: flex; gap: 16rpx; }
+.sug-confirm {
+  flex: 1; text-align: center; padding: 16rpx 0;
+  background: var(--primary, #2D8B6F); color: #fff;
+  border-radius: 12rpx; font-size: 26rpx; font-weight: 600;
+}
+.sug-dismiss {
+  flex: 1; text-align: center; padding: 16rpx 0;
+  background: var(--bg, #F4F1EB); color: var(--text2);
+  border-radius: 12rpx; font-size: 26rpx;
+}
+
+/* ── Tasks ── */
+.task-card {
+  display: flex; align-items: center; justify-content: space-between;
+  background: #fff; border-radius: 16rpx; padding: 20rpx 24rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+  margin-bottom: 12rpx;
+}
+.task-left { display: flex; align-items: center; gap: 16rpx; }
+.task-icon { font-size: 32rpx; }
+.task-info { display: flex; flex-direction: column; }
+.task-name { font-size: 28rpx; font-weight: 500; color: var(--text); }
+.task-time { font-size: 22rpx; color: var(--text2); }
+.task-btn {
+  padding: 12rpx 28rpx; border-radius: 24rpx;
+  background: var(--primary, #2D8B6F); color: #fff;
+  font-size: 24rpx; font-weight: 600;
+}
+.task-btn.done { background: var(--border, #E8E4DD); color: var(--text2); }
+
+/* ── Prompts ── */
+.prompt-grid { display: flex; flex-wrap: wrap; gap: 12rpx; }
+.prompt-chip {
+  display: inline-flex; align-items: center; gap: 8rpx;
+  padding: 14rpx 24rpx; border-radius: 32rpx;
+  background: #fff; border: 1rpx solid var(--border, #E8E4DD);
+  font-size: 24rpx; color: var(--text2);
+  box-shadow: 0 2rpx 4rpx rgba(0,0,0,0.04);
+}
+.prompt-icon { font-size: 24rpx; }
+.prompt-text { font-size: 24rpx; }
+
+/* ── Activity ── */
+.activity-card {
+  display: flex; align-items: center; gap: 16rpx;
+  background: #fff; border-radius: 16rpx; padding: 20rpx 24rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+  margin-bottom: 12rpx;
+}
+.activity-icon { font-size: 36rpx; flex-shrink: 0; }
+.activity-info { flex: 1; display: flex; flex-direction: column; }
+.activity-title { font-size: 28rpx; color: var(--text); font-weight: 500; }
+.activity-date { font-size: 22rpx; color: var(--text2); }
+.activity-status { font-size: 22rpx; color: var(--primary, #2D8B6F); }
+.activity-status.fail { color: #E55B5B; }
 
 /* ════════════════════════════════════════
    语音弹窗 — 居中 + 三段固定布局
@@ -127,172 +310,24 @@ page { background: var(--bg, #F4F1EB); }
   width: 6rpx; height: 100%;
   border-radius: 3rpx;
   background: #DC2626;
-  animation: wave 0.6s ease-in-out infinite alternate;
+  animation: wave-anim 0.8s ease-in-out infinite alternate;
 }
-@keyframes wave {
-  0% { transform: scaleY(0.3); opacity: 0.5; }
-  100% { transform: scaleY(1); opacity: 1; }
+@keyframes wave-anim {
+  0% { transform: scaleY(0.3); }
+  100% { transform: scaleY(1); }
 }
 
 /* 提交按钮 */
 .vm-submit-btn {
-  width: 100%; text-align: center;
-  padding: 24rpx 0; height: auto;
+  width: 100%; height: 96rpx;
+  display: flex; align-items: center; justify-content: center;
   border-radius: 16rpx;
   background: var(--border, #E8E4DD);
   color: var(--text2);
   font-size: 30rpx; font-weight: 600;
+  transition: all 0.2s;
 }
 .vm-submit-btn.active {
   background: var(--primary, #2D8B6F);
   color: #fff;
-}
-
-/* ── AI Tip ── */
-.ai-tip-bar {
-  margin: 16rpx 32rpx; padding: 20rpx 24rpx;
-  background: #fff; border-radius: 16rpx;
-  display: flex; align-items: flex-start; gap: 12rpx;
-  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04);
-}
-.atb-icon { font-size: 32rpx; flex-shrink: 0; }
-.atb-text { font-size: 26rpx; color: var(--text2); line-height: 1.6; }
-
-/* ── Suggestion Section ── */
-.suggestion-section { padding: 0 32rpx; margin-top: 16rpx; }
-.suggestion-header { margin-bottom: 16rpx; }
-.suggestion-title { font-size: 30rpx; font-weight: 600; color: var(--text); }
-.suggestion-card {
-  background: #fff; border-radius: 20rpx; padding: 24rpx;
-  margin-bottom: 16rpx;
-  border-left: 6rpx solid var(--primary, #2D8B6F);
-  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04);
-}
-.sug-info { margin-bottom: 16rpx; }
-.sug-name { font-size: 32rpx; font-weight: 600; color: var(--text); display: block; }
-.sug-detail { font-size: 26rpx; color: var(--text2); display: block; margin-top: 6rpx; }
-.sug-source { font-size: 22rpx; color: var(--text2); display: block; margin-top: 8rpx; }
-
-.sug-form { padding: 16rpx 0; border-top: 1rpx solid var(--border, #E8E4DD); }
-.sug-form-row { display: flex; align-items: center; gap: 16rpx; margin-bottom: 16rpx; }
-.sfr-label { font-size: 26rpx; color: var(--text2); min-width: 120rpx; flex-shrink: 0; }
-.sfr-options { display: flex; gap: 12rpx; flex-wrap: wrap; }
-.sfr-opt {
-  padding: 8rpx 24rpx; border-radius: 24rpx;
-  font-size: 26rpx; color: var(--text);
-  background: var(--bg, #F4F1EB);
-  border: 2rpx solid transparent;
-}
-.sfr-opt.active {
-  background: rgba(45,139,111,0.1);
-  border-color: var(--primary, #2D8B6F);
-  color: var(--primary, #2D8B6F); font-weight: 600;
-}
-.sfr-input {
-  flex: 1; height: 56rpx;
-  padding: 0 16rpx; border-radius: 12rpx;
-  background: var(--bg, #F4F1EB);
-  font-size: 26rpx; color: var(--text);
-}
-/* ★ 新增: 输入组样式（每N天一次 / 共N天） */
-.sfr-input-group {
-  display: flex; align-items: center; gap: 8rpx;
-  flex: 1;
-}
-.sfr-prefix, .sfr-suffix {
-  font-size: 26rpx; color: var(--sub, #6B7785); white-space: nowrap;
-}
-.sfr-input-num {
-  width: 120rpx; height: 72rpx;
-  padding: 0 20rpx; border-radius: 16rpx;
-  background: var(--bg, #F4F1EB);
-  border: 2rpx solid var(--border, #E8ECF0);
-  font-size: 32rpx; font-weight: 600;
-  color: var(--text); text-align: center;
-}
-
-.sug-actions { display: flex; gap: 16rpx; justify-content: flex-end; padding-top: 12rpx; }
-.sug-btn {
-  padding: 12rpx 28rpx; border-radius: 12rpx;
-  font-size: 26rpx; font-weight: 500;
-}
-.sug-btn.dismiss { background: var(--bg); color: var(--text2); }
-.sug-btn.expand { background: var(--primary, #2D8B6F); color: #fff; }
-.sug-btn.confirm { background: var(--primary, #2D8B6F); color: #fff; }
-
-/* ── OK Bar ── */
-.ok-bar {
-  margin: 24rpx 32rpx; padding: 24rpx;
-  background: #fff; border-radius: 16rpx;
-  display: flex; align-items: center; gap: 12rpx;
-  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04);
-}
-.ok-icon { font-size: 36rpx; }
-.ok-text { font-size: 28rpx; color: var(--text2); }
-
-/* ── Task Card ── */
-.task-card {
-  margin: 12rpx 32rpx; padding: 24rpx;
-  background: #fff; border-radius: 16rpx;
-  display: flex; align-items: center; justify-content: space-between;
-  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04);
-}
-.task-left { display: flex; align-items: center; gap: 16rpx; }
-.task-icon { font-size: 40rpx; }
-.task-info { display: flex; flex-direction: column; }
-.task-name { font-size: 30rpx; font-weight: 600; color: var(--text); }
-.task-time { font-size: 24rpx; color: var(--text2); margin-top: 4rpx; }
-.task-punch {
-  padding: 12rpx 28rpx; border-radius: 12rpx;
-  background: var(--primary, #2D8B6F); color: #fff;
-  font-size: 26rpx; font-weight: 600;
-}
-
-/* ── Prompts ── */
-.section-label {
-  font-size: 28rpx; font-weight: 600; color: var(--text);
-  padding: 24rpx 32rpx 12rpx;
-}
-.prompts-grid {
-  display: flex; flex-wrap: wrap; gap: 16rpx;
-  padding: 0 32rpx;
-}
-.prompt-item {
-  display: flex; align-items: center; gap: 8rpx;
-  padding: 16rpx 24rpx;
-  background: #fff; border-radius: 16rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
-}
-.prompt-icon { font-size: 28rpx; }
-.prompt-text { font-size: 26rpx; color: var(--text); }
-
-/* ── Activity List ── */
-.activity-list { padding: 0 32rpx; }
-.activity-item {
-  display: flex; align-items: center; gap: 16rpx;
-  padding: 20rpx 0;
-  border-bottom: 1rpx solid var(--border, #E8E4DD);
-}
-.activity-icon { font-size: 36rpx; flex-shrink: 0; }
-.activity-info { flex: 1; min-width: 0; }
-.activity-title {
-  font-size: 28rpx; color: var(--text);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  display: block;
-}
-.activity-date { font-size: 22rpx; color: var(--text2); display: block; margin-top: 4rpx; }
-.activity-tag {
-  flex-shrink: 0; padding: 6rpx 16rpx; border-radius: 8rpx;
-  font-size: 22rpx;
-}
-.activity-tag.done { background: rgba(45,139,111,0.1); color: var(--primary); }
-.activity-tag.processing {
-  background: rgba(245,166,35,0.15); color: #D97706;
-  animation: breathe 2s ease-in-out infinite;
-}
-.activity-tag.failed { background: rgba(220,38,38,0.1); color: #DC2626; }
-
-@keyframes breathe {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
 }
