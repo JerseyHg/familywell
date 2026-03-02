@@ -22,7 +22,7 @@ from app.schemas.medication import (
 )
 from app.utils.deps import get_current_user
 
-from app.routers.voice_audio import VoiceAudioRequest, transcribe_audio_keys
+from app.routers.voice_audio import transcribe_audio_keys
 
 router = APIRouter(prefix="/api/medications", tags=["medications"])
 
