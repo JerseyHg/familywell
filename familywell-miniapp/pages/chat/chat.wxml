@@ -1,5 +1,8 @@
 <view class="chat-page">
 
+  <!-- ★ Fix 1: safe-area 顶部留白 -->
+  <view class="safe-top" />
+
   <!-- ── Header ── -->
   <view class="chat-header">
     <view class="chat-header-inner">
@@ -18,16 +21,16 @@
     scroll-into-view="{{scrollToView}}"
     scroll-with-animation
     enhanced
+    bounces
     show-scrollbar="{{false}}"
   >
 
-    <!-- Welcome (no messages) -->
+    <!-- Welcome -->
     <view class="welcome" wx:if="{{messages.length === 0 && !typing}}">
       <view class="welcome-avatar">🤖</view>
       <text class="welcome-title">你好，我是健康助手</text>
       <text class="welcome-desc">我能看到全部健康档案，随时可以问我</text>
 
-      <!-- Initial prompts -->
       <view class="welcome-prompts">
         <view
           class="welcome-prompt"
@@ -55,94 +58,127 @@
         <view class="ai-row" wx:if="{{item.role === 'assistant'}}">
           <view class="ai-avatar-sm">🤖</view>
           <view class="ai-bubble-group">
-            <!-- Charts -->
-            <block wx:for="{{item.charts}}" wx:for-item="chart" wx:key="type">
+
+            <!-- Text bubble -->
+            <view class="ai-bubble" wx:if="{{item.text}}">
+              <text class="ai-bubble-text">{{item.text}}</text>
+            </view>
+
+            <!-- ★ Fix 2: 完整图表渲染模板 -->
+            <block wx:for="{{item.charts}}" wx:for-item="chart" wx:for-index="ci" wx:key="ci">
               <view class="chart-card">
                 <view class="chart-header">
                   <text class="chart-icon">{{chart.icon || '📊'}}</text>
                   <text class="chart-title">{{chart.title}}</text>
                 </view>
 
-                <!-- ── pie: 营养摄入 ── -->
+                <!-- ── bar_stack: 堆叠柱状图 ── -->
+                <view class="chart-body" wx:if="{{chart.type === 'bar_stack'}}">
+                  <view class="bar-row">
+                    <view class="bar-col" wx:for="{{chart.data}}" wx:for-item="d" wx:key="label">
+                      <view class="bar-stack">
+                        <view wx:for="{{chart.keys}}" wx:for-item="k" wx:for-index="ki" wx:key="k"
+                          class="bar-seg"
+                          style="height: {{d[k] / 4}}rpx; background: {{chart.colors[ki]}};"
+                        />
+                      </view>
+                      <text class="bar-label">{{d.label}}</text>
+                    </view>
+                  </view>
+                  <view class="chart-legend">
+                    <view class="legend-item" wx:for="{{chart.keys}}" wx:for-index="ki" wx:key="*this">
+                      <view class="legend-dot" style="background: {{chart.colors[ki]}}" />
+                      <text>{{item}}</text>
+                    </view>
+                  </view>
+                </view>
+
+                <!-- ── pie: 饼图（饮食） ── -->
                 <view class="chart-body" wx:if="{{chart.type === 'pie'}}">
                   <view class="pie-wrapper">
-                    <view class="pie-chart" style="background: conic-gradient({{chart.data[0].color}} 0% {{chart.data[0].value / (chart.data[0].value + chart.data[1].value + chart.data[2].value) * 100}}%, {{chart.data[1].color}} {{chart.data[0].value / (chart.data[0].value + chart.data[1].value + chart.data[2].value) * 100}}% {{(chart.data[0].value + chart.data[1].value) / (chart.data[0].value + chart.data[1].value + chart.data[2].value) * 100}}%, {{chart.data[2].color}} {{(chart.data[0].value + chart.data[1].value) / (chart.data[0].value + chart.data[1].value + chart.data[2].value) * 100}}% 100%);" />
+                    <view class="pie-chart" style="background: {{chart._gradient || 'conic-gradient(#ccc 0% 100%)'}};" />
                     <view class="pie-center">
-                      <text class="pie-cal">{{chart.summary.total_calories}}</text>
-                      <text class="pie-cal-unit">千卡</text>
+                      <text class="pie-cal">{{chart.summary.avg_calories}}</text>
+                      <text class="pie-cal-unit">千卡/天</text>
                     </view>
                   </view>
                   <view class="pie-legend">
-                    <view class="pie-legend-item" wx:for="{{chart.data}}" wx:for-item="d" wx:key="name">
-                      <view class="pie-legend-dot" style="background: {{d.color}};" />
-                      <text class="pie-legend-name">{{d.name}}</text>
-                      <text class="pie-legend-val">{{d.value}}g</text>
+                    <view class="pie-legend-item" wx:for="{{chart.data}}" wx:for-item="seg" wx:key="name">
+                      <view class="pie-legend-dot" style="background: {{seg.color}};" />
+                      <text class="pie-legend-name">{{seg.name}}</text>
+                      <text class="pie-legend-val">{{seg.value}}g ({{seg.pct}}%)</text>
                     </view>
                   </view>
                   <view class="pie-footer">
-                    <text class="pf-item">日均 {{chart.summary.avg_calories}} 千卡</text>
-                    <text class="pf-item">共 {{chart.summary.total_meals}} 餐</text>
+                    <text class="pf-item">🔥 总热量 {{chart.summary.total_calories}} 千卡</text>
+                    <text class="pf-item">🍽️ 共 {{chart.summary.total_meals}} 餐 / {{chart.summary.days}} 天</text>
                   </view>
                 </view>
 
-                <!-- ── dual_line: 血压 ── -->
+                <!-- ── dual_line: 血压双柱 ── -->
                 <view class="chart-body" wx:if="{{chart.type === 'dual_line'}}">
-                  <view class="bp-latest">
-                    <text class="bp-val">{{chart.summary.latest}}</text>
-                    <text class="bp-unit">mmHg</text>
-                  </view>
-                  <view class="line-bars">
-                    <view class="bar-group" wx:for="{{chart.data}}" wx:for-item="p" wx:key="label">
-                      <view class="bar-pair">
-                        <view class="bar sys" style="height: {{(p['收缩压'] || 0) / 2}}rpx; background: {{chart.color1}};" />
-                        <view class="bar dia" style="height: {{(p['舒张压'] || 0) / 2}}rpx; background: {{chart.color2}};" />
+                  <view class="bar-row">
+                    <view class="bar-col" wx:for="{{chart.data}}" wx:for-item="d" wx:key="label">
+                      <view class="dual-bars">
+                        <view class="bar-seg single" style="height: {{(d.systolic || 0) / 2.5}}rpx; background: #E85D3A;" />
+                        <view class="bar-seg single" style="height: {{(d.diastolic || 0) / 2.5}}rpx; background: #2D8B6F;" />
                       </view>
-                      <text class="bar-label">{{p.label}}</text>
+                      <text class="bar-label">{{d.label}}</text>
+                    </view>
+                  </view>
+                  <view class="chart-legend">
+                    <view class="legend-item"><view class="legend-dot" style="background: #E85D3A" /><text>收缩压</text></view>
+                    <view class="legend-item"><view class="legend-dot" style="background: #2D8B6F" /><text>舒张压</text></view>
+                  </view>
+                </view>
+
+                <!-- ── trend: 单指标趋势 ── -->
+                <view class="chart-body" wx:if="{{chart.type === 'trend'}}">
+                  <view class="trend-header">
+                    <text class="trend-latest">{{chart.summary.latest}}</text>
+                    <text class="trend-unit">{{chart.summary.unit}}</text>
+                    <text class="trend-change {{chart.summary.change_pct > 0 ? 'up' : 'down'}}">
+                      {{chart.summary.change_pct > 0 ? '+' : ''}}{{chart.summary.change_pct}}%
+                    </text>
+                  </view>
+                  <view class="bar-row">
+                    <view class="bar-col" wx:for="{{chart.data}}" wx:for-item="d" wx:key="label">
+                      <view class="dot" style="margin-bottom: {{d.value * 20}}rpx;" />
+                      <text class="bar-label">{{d.label}}</text>
                     </view>
                   </view>
                 </view>
 
-                <!-- ── line: PSA etc ── -->
-                <view class="chart-body" wx:if="{{chart.type === 'line'}}">
-                  <view class="line-bars">
-                    <view class="bar-group" wx:for="{{chart.data}}" wx:for-item="p" wx:key="label">
-                      <view class="bar-single" style="height: {{p.value * 20}}rpx; background: {{chart.color || '#2D8B6F'}};" />
-                      <text class="bar-label">{{p.label}}</text>
-                    </view>
-                  </view>
-                </view>
-
-                <!-- ── adherence: 用药 ── -->
+                <!-- ── adherence: 用药依从性 ── -->
                 <view class="chart-body" wx:if="{{chart.type === 'adherence'}}">
-                  <view class="adh-ring-row">
-                    <view class="adh-ring" style="background: conic-gradient(var(--primary) 0% {{chart.summary.overall_rate}}%, var(--border) {{chart.summary.overall_rate}}% 100%);">
-                      <view class="adh-ring-center">
-                        <text class="adh-pct">{{chart.summary.overall_rate}}%</text>
-                      </view>
+                  <view class="adherence-header">
+                    <view class="adherence-ring">
+                      <text class="ring-num">{{chart.summary.rate}}%</text>
                     </view>
-                    <view class="adh-stats">
-                      <text class="adh-stat">✅ 已完成 {{chart.summary.completed}}</text>
-                      <text class="adh-stat">❌ 漏服 {{chart.summary.missed}}</text>
-                      <text class="adh-stat">📋 总计 {{chart.summary.total_tasks}}</text>
+                    <view class="adherence-stats">
+                      <text class="ad-stat">完成 {{chart.summary.done}}/{{chart.summary.total}} 次</text>
+                      <text class="ad-stat missed" wx:if="{{chart.summary.missed > 0}}">漏服 {{chart.summary.missed}} 次</text>
                     </view>
                   </view>
-                  <view class="med-list" wx:if="{{chart.summary.by_medication}}">
-                    <view class="med-item" wx:for="{{chart.summary.by_medication}}" wx:for-item="med" wx:key="name">
-                      <text class="med-name">{{med.name}}</text>
-                      <view class="med-bar-bg">
-                        <view class="med-bar-fill" style="width: {{med.rate}}%; background: {{med.rate >= 80 ? '#2D8B6F' : '#F5A623'}};" />
-                      </view>
-                      <text class="med-ratio">{{med.done}}/{{med.total}}</text>
+                  <view class="bar-row compact">
+                    <view class="bar-col" wx:for="{{chart.data}}" wx:for-item="d" wx:key="label">
+                      <view class="bar-seg single" style="height: {{d.rate * 0.8}}rpx; background: {{d.rate >= 100 ? '#2D8B6F' : d.rate >= 50 ? '#F5A623' : '#E85D3A'}};" />
+                      <text class="bar-label">{{d.label}}</text>
                     </view>
+                  </view>
+                  <view class="med-progress" wx:for="{{chart.medications}}" wx:for-item="med" wx:key="name">
+                    <text class="med-name">{{med.name}}</text>
+                    <view class="med-bar-bg">
+                      <view class="med-bar-fill" style="width: {{med.done / med.total * 100}}%; background: {{med.done === med.total ? '#2D8B6F' : '#F5A623'}};" />
+                    </view>
+                    <text class="med-ratio">{{med.done}}/{{med.total}}</text>
                   </view>
                 </view>
 
                 <!-- ── alerts: 待处理事项 ── -->
                 <view class="chart-body" wx:if="{{chart.type === 'alerts'}}">
                   <view class="alert-item" wx:for="{{chart.data}}" wx:for-item="a" wx:key="title">
-                    <text class="alert-icon">
-                      {{a.type === 'med_low_stock' ? '💊' : a.type === 'insurance_expiry' ? '🛡️' : a.type === 'checkup_due' ? '📊' : '⚠️'}}
-                    </text>
+                    <text class="alert-icon">{{a.type === 'med_low_stock' ? '💊' : a.type === 'insurance_expiry' ? '🛡️' : a.type === 'checkup_due' ? '📊' : '⚠️'}}</text>
                     <view class="alert-info">
                       <text class="alert-title">{{a.title}}</text>
                       <text class="alert-desc">{{a.description}}</text>
@@ -157,9 +193,7 @@
                       <text class="ins-name">{{ins.provider}} {{ins.policy_type}}</text>
                       <text class="ins-urgent" wx:if="{{ins.urgent}}">即将到期</text>
                     </view>
-                    <text class="ins-detail" wx:if="{{ins.days_left !== null}}">
-                      到期日 {{ins.end_date}} · 还剩 {{ins.days_left}} 天
-                    </text>
+                    <text class="ins-detail" wx:if="{{ins.days_left !== null}}">到期日 {{ins.end_date}} · 还剩 {{ins.days_left}} 天</text>
                   </view>
                 </view>
 
@@ -171,10 +205,6 @@
               </view>
             </block>
 
-            <!-- Text bubble -->
-            <view class="ai-bubble" wx:if="{{item.text}}">
-              <text class="ai-bubble-text">{{item.text}}</text>
-            </view>
           </view>
         </view>
 
@@ -182,7 +212,7 @@
     </block>
 
     <!-- Typing indicator -->
-    <view class="msg-row assistant" wx:if="{{typing}}">
+    <view class="msg-row assistant" wx:if="{{typing && !messages[messages.length - 1].text}}">
       <view class="ai-row">
         <view class="ai-avatar-sm">🤖</view>
         <view class="ai-bubble typing-bubble">
@@ -195,7 +225,7 @@
       </view>
     </view>
 
-    <!-- ★ Follow-up prompts — 改为 wrap 多排布局（Problem 5） -->
+    <!-- Follow-up prompts -->
     <view class="followup-area" wx:if="{{messages.length > 0 && !typing}}">
       <view class="followup-wrap">
         <view
@@ -213,7 +243,7 @@
     <view class="scroll-bottom" id="scroll-bottom" />
   </scroll-view>
 
-  <!-- ── Input Bar（★ Problem 4: 修复位置） ── -->
+  <!-- ── Input Bar ── -->
   <view class="input-bar">
     <view class="input-wrap">
       <input
@@ -230,4 +260,5 @@
       <text class="send-arrow">➤</text>
     </view>
   </view>
+
 </view>

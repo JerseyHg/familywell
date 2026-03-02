@@ -100,6 +100,7 @@ Page({
         _medType: 'long_term',
         _totalDays: '',
         _interval: 1,   // ★ 默认每天
+        _intervalStr: '',  // ★ 自定义输入时的字符串
       }))
 
       this.setData({
@@ -180,22 +181,33 @@ Page({
     const { id, interval } = e.currentTarget.dataset
     const idx = this.data.medSuggestions.findIndex((s: any) => s.id === Number(id))
     if (idx < 0) return
-    this.setData({ [`medSuggestions[${idx}]._interval`]: Number(interval) })
+    const n = Number(interval)
+    this.setData({
+      [`medSuggestions[${idx}]._interval`]: n,
+      [`medSuggestions[${idx}]._intervalStr`]: '',   // 清空自定义输入
+    })
   },
 
   onSugIntervalInput(e: any) {
     const id = e.currentTarget.dataset.id
     const idx = this.data.medSuggestions.findIndex((s: any) => s.id === Number(id))
     if (idx < 0) return
-    const val = Number(e.detail.value) || 1
-    this.setData({ [`medSuggestions[${idx}]._interval`]: Math.max(1, val) })
+    const raw = e.detail.value    // ★ 允许清空
+    const num = Number(raw)
+    this.setData({
+      [`medSuggestions[${idx}]._intervalStr`]: raw,
+      [`medSuggestions[${idx}]._interval`]: (num >= 1) ? num : 4,  // 保持 >=4 让面板显示
+    })
   },
 
   onSugIntervalCustom(e: any) {
     const id = e.currentTarget.dataset.id
     const idx = this.data.medSuggestions.findIndex((s: any) => s.id === Number(id))
     if (idx < 0) return
-    this.setData({ [`medSuggestions[${idx}]._interval`]: 4 })  // 切到自定义输入
+    this.setData({
+      [`medSuggestions[${idx}]._interval`]: 4,
+      [`medSuggestions[${idx}]._intervalStr`]: '',   // ★ 空白让用户输入
+    })
   },
 
   onSugDays(e: any) {
@@ -213,12 +225,18 @@ Page({
     const totalDays = Number(sug._totalDays) || 7
 
     try {
+      // ★ 自定义频率时从字符串读取
+      let intervalDays = sug._interval || 1
+      if (sug._interval >= 4 && sug._intervalStr) {
+        intervalDays = Math.max(1, Number(sug._intervalStr) || 1)
+      }
+
       await medsApi.confirmSuggestion(Number(id), {
         times_per_day: sug._times,
         med_type: sug._medType,
         total_days: (sug._medType === 'course' || sug._medType === 'temporary') ? totalDays : null,
         dosage: sug.dosage,
-        interval_days: sug._interval || 1,
+        interval_days: intervalDays,
       })
       wx.showToast({ title: `已添加「${sug.name}」`, icon: 'success' })
       this.loadHomeData()
@@ -411,7 +429,19 @@ Page({
     })
 
     try {
-      await medsApi.voiceAdd(fullText)
+      const res: any = await medsApi.voiceAdd(fullText)
+
+      // ★ 显示各类型结果的 icon
+      const typeIcons: Record<string, string> = {
+        medication: '💊', food: '🍽️', vitals: '❤️', symptom: '📝',
+        insurance: '🛡️', memo: '📋',
+      }
+      const items = res.items || []
+      if (items.length > 0) {
+        const labels = items.map((i: any) => `${typeIcons[i.type] || '✅'}${i.summary || ''}`).join(' ')
+        wx.showToast({ title: labels.slice(0, 40) || '✅ 记录成功', icon: 'none', duration: 2500 })
+      }
+
       this.loadHomeData()
     } catch (err: any) {
       const activity = this.data.recentActivity.map((item: any) => {

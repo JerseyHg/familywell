@@ -1,8 +1,10 @@
 /**
  * pages/chat/chat.ts — AI 健康助手
  * ═══════════════════════════════════════
- * ★ Fix 3: 随机 placeholder 提示词
- * ★ Fix 4: 修复流式输出 — 防重复处理 + 非流式模拟打字
+ * ★ Fix 1: safe-top 在 wxml 中
+ * ★ Fix 2: 完整图表模板在 wxml 中
+ * ★ Fix 3: 流式输出 — chunk 模式正常逐字 + success 兜底也模拟逐字
+ * ★ Fix 4: 平滑滚动
  */
 import { chatApi } from '../../services/api'
 
@@ -59,8 +61,7 @@ Page({
   _streamMsgIdx: -1,
   _streamTask: null as any,
   _throttleTimer: null as any,
-  _chunkedUsed: false,          // ★ Fix 4: 标记是否已通过 chunk 处理过
-  _doneHandled: false,          // ★ Fix 4: 标记 done 事件是否已处理
+  _typingTimer: null as any,
 
   onShow() {
     this.getTabBar()?.setData({ active: 2 })
@@ -78,6 +79,12 @@ Page({
 
   onHide() {
     this._streamTask?.abort?.()
+    this._clearTimers()
+  },
+
+  _clearTimers() {
+    if (this._throttleTimer) { clearTimeout(this._throttleTimer); this._throttleTimer = null }
+    if (this._typingTimer) { clearTimeout(this._typingTimer); this._typingTimer = null }
   },
 
   onInputChange(e: any) {
@@ -110,8 +117,7 @@ Page({
 
     this._streamText = ''
     this._streamMsgIdx = aiIdx
-    this._chunkedUsed = false    // ★ 重置
-    this._doneHandled = false    // ★ 重置
+    this._clearTimers()
 
     this.setData({
       messages,
@@ -128,35 +134,59 @@ Page({
       },
       {
         onCharts: (charts) => {
-          this._chunkedUsed = true
-          this.setData({ [`messages[${aiIdx}].charts`]: charts })
+          // ★ Fix 1: 为饼图数据补充 pct 百分比
+          const processed = this._processCharts(charts)
+          this.setData({ [`messages[${aiIdx}].charts`]: processed })
           this._scrollToBottom()
         },
 
         onText: (delta) => {
-          this._chunkedUsed = true
           this._streamText += delta
           this._throttledUpdateText()
         },
 
         onDone: (sessionId) => {
-          // ★ Fix 4: 防止 success 回调重复触发 done
-          if (this._doneHandled) return
-          this._doneHandled = true
+          this._clearTimers()
 
-          if (this._throttleTimer) {
-            clearTimeout(this._throttleTimer)
-            this._throttleTimer = null
+          // ★ 如果 chunk 模式正常工作了，直接设置最终文本
+          if (this._streamText) {
+            this.setData({
+              [`messages[${aiIdx}].text`]: this._streamText,
+              sessionId: sessionId || this.data.sessionId,
+              typing: false,
+            })
+            this._scrollToBottom()
+          } else {
+            // 没收到任何 text（不应该发生），标记完成
+            this.setData({
+              sessionId: sessionId || this.data.sessionId,
+              typing: false,
+            })
           }
 
-          this.setData({
-            [`messages[${aiIdx}].text`]: this._streamText,
-            sessionId: sessionId || this.data.sessionId,
-            typing: false,
-          })
-          this._scrollToBottom()
           this._streamTask = null
           this._updateFollowupPrompts(question)
+        },
+
+        // ★ Fix 3: success 兜底 — chunk 没工作时，拿到完整数据做模拟打字
+        onFallbackComplete: (fullText, charts, sessionId) => {
+          this._clearTimers()
+
+          // 先设置 charts
+          if (charts && charts.length) {
+            const processed = this._processCharts(charts)
+            this.setData({ [`messages[${aiIdx}].charts`]: processed })
+          }
+
+          // 模拟逐字输出
+          this._simulateTyping(aiIdx, fullText, () => {
+            this.setData({
+              sessionId: sessionId || this.data.sessionId,
+              typing: false,
+            })
+            this._scrollToBottom()
+            this._updateFollowupPrompts(question)
+          })
         },
 
         onError: (err) => {
@@ -225,11 +255,36 @@ Page({
         this.setData({ [`messages[${idx}].text`]: this._streamText })
         this._scrollToBottom()
       }
-    }, 80)
+    }, 60)
   },
 
   /**
-   * ★ Fix 4: 同步 fallback 加模拟打字效果
+   * ★ 模拟打字效果（用于 success 兜底和 sync fallback）
+   */
+  _simulateTyping(aiIdx: number, fullText: string, onComplete: () => void) {
+    let pos = 0
+    const chunkSize = 4
+    const interval = 25
+
+    const tick = () => {
+      if (pos >= fullText.length) {
+        this.setData({ [`messages[${aiIdx}].text`]: fullText })
+        this._scrollToBottom()
+        onComplete()
+        return
+      }
+
+      pos = Math.min(pos + chunkSize, fullText.length)
+      this.setData({ [`messages[${aiIdx}].text`]: fullText.slice(0, pos) })
+      this._scrollToBottom()
+      this._typingTimer = setTimeout(tick, interval)
+    }
+
+    tick()
+  },
+
+  /**
+   * 完全同步 fallback（stream 失败时）
    */
   async _fallbackSync(question: string, aiIdx: number) {
     try {
@@ -239,20 +294,19 @@ Page({
         include_family: false,
       })
 
-      // 先设置 charts
       if (res.charts && res.charts.length) {
-        this.setData({ [`messages[${aiIdx}].charts`]: res.charts })
+        const processed = this._processCharts(res.charts)
+        this.setData({ [`messages[${aiIdx}].charts`]: processed })
       }
 
-      // ★ 模拟逐字输出
       const fullText = res.answer || ''
-      await this._simulateTyping(aiIdx, fullText)
-
-      this.setData({
-        sessionId: res.session_id || this.data.sessionId,
-        typing: false,
+      this._simulateTyping(aiIdx, fullText, () => {
+        this.setData({
+          sessionId: res.session_id || this.data.sessionId,
+          typing: false,
+        })
+        this._updateFollowupPrompts(question)
       })
-      this._updateFollowupPrompts(question)
     } catch (err2) {
       this.setData({
         [`messages[${aiIdx}].text`]: '抱歉，AI 助手暂时无法回答，请稍后再试。',
@@ -262,39 +316,45 @@ Page({
   },
 
   /**
-   * ★ 模拟打字效果：每次输出一小段文字
+   * ★ Fix 1: 为图表数据做预处理
+   * — pie 图：计算每段的 pct + 累计百分比 + gradient 字符串
    */
-  _simulateTyping(aiIdx: number, fullText: string): Promise<void> {
-    return new Promise((resolve) => {
-      let pos = 0
-      const chunkSize = 3  // 每次显示 3 个字符
-      const interval = 30  // 30ms 间隔
+  _processCharts(charts: any[]): any[] {
+    return charts.map((chart: any) => {
+      if (chart.type === 'pie' && chart.data && chart.data.length) {
+        const total = chart.data.reduce((s: number, d: any) => s + (d.value || 0), 0)
+        if (total === 0) return chart
 
-      const tick = () => {
-        if (pos >= fullText.length) {
-          this.setData({ [`messages[${aiIdx}].text`]: fullText })
-          this._scrollToBottom()
-          resolve()
-          return
-        }
+        let cumPct = 0
+        const data = chart.data.map((d: any) => {
+          const pct = Math.round((d.value / total) * 100)
+          const startPct = cumPct
+          cumPct += pct
+          return { ...d, pct, startPct, endPct: cumPct }
+        })
+        // 修正尾差
+        if (data.length > 0) data[data.length - 1].endPct = 100
 
-        pos = Math.min(pos + chunkSize, fullText.length)
-        this.setData({ [`messages[${aiIdx}].text`]: fullText.slice(0, pos) })
-        this._scrollToBottom()
-        setTimeout(tick, interval)
+        // 生成 conic-gradient 字符串
+        const gradientParts = data.map((d: any) => `${d.color} ${d.startPct}% ${d.endPct}%`)
+        const gradient = `conic-gradient(${gradientParts.join(', ')})`
+
+        return { ...chart, data, _gradient: gradient }
       }
-
-      tick()
+      return chart
     })
   },
 
   _scrollToBottom() {
-    const idx = this.data.messages.length - 1
-    this.setData({ scrollToView: `msg-${idx}` })
+    this.setData({ scrollToView: '' })
+    setTimeout(() => {
+      this.setData({ scrollToView: 'scroll-bottom' })
+    }, 50)
   },
 
   onNewChat() {
     this._streamTask?.abort?.()
+    this._clearTimers()
     this.setData({
       messages: [],
       sessionId: '',

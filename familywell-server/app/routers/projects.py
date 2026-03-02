@@ -8,6 +8,9 @@ PUT    /api/projects/:id          更新项目
 DELETE /api/projects/:id          删除项目
 POST   /api/projects/:id/records  批量归入记录
 DELETE /api/projects/:id/records  批量移出记录
+
+★ Fix 5: 自定义项目不再自动归入记录
+         模板项目只归入相关分类的记录
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, update
@@ -24,6 +27,19 @@ from app.schemas.project import (
 from app.utils.deps import get_current_user
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
+
+
+# ★ Fix 5: 模板→相关分类映射
+TEMPLATE_CATEGORIES: dict[str, list[str]] = {
+    "chemo_cycle":     ["checkup", "lab", "visit", "prescription"],
+    "annual_checkup":  ["checkup", "lab"],
+    "pregnancy":       ["checkup", "lab", "visit", "weight"],
+    "hospitalization": ["checkup", "lab", "visit", "prescription"],
+    "weight_loss":     ["food", "weight"],
+    "rehab":           ["checkup", "lab", "visit"],
+    "chronic":         ["checkup", "lab", "prescription", "bp_reading"],
+    # custom → 不自动归入
+}
 
 
 # ─── Helpers ───
@@ -84,14 +100,18 @@ async def create_project(
     db.add(project)
     await db.flush()
 
-    # 如果设置了时间范围，自动归入该时间段内的记录
-    if req.start_date:
+    # ★ Fix 5: 只有模板项目（非 custom）且设了日期才自动归入
+    template = req.template or "custom"
+    allowed_cats = TEMPLATE_CATEGORIES.get(template)
+
+    if allowed_cats and req.start_date:
         auto_query = (
             update(Record)
             .where(
                 Record.user_id == user.id,
                 Record.project_id.is_(None),
                 Record.record_date >= req.start_date,
+                Record.category.in_(allowed_cats),      # ★ 只归入相关分类
             )
         )
         if req.end_date:

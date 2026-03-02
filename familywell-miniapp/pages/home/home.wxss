@@ -4,7 +4,7 @@
 
 page { background: var(--bg, #F4F1EB); }
 
-.safe-top { height: env(safe-area-inset-top); }
+.safe-top { height: calc(44px + env(safe-area-inset-top)); }
 .safe-bottom { height: 180rpx; }
 
 /* ── Header ── */
@@ -193,6 +193,22 @@ page { background: var(--bg, #F4F1EB); }
   padding: 0 16rpx; border-radius: 12rpx;
   background: var(--bg, #F4F1EB);
   font-size: 26rpx; color: var(--text);
+}
+/* ★ 新增: 输入组样式（每N天一次 / 共N天） */
+.sfr-input-group {
+  display: flex; align-items: center; gap: 8rpx;
+  flex: 1;
+}
+.sfr-prefix, .sfr-suffix {
+  font-size: 26rpx; color: var(--sub, #6B7785); white-space: nowrap;
+}
+.sfr-input-num {
+  width: 120rpx; height: 72rpx;
+  padding: 0 20rpx; border-radius: 16rpx;
+  background: var(--bg, #F4F1EB);
+  border: 2rpx solid var(--border, #E8ECF0);
+  font-size: 32rpx; font-weight: 600;
+  color: var(--text); text-align: center;
 }
 
 .sug-actions { display: flex; gap: 16rpx; justify-content: flex-end; padding-top: 12rpx; }

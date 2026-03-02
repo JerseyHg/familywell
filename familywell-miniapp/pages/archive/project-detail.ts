@@ -1,8 +1,12 @@
+/**
+ * pages/archive/project-detail.ts
+ * ★ Fix 4: 移出记录后立即更新本地计数（乐观更新）
+ */
 import { projectsApi, recordsApi } from '../../services/api'
 
 const CATEGORY_CONFIG: { key: string; label: string; icon: string; cats: string[] }[] = [
   { key: 'medical', label: '医疗', icon: '🩺', cats: ['checkup', 'lab', 'visit', 'bp_reading'] },
-  { key: 'prescription', label: '用药', icon: '💊', cats: ['prescription'] },
+  { key: 'prescription', label: '用药', icon: '💊', cats: ['prescription', 'medication_log'] },
   { key: 'nutrition', label: '饮食', icon: '🍽️', cats: ['food', 'weight'] },
   { key: 'insurance', label: '保险', icon: '🛡️', cats: ['insurance'] },
   { key: 'other', label: '其他', icon: '📄', cats: ['other'] },
@@ -29,7 +33,6 @@ function groupByCategory(records: any[]): any[] {
     icon: cfg.icon,
     records: records.filter(r => cfg.cats.includes(r.category)),
   }))
-  // 只返回有记录的分组
   return groups.filter(g => g.records.length > 0)
 }
 
@@ -41,7 +44,6 @@ Page({
     categoryGroups: [] as any[],
     loading: true,
 
-    // 编辑弹窗
     showEditModal: false,
     iconOptions: ICON_OPTIONS,
     editForm: {
@@ -83,6 +85,7 @@ Page({
       this.setData({
         project: {
           ...project,
+          record_count: records.length,   // ★ 用实际记录数，而非 API 返回的 count
           dateRange: formatDateRange(project.start_date, project.end_date),
         },
         records,
@@ -198,7 +201,7 @@ Page({
     })
   },
 
-  // ── 移出记录 ──
+  // ── ★ Fix 4: 移出记录 — 乐观更新 ──
 
   onRemoveRecord(e: any) {
     const recordId = e.currentTarget.dataset.id
@@ -207,9 +210,23 @@ Page({
       content: '将该记录从项目中移出？',
       success: async (res) => {
         if (res.confirm) {
-          await projectsApi.removeRecords(this.data.projectId, [recordId])
-          wx.showToast({ title: '已移出', icon: 'success' })
-          this.loadData()
+          // ★ 立即从本地数据中移除（乐观更新）
+          const newRecords = this.data.records.filter((r: any) => r.id !== recordId)
+          this.setData({
+            records: newRecords,
+            categoryGroups: groupByCategory(newRecords),
+            'project.record_count': newRecords.length,
+          })
+
+          try {
+            await projectsApi.removeRecords(this.data.projectId, [recordId])
+            wx.showToast({ title: '已移出', icon: 'success' })
+          } catch (err) {
+            console.error('Failed to remove record:', err)
+            wx.showToast({ title: '移出失败', icon: 'none' })
+            // 失败则重新加载
+            this.loadData()
+          }
         }
       },
     })

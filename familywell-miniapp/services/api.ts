@@ -268,6 +268,8 @@ interface ChatStreamCallbacks {
   onText?: (delta: string) => void
   onDone?: (sessionId: string) => void
   onError?: (err: any) => void
+  // ★ success 兜底：chunk 没生效时，收集完整数据后一次性回调
+  onFallbackComplete?: (fullText: string, charts: any[], sessionId: string) => void
 }
 
 export const chatApi = {
@@ -293,12 +295,22 @@ export const chatApi = {
       responseType: 'text',
 
       success(res) {
-        // ★ Fix 4: 如果 chunk 已经处理过，不再重复解析
+        // ★ chunk 已经处理过，不再重复
         if (chunkedUsed) return
 
-        // chunk 没工作（老版基础库），用完整响应做一次性解析
+        // ★ chunk 没工作 → 收集完整数据，调 onFallbackComplete 做模拟打字
         if (typeof res.data === 'string') {
-          _parseAllSSELines(res.data, callbacks)
+          const collected = _collectSSEData(res.data)
+          if (callbacks.onFallbackComplete) {
+            callbacks.onFallbackComplete(
+              collected.fullText,
+              collected.charts,
+              collected.sessionId,
+            )
+          } else {
+            // 没有 fallback 回调，走老路
+            _parseAllSSELines(res.data, callbacks)
+          }
         }
       },
 
@@ -370,6 +382,31 @@ function _arrayBufferToString(buf: ArrayBuffer): string {
   } catch {
     return str
   }
+}
+
+/**
+ * ★ 收集完整 SSE 数据（不触发回调），用于 success 兜底做模拟打字
+ */
+function _collectSSEData(fullData: string): { fullText: string; charts: any[]; sessionId: string } {
+  let fullText = ''
+  let charts: any[] = []
+  let sessionId = ''
+
+  const lines = fullData.split('\n')
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed.startsWith('data:')) continue
+    const jsonStr = trimmed.slice(5).trim()
+    if (!jsonStr) continue
+    try {
+      const evt = JSON.parse(jsonStr)
+      if (evt.type === 'text') fullText += (evt.content || '')
+      else if (evt.type === 'charts') charts = evt.charts || []
+      else if (evt.type === 'done') sessionId = evt.session_id || ''
+    } catch { /* skip */ }
+  }
+
+  return { fullText, charts, sessionId }
 }
 
 function _parseAllSSELines(fullData: string, callbacks: ChatStreamCallbacks) {

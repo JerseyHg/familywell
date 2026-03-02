@@ -1,4 +1,5 @@
 {
   "usingComponents": {},
-  "navigationBarTitleText": "归档"
+  "navigationBarTitleText": "",
+  "navigationStyle": "custom"
 }

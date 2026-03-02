@@ -119,14 +119,16 @@
           <view class="sfr-opt {{item._interval === 1 ? 'active' : ''}}" data-id="{{item.id}}" data-interval="1" bindtap="onSugInterval">每天</view>
           <view class="sfr-opt {{item._interval === 2 ? 'active' : ''}}" data-id="{{item.id}}" data-interval="2" bindtap="onSugInterval">隔天</view>
           <view class="sfr-opt {{item._interval === 3 ? 'active' : ''}}" data-id="{{item.id}}" data-interval="3" bindtap="onSugInterval">每3天</view>
+          <view class="sfr-opt {{item._interval >= 4 ? 'active' : ''}}" data-id="{{item.id}}" bindtap="onSugIntervalCustom">其他</view>
         </view>
       </view>
       <view class="sug-form-row" wx:if="{{item._interval >= 4}}">
         <text class="sfr-label">每几天</text>
-        <input class="sfr-input" type="number" placeholder="输入天数" value="{{item._interval}}" data-id="{{item.id}}" bindinput="onSugIntervalInput" />
-      </view>
-      <view class="sug-form-row" wx:if="{{item._interval <= 3}}">
-        <text class="sfr-label" style="font-size:22rpx;color:var(--text2);" catchtap="onSugIntervalCustom" data-id="{{item.id}}">自定义天数 →</text>
+        <view class="sfr-interval-custom">
+          <text class="sfr-prefix">每</text>
+          <input class="sfr-interval-input" type="number" placeholder="输入天数" value="{{item._intervalStr}}" data-id="{{item.id}}" bindinput="onSugIntervalInput" focus="{{item._interval >= 4}}" />
+          <text class="sfr-suffix">天一次</text>
+        </view>
       </view>
       <view class="sug-form-row">
         <text class="sfr-label">每次几服</text>
@@ -146,7 +148,10 @@
       </view>
       <view class="sug-form-row" wx:if="{{item._medType === 'course' || item._medType === 'temporary'}}">
         <text class="sfr-label">共几天</text>
-        <input class="sfr-input" type="number" placeholder="输入天数" value="{{item._totalDays}}" data-id="{{item.id}}" bindinput="onSugDays" />
+        <view class="sfr-input-group">
+          <input class="sfr-input-num" type="number" placeholder="输入天数" value="{{item._totalDays}}" data-id="{{item.id}}" bindinput="onSugDays" />
+          <text class="sfr-suffix">天</text>
+        </view>
       </view>
     </view>
 
