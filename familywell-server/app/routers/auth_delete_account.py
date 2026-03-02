@@ -110,6 +110,10 @@ async def delete_account(
         # ── 6. 删除记录 ──
         await db.execute(delete(Record).where(Record.user_id == user_id))
 
+        # ── 6.5 删除项目 ──
+        from app.models.project import Project
+        await db.execute(delete(Project).where(Project.user_id == user_id))
+
         # ── 7. 处理家庭关系 ──
         # 查找用户所在的家庭
         fm_result = await db.execute(
