@@ -1,4 +1,9 @@
-import { profileApi, familyApi, recordsApi, authApi} from '../../services/api'
+/**
+ * pages/settings/settings.ts — 设置页
+ * ═══════════════════════════════════════
+ * ★ 新增：帮助与反馈、导出数据、关于 FamilyWell 功能
+ */
+import { profileApi, familyApi, recordsApi, authApi } from '../../services/api'
 
 Page({
   data: {
@@ -25,6 +30,9 @@ Page({
 
     // 数据
     recordCount: 0,
+
+    // ★ 关于弹窗
+    showAboutModal: false,
   },
 
   onShow() {
@@ -69,9 +77,9 @@ Page({
     try {
       const members: any = await familyApi.members(familyId)
       // 判断当前用户角色
-      const myInfo = wx.getStorageSync('userInfo')
+      const myInfo = wx.getStorageSync('user')
+
       const myMember = (members as any[]).find((m: any) => {
-        // 用 nickname 匹配或者用 user_id
         return m.user_id === myInfo?.id
       })
 
@@ -171,8 +179,6 @@ Page({
   onViewMember(e: any) {
     const uid = e.currentTarget.dataset.uid
     const name = e.currentTarget.dataset.name
-    // 后续可以跳到成员详情页
-    // 暂时用 overview 接口展示摘要
     wx.showToast({ title: `查看 ${name} 的健康档案`, icon: 'none' })
   },
 
@@ -208,6 +214,48 @@ Page({
   // ── 跳转归档 ──
   goArchive() {
     wx.switchTab({ url: '/pages/archive/archive' })
+  },
+
+  // ══════════════════════════════
+  // ★ 帮助与反馈
+  // ══════════════════════════════
+  onFeedback() {
+    wx.showModal({
+      title: '帮助与反馈',
+      content: '如有问题或建议，请通过以下方式联系我们：\n\n邮箱：teban.official@gmail.com\n\n我们会尽快回复您！',
+      showCancel: false,
+      confirmText: '我知道了',
+    })
+  },
+
+  // ══════════════════════════════
+  // ★ 导出数据
+  // ══════════════════════════════
+  onExportData() {
+    wx.showModal({
+      title: '导出数据',
+      content: '数据导出功能正在开发中，敬请期待！\n\n上线后您可以导出所有健康档案、用药记录等数据。',
+      showCancel: false,
+      confirmText: '我知道了',
+    })
+  },
+
+  // ══════════════════════════════
+  // ★ 关于 FamilyWell
+  // ══════════════════════════════
+  onShowAbout() {
+    this.setData({ showAboutModal: true })
+  },
+
+  hideAbout() {
+    this.setData({ showAboutModal: false })
+  },
+
+  copyEmail() {
+    wx.setClipboardData({
+      data: 'teban.official@gmail.com',
+      success: () => wx.showToast({ title: '邮箱已复制', icon: 'success' }),
+    })
   },
 
   // ── 退出登录 ──

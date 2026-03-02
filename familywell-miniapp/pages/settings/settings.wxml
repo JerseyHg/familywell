@@ -56,13 +56,16 @@
   <view class="menu-item" bindtap="goEditProfile" data-step="2">
     <text class="mi-icon">📋</text><text class="mi-label">既往病史</text><text class="mi-arrow">›</text>
   </view>
+  <view class="menu-item" bindtap="goEditProfile" data-step="3">
+    <text class="mi-icon">⚠️</text><text class="mi-label">过敏信息</text><text class="mi-arrow">›</text>
+  </view>
   <view class="menu-item" bindtap="goEditProfile" data-step="4">
     <text class="mi-icon">📞</text><text class="mi-label">紧急联系人</text><text class="mi-arrow">›</text>
   </view>
 </view>
 
 <!-- ══════════════════════════════
-     家庭管理（核心改动）
+     家庭管理
      ══════════════════════════════ -->
 <view class="section-label">家庭</view>
 
@@ -144,7 +147,7 @@
     <text class="mi-desc">{{recordCount}} 条</text>
     <text class="mi-arrow">›</text>
   </view>
-  <view class="menu-item">
+  <view class="menu-item" bindtap="onExportData">
     <text class="mi-icon">📤</text><text class="mi-label">导出数据</text><text class="mi-arrow">›</text>
   </view>
 </view>
@@ -152,7 +155,7 @@
 <!-- ── Menu: 关于 ── -->
 <view class="section-label">关于</view>
 <view class="menu-group">
-  <view class="menu-item">
+  <view class="menu-item" bindtap="onFeedback">
     <text class="mi-icon">❓</text><text class="mi-label">帮助与反馈</text><text class="mi-arrow">›</text>
   </view>
   <view class="menu-item" bindtap="goAgreement" data-type="service">
@@ -161,7 +164,7 @@
   <view class="menu-item" bindtap="goAgreement" data-type="privacy">
     <text class="mi-icon">🔒</text><text class="mi-label">隐私政策</text><text class="mi-arrow">›</text>
   </view>
-  <view class="menu-item">
+  <view class="menu-item" bindtap="onShowAbout">
     <text class="mi-icon">ℹ️</text><text class="mi-label">关于 FamilyWell</text>
     <text class="mi-desc">v2.0</text><text class="mi-arrow">›</text>
   </view>
@@ -171,4 +174,32 @@
 
 <!-- ★ 账号注销 -->
 <view class="delete-account-btn" bindtap="onDeleteAccount">注销账号</view>
+
+<!-- ── 关于 FamilyWell 弹窗 ── -->
+<view class="modal-mask" wx:if="{{showAboutModal}}" bindtap="hideAbout">
+  <view class="about-modal" catchtap="noop">
+    <view class="about-logo">🏥</view>
+    <text class="about-name">FamilyWell</text>
+    <text class="about-slogan">家庭健康档案管理</text>
+    <view class="about-divider" />
+    <view class="about-info">
+      <view class="about-row">
+        <text class="about-label">版本</text>
+        <text class="about-value">v2.0.0</text>
+      </view>
+      <view class="about-row">
+        <text class="about-label">开发者</text>
+        <text class="about-value">FamilyWell 团队</text>
+      </view>
+      <view class="about-row">
+        <text class="about-label">联系邮箱</text>
+        <text class="about-value about-email" bindtap="copyEmail">teban.official@gmail.com</text>
+      </view>
+    </view>
+    <view class="about-footer">
+      <text class="about-copyright">© 2025 FamilyWell. All rights reserved.</text>
+    </view>
+  </view>
+</view>
+
 <view class="safe-bottom" />

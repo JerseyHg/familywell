@@ -1,3 +1,7 @@
+/* pages/settings/settings.wxss
+   ★ 新增：关于 FamilyWell 弹窗样式
+*/
+
 page { background: var(--bg); }
 
 .safe-top { height: calc(44px + env(safe-area-inset-top)); }
@@ -106,34 +110,33 @@ page { background: var(--bg); }
 .fc-info { flex: 1; }
 .fc-name { display: block; font-size: 32rpx; font-weight: 700; color: var(--text); }
 .fc-role {
-  display: inline-block; margin-top: 6rpx;
-  padding: 2rpx 16rpx; border-radius: 12rpx;
+  display: inline-block; margin-top: 4rpx;
+  padding: 4rpx 16rpx; border-radius: 12rpx;
   background: var(--primary-light); color: var(--primary);
-  font-size: 22rpx; font-weight: 600;
+  font-size: 22rpx; font-weight: 500;
 }
-
 .fc-code-row {
   display: flex; align-items: center; gap: 16rpx;
-  margin-top: 24rpx; padding-top: 24rpx;
+  margin-top: 20rpx; padding-top: 20rpx;
   border-top: 1rpx solid var(--border);
 }
-.fc-code-label { font-size: 26rpx; color: var(--sub); }
+.fc-code-label { font-size: 24rpx; color: var(--sub); }
 .fc-code {
-  flex: 1;
   font-size: 36rpx; font-weight: 800; color: var(--primary);
   letter-spacing: 6rpx; font-family: 'Courier New', monospace;
+  flex: 1;
 }
 .fc-copy {
-  padding: 8rpx 28rpx; border-radius: 24rpx;
+  padding: 8rpx 24rpx; border-radius: 20rpx;
   background: var(--primary-light); color: var(--primary);
-  font-size: 24rpx; font-weight: 600;
+  font-size: 24rpx; font-weight: 500;
 }
 
 /* ══════════════════════════════
    Member List
    ══════════════════════════════ */
 .member-list {
-  margin: 16rpx 48rpx 0;
+  margin: 12rpx 48rpx 0;
   background: var(--card);
   border-radius: 36rpx;
   overflow: hidden;
@@ -145,28 +148,25 @@ page { background: var(--bg); }
   border-bottom: 1rpx solid var(--border);
 }
 .member-item:last-child { border-bottom: none; }
-
 .mb-left { display: flex; align-items: center; gap: 20rpx; }
 .mb-avatar {
   width: 72rpx; height: 72rpx; border-radius: 36rpx;
-  background: linear-gradient(135deg, #2D8B6F, #4DB892);
+  background: var(--primary-light); color: var(--primary);
   display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 30rpx; font-weight: 700;
-  flex-shrink: 0;
+  font-size: 28rpx; font-weight: 700;
 }
 .mb-info { display: flex; flex-direction: column; gap: 4rpx; }
 .mb-name { font-size: 28rpx; font-weight: 600; color: var(--text); }
 .mb-role-tag {
-  display: inline-block; width: fit-content;
-  padding: 2rpx 14rpx; border-radius: 10rpx;
-  background: var(--bg); color: var(--muted);
-  font-size: 20rpx;
+  display: inline-block;
+  padding: 2rpx 12rpx; border-radius: 8rpx;
+  background: var(--bg); color: var(--sub);
+  font-size: 20rpx; font-weight: 500;
 }
 .mb-role-tag.admin {
   background: var(--primary-light); color: var(--primary);
 }
-
-.mb-actions { display: flex; gap: 16rpx; align-items: center; }
+.mb-actions { display: flex; gap: 12rpx; }
 .mb-detail {
   padding: 8rpx 24rpx; border-radius: 20rpx;
   background: var(--blue-light); color: var(--blue);
@@ -238,4 +238,65 @@ page { background: var(--bg); }
   color: #999;
   border-radius: 20rpx;
   background: transparent;
+}
+
+/* ══════════════════════════════
+   ★ About FamilyWell Modal
+   ══════════════════════════════ */
+.about-modal {
+  width: 80%;
+  background: var(--card, #fff);
+  border-radius: 40rpx;
+  padding: 60rpx 48rpx 40rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.about-logo {
+  font-size: 96rpx;
+  margin-bottom: 16rpx;
+}
+.about-name {
+  font-size: 40rpx;
+  font-weight: 800;
+  color: var(--text, #2C2925);
+}
+.about-slogan {
+  font-size: 26rpx;
+  color: var(--sub, #8B8680);
+  margin-top: 8rpx;
+}
+.about-divider {
+  width: 100%;
+  height: 1rpx;
+  background: var(--border, #E8E3DD);
+  margin: 36rpx 0;
+}
+.about-info {
+  width: 100%;
+}
+.about-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16rpx 0;
+}
+.about-label {
+  font-size: 28rpx;
+  color: var(--sub, #8B8680);
+}
+.about-value {
+  font-size: 28rpx;
+  color: var(--text, #2C2925);
+  font-weight: 500;
+}
+.about-email {
+  color: var(--primary, #2D8B6F);
+}
+.about-footer {
+  margin-top: 32rpx;
+}
+.about-copyright {
+  font-size: 22rpx;
+  color: var(--muted, #A9A49E);
 }

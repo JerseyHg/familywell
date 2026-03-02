@@ -53,7 +53,7 @@
   },
   "permission": {
     "scope.record": {
-      "desc": "用于语音录入日常信息信息"
+      "desc": "用于语音录入日常信息"
     },
     "scope.camera": {
       "desc": "用于拍照上传后端文件处理"
