@@ -1,11 +1,13 @@
 /* FamilyWell — Chat Page Styles
-   ★ Fix: input-bar 安全区 + 不被遮挡 */
+   ★ Fix: padding-bottom 留出 TabBar 空间 */
 
 page { background: var(--bg); height: 100vh; overflow: hidden; }
 
 .chat-page {
   display: flex; flex-direction: column; height: 100vh;
-  padding-bottom: 0; box-sizing: border-box; overflow: hidden; width: 100vw;
+  /* ★ 关键：给自定义 TabBar 留空间 */
+  padding-bottom: calc(env(safe-area-inset-bottom) + 120rpx);
+  box-sizing: border-box; overflow: hidden; width: 100vw;
 }
 .safe-top { height: calc(44px + env(safe-area-inset-top)); flex-shrink: 0; background: var(--card); }
 
@@ -134,10 +136,10 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
   font-size: 22rpx; color: var(--sub); box-shadow: 0 2rpx 4rpx rgba(0,0,0,0.04);
 }
 
-/* ★ Input Bar — safe area 在这里处理 */
+/* ★ Input Bar */
 .input-bar {
   display: flex; align-items: center; gap: 16rpx;
-  padding: 16rpx 32rpx calc(16rpx + env(safe-area-inset-bottom));
+  padding: 16rpx 32rpx;
   background: var(--card); border-top: 1rpx solid var(--border);
   flex-shrink: 0; width: 100%; box-sizing: border-box;
 }

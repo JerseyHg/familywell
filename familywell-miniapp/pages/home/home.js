@@ -32,6 +32,7 @@ Page({
   _stopFallbackTimer: null,
   _recordStartTime: 0,
   _pendingStop: false,
+  _recorderBusy: false,
 
   // ════════════════════════════════════════
   //  生命周期
@@ -285,7 +286,7 @@ Page({
 
   // ── ★ 按住说话：立即开始 ──
   onRecordStart: function () {
-    if (this.data.isRecording) return;
+    if (this.data.isRecording || this._recorderBusy) return;
     this._pendingStop = false;
     this._startRecording();
   },
@@ -293,6 +294,7 @@ Page({
   // ── ★ 松开结束 ──
   onRecordEnd: function () {
     if (this.data.isRecording) {
+      this._recorderBusy = true;
       this._stopRecording();
     } else {
       // recorder.start() 是异步的，onStart 还没回调
@@ -306,22 +308,24 @@ Page({
     var recorder = wx.getRecorderManager();
 
     recorder.onStart(function () {
+      self._recorderBusy = false;
       self._recordStartTime = Date.now();
       self.setData({ isRecording: true, recordingDuration: 0 });
       self._recordTimer = setInterval(function () {
         self.setData({ recordingDuration: self.data.recordingDuration + 1 });
       }, 1000);
 
-      // ★ 如果用户在 onStart 之前就松手了，延迟后自动停止
+      // ★ 用户在 onStart 前就松手了 → 立即停止
       if (self._pendingStop) {
         self._pendingStop = false;
-        setTimeout(function () { self._stopRecording(); }, 500);
+        self._recorder.stop();
       }
     });
 
     recorder.onStop(function (res) {
       clearInterval(self._recordTimer);
       clearTimeout(self._stopFallbackTimer);
+      self._recorderBusy = false;
       var duration = Math.round((Date.now() - self._recordStartTime) / 1000);
       self.setData({ isRecording: false });
 
@@ -338,6 +342,7 @@ Page({
       console.error('[Voice] recorder error:', err);
       clearInterval(self._recordTimer);
       clearTimeout(self._stopFallbackTimer);
+      self._recorderBusy = false;
       self.setData({ isRecording: false });
       wx.showToast({ title: '录音失败，请重试', icon: 'none' });
     });
@@ -351,6 +356,7 @@ Page({
     wx.authorize({
       scope: 'scope.record',
       success: function () {
+        self._recorderBusy = true;
         self._recorder.start({
           format: 'mp3',
           sampleRate: 16000,

@@ -60,6 +60,7 @@ Page({
   _stopFallbackTimer: null,
   _recordStartTime: 0,
   _pendingStop: false,
+  _recorderBusy: false,   // ★ 防止 stop 未完成就再 start
 
   onShow: function () {
     var tabBar = this.getTabBar();
@@ -141,24 +142,25 @@ Page({
     var recorder = wx.getRecorderManager();
 
     recorder.onStart(function () {
+      self._recorderBusy = false;  // ★ start 成功，不再 busy
       self._recordStartTime = Date.now();
       self.setData({ isRecording: true, recordingDuration: 0 });
       self._recordTimer = setInterval(function () {
         self.setData({ recordingDuration: self.data.recordingDuration + 1 });
       }, 1000);
 
+      // ★ 用户在 onStart 前就松手了 → 立即停止（不延迟）
       if (self._pendingStop) {
         self._pendingStop = false;
-        setTimeout(function () {
-          clearTimeout(self._stopFallbackTimer);
-          if (self._recorder) self._recorder.stop();
-        }, 500);
+        // 立即 stop，onStop 里 duration<1s 会自动丢弃
+        self._recorder.stop();
       }
     });
 
     recorder.onStop(function (res) {
       clearInterval(self._recordTimer);
       clearTimeout(self._stopFallbackTimer);
+      self._recorderBusy = false;  // ★ stop 完成，可以再次录音
       var duration = Math.round((Date.now() - self._recordStartTime) / 1000);
       self.setData({ isRecording: false, recordingDuration: 0 });
 
@@ -173,6 +175,7 @@ Page({
       console.error('[Chat Voice] recorder error:', err);
       clearInterval(self._recordTimer);
       clearTimeout(self._stopFallbackTimer);
+      self._recorderBusy = false;  // ★ 出错也要解锁
       self.setData({ isRecording: false, recordingDuration: 0 });
       wx.showToast({ title: '录音失败，请重试', icon: 'none' });
     });
@@ -181,7 +184,7 @@ Page({
   },
 
   onVoiceRecordStart: function () {
-    if (this.data.isRecording || this.data.typing) return;
+    if (this.data.isRecording || this.data.typing || this._recorderBusy) return;
     if (!this._requireLogin()) return;
     this._pendingStop = false;
     this._startChatRecording();
@@ -189,6 +192,7 @@ Page({
 
   onVoiceRecordEnd: function () {
     if (this.data.isRecording) {
+      this._recorderBusy = true;  // ★ stop 也是异步的，锁住直到 onStop
       clearTimeout(this._stopFallbackTimer);
       if (this._recorder) this._recorder.stop();
     } else {
@@ -202,6 +206,7 @@ Page({
     wx.authorize({
       scope: 'scope.record',
       success: function () {
+        self._recorderBusy = true;  // ★ 标记为忙，直到 onStart/onStop/onError
         self._recorder.start({
           format: 'mp3',
           sampleRate: 16000,
