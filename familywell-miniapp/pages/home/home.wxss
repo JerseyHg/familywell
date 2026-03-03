@@ -1,6 +1,7 @@
 /* pages/home/home.wxss — 首页样式
    ★ 审核整改：左上角登录区域
    ★ 语音弹窗：固定三段布局（header / content / footer）
+   ★ 文件上传：action-row 改为三列布局
 */
 
 page { background: var(--bg, #F4F1EB); }
@@ -108,17 +109,20 @@ page { background: var(--bg, #F4F1EB); }
   white-space: nowrap;
 }
 
-/* ── Action Row ── */
-.action-row { display: flex; gap: 20rpx; padding: 12rpx 32rpx; }
+/* ══════════════════════════════════════
+   ★ Action Row — 三列纵向布局
+   ══════════════════════════════════════ */
+.action-row { display: flex; gap: 16rpx; padding: 12rpx 32rpx; }
 .action-btn {
-  flex: 1; display: flex; align-items: center; gap: 16rpx;
-  background: #fff; border-radius: 20rpx; padding: 28rpx 24rpx;
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 8rpx;
+  background: #fff; border-radius: 20rpx; padding: 28rpx 12rpx;
   box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.05);
 }
-.ab-icon { font-size: 48rpx; }
-.ab-text { display: flex; flex-direction: column; }
-.ab-title { font-size: 30rpx; font-weight: 600; color: var(--text); }
-.ab-desc { font-size: 22rpx; color: var(--text2); margin-top: 4rpx; }
+.ab-icon { font-size: 44rpx; }
+.ab-text { display: flex; flex-direction: column; align-items: center; }
+.ab-title { font-size: 26rpx; font-weight: 600; color: var(--text); }
+.ab-desc { font-size: 20rpx; color: var(--text2); margin-top: 2rpx; }
 
 /* ── Sections ── */
 .section { padding: 12rpx 32rpx; }

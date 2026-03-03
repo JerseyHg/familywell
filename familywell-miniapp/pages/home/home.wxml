@@ -29,7 +29,14 @@
     <view class="ab-icon">📷</view>
     <view class="ab-text">
       <text class="ab-title">拍照上传</text>
-      <text class="ab-desc">体检单、处方、食物…</text>
+      <text class="ab-desc">拍体检单、处方…</text>
+    </view>
+  </view>
+  <view class="action-btn file" bindtap="onFileUpload">
+    <view class="ab-icon">📎</view>
+    <view class="ab-text">
+      <text class="ab-title">文件上传</text>
+      <text class="ab-desc">PDF、图片文件</text>
     </view>
   </view>
   <view class="action-btn voice" bindtap="onVoiceAdd">

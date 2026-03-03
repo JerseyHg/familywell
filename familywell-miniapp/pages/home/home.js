@@ -199,6 +199,21 @@ Page({
       .catch(function () {});
   },
 
+  onFileUpload: function () {
+    console.log('[onFileUpload] called, chooseAndUploadFile =', typeof upload_1.chooseAndUploadFile);
+    var self = this;
+    if (!this._requireLogin()) return;
+    if (typeof upload_1.chooseAndUploadFile !== 'function') {
+      wx.showToast({ title: 'chooseAndUploadFile 未定义，请重新编译', icon: 'none' });
+      return;
+    }
+    (0, upload_1.chooseAndUploadFile)({ maxCount: 5 })
+        .then(function (result) {
+          (0, upload_1.pollBatchAIStatus)(result.recordIds, function () { self.loadHomeData(); });
+        })
+        .catch(function (err) { console.error('[onFileUpload] error:', err); });
+  },
+
   onPromptTap: function (e) {
     var text = e.currentTarget.dataset.text;
     var app = getApp();

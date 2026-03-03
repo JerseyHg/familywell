@@ -1,3 +1,8 @@
+"""
+app/services/record_processor.py — 记录处理管线
+═══════════════════════════════════════════════════
+★ PDF 双路径：文字类 PDF → 文本模型；扫描件 → 视觉模型（多页支持）
+"""
 import base64
 import logging
 import tempfile
@@ -29,6 +34,37 @@ def _parse_date(date_str: str | None) -> date | None:
         return None
 
 
+# ════════════════════════════════════════
+# ★ PDF 文字提取 & 类型检测
+# ════════════════════════════════════════
+
+def _extract_pdf_text(pdf_path: str) -> str:
+    """
+    尝试从 PDF 中提取文字。
+    返回提取到的文本；如果是扫描件则返回空字符串或很少的文字。
+    """
+    try:
+        import fitz  # PyMuPDF
+        doc = fitz.open(pdf_path)
+        texts = []
+        for page in doc:
+            texts.append(page.get_text())
+        doc.close()
+        return "\n".join(texts).strip()
+    except Exception as e:
+        logger.warning(f"PDF text extraction failed: {e}")
+        return ""
+
+
+def _is_text_pdf(extracted_text: str, min_chars: int = 50) -> bool:
+    """判断 PDF 是文字类还是扫描件：提取到足够多的字符即为文字类。"""
+    return len(extracted_text) > min_chars
+
+
+# ════════════════════════════════════════
+# 主处理管线
+# ════════════════════════════════════════
+
 async def process_record(record_id: int):
     """Main pipeline: download file → AI recognize → dispatch results."""
     async with async_session() as db:
@@ -49,22 +85,14 @@ async def process_record(record_id: int):
                 local_path = Path(tmp_dir) / f"file.{ext}"
                 cos_service.download_file(record.file_key, str(local_path))
 
-                # 3. Convert PDF to images if needed
+                # 3. ★ 根据文件类型分流处理
                 if record.file_type == "pdf":
-                    from pdf2image import convert_from_path
-
-                    images = convert_from_path(str(local_path), first_page=1, last_page=3)
-                    # Use first page for recognition
-                    img_path = Path(tmp_dir) / "page1.jpg"
-                    images[0].save(str(img_path), "JPEG")
-                    local_path = img_path
-
-                # 4. Encode to base64
-                with open(local_path, "rb") as f:
-                    image_b64 = base64.b64encode(f.read()).decode()
-
-            # 5. Call Doubao AI
-            ai_result = await ai_service.recognize_image(image_b64)
+                    ai_result = await _process_pdf(record_id, str(local_path), tmp_dir)
+                else:
+                    # ── 图片文件：原有逻辑不变 ──
+                    with open(local_path, "rb") as f:
+                        image_b64 = base64.b64encode(f.read()).decode()
+                    ai_result = await ai_service.recognize_image(image_b64)
 
             # 6. Update record
             record.ai_raw_result = ai_result
@@ -103,6 +131,83 @@ async def process_record(record_id: int):
             record.ai_error = str(e)
             await db.commit()
 
+
+# ════════════════════════════════════════
+# ★ PDF 双路径处理
+# ════════════════════════════════════════
+
+async def _process_pdf(record_id: int, pdf_path: str, tmp_dir: str) -> dict:
+    """
+    PDF 智能分流：
+    - 文字类 PDF → 提取文字 → 文本模型（更准确、更便宜、无页数限制）
+    - 扫描件 PDF → 转图片 → 视觉模型（逐页识别后合并）
+    """
+    pdf_text = _extract_pdf_text(pdf_path)
+
+    if _is_text_pdf(pdf_text):
+        # ── 文字类 PDF：直接用文本接口 ──
+        logger.info(f"Record {record_id}: text PDF detected ({len(pdf_text)} chars)")
+        return await ai_service.recognize_text(pdf_text)
+    else:
+        # ── 扫描件 PDF：转图片走视觉模型 ──
+        logger.info(f"Record {record_id}: scanned PDF detected")
+        return await _process_scanned_pdf(record_id, pdf_path, tmp_dir)
+
+
+async def _process_scanned_pdf(record_id: int, pdf_path: str, tmp_dir: str) -> dict:
+    """扫描件 PDF：逐页转图片 → 视觉模型识别 → 合并结果。"""
+    from pdf2image import convert_from_path
+
+    images = convert_from_path(pdf_path, dpi=200)
+    logger.info(f"Record {record_id}: scanned PDF has {len(images)} pages")
+
+    if len(images) == 1:
+        # 单页：直接识别
+        img_path = Path(tmp_dir) / "page1.jpg"
+        images[0].save(str(img_path), "JPEG")
+        with open(img_path, "rb") as f:
+            image_b64 = base64.b64encode(f.read()).decode()
+        return await ai_service.recognize_image(image_b64)
+
+    # 多页：逐页识别后合并
+    all_raw_texts = []
+    ai_result = None
+
+    for i, img in enumerate(images):
+        img_path = Path(tmp_dir) / f"page{i + 1}.jpg"
+        img.save(str(img_path), "JPEG")
+        with open(img_path, "rb") as f:
+            page_b64 = base64.b64encode(f.read()).decode()
+
+        logger.info(f"Record {record_id}: recognizing page {i + 1}/{len(images)}")
+        page_result = await ai_service.recognize_image(page_b64)
+
+        # 第一页的结构化结果作为主结果
+        if ai_result is None:
+            ai_result = page_result
+        else:
+            # 后续页的指标、药物追加到主结果
+            if page_result.get("indicators"):
+                ai_result.setdefault("indicators", []).extend(
+                    page_result["indicators"]
+                )
+            if page_result.get("medications"):
+                ai_result.setdefault("medications", []).extend(
+                    page_result["medications"]
+                )
+
+        all_raw_texts.append(page_result.get("raw_text", ""))
+
+    # 合并所有页的 raw_text
+    if ai_result:
+        ai_result["raw_text"] = "\n\n".join(filter(None, all_raw_texts))
+
+    return ai_result or {"category": "other", "title": "识别失败"}
+
+
+# ════════════════════════════════════════
+# 结果分发
+# ════════════════════════════════════════
 
 async def _dispatch_result(db: AsyncSession, record: Record, ai_result: dict):
     """Dispatch AI results to appropriate sub-tables."""
