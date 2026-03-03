@@ -18,15 +18,6 @@ services:
       - shared-net       # 连 shared-postgres
       - familywell       # 内部连 redis
 
-  redis:
-    image: redis:7-alpine
-    container_name: familywell-redis
-    restart: always
-    volumes:
-      - redis_data:/data
-    networks:
-      - familywell
-
 volumes:
   redis_data:
 
