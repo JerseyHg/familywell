@@ -951,143 +951,72 @@ async def voice_add_audio(
     if not items:
         raise HTTPException(status_code=400, detail="未能识别有效内容")
 
-    # ★ Step 3: 创建 Record（归档可见）
     from datetime import date as date_type
     today = date_type.today()
 
-    record = Record(
-        user_id=user.id,
-        file_key=req.audio_keys[0] if req.audio_keys else None,
-        file_type="audio",
-        source="voice",
-        category="medication_log",
-        ai_status="completed",
-        ai_raw_result={
-            "category": "medication_log",
-            "title": f"语音记录 - {today.strftime('%m/%d')}",
-            "raw_text": full_text,
-            "items": items,
-        },
-        record_date=today,
-        title=f"语音记录 - {today.strftime('%m/%d')}",
-    )
-    db.add(record)
-    await db.flush()
-
-    # ★ Step 4: 按类型分发处理（复用原有逻辑）
     result_items = []
+    record_ids_to_embed = []
 
     for item in items:
         item_type = item.get("type", "memo")
+        summary = item.get("summary", full_text[:30])
         data = item.get("data", {})
-        summary = item.get("summary", "")
 
         try:
             if item_type == "medication":
-                meds = data.get("medications", [])
-                for med_info in meds:
-                    med_name = med_info.get("name", "").strip()
-                    if not med_name:
-                        continue
-
-                    # 查找已有药物
-                    existing = await db.execute(
-                        select(Medication).where(
-                            Medication.user_id == user.id,
-                            Medication.name == med_name,
-                            Medication.is_active == True,
-                        )
-                    )
-                    existing_med = existing.scalar_one_or_none()
-
-                    if existing_med:
-                        # 自动打卡
-                        from datetime import datetime, time as time_type
-                        now = datetime.now()
-                        task_result = await db.execute(
-                            select(MedicationTask).where(
-                                MedicationTask.medication_id == existing_med.id,
-                                MedicationTask.scheduled_date == today,
-                                MedicationTask.completed == False,
-                            )
-                        )
-                        uncompleted = task_result.scalars().first()
-                        if uncompleted:
-                            uncompleted.completed = True
-                            uncompleted.completed_at = now
-                            summary = f"✅ {med_name} 已打卡"
-                        else:
-                            summary = f"💊 {med_name} 今日已全部服用"
-                    else:
-                        # 创建药物建议
-                        sug = MedicationSuggestion(
-                            user_id=user.id,
-                            record_id=record.id,
-                            name=med_name,
-                            dosage=med_info.get("dosage"),
-                            med_type=med_info.get("med_type", "long_term"),
-                            times_per_day=med_info.get("times_per_day", 1),
-                            total_days=med_info.get("total_days"),
-                            reason=f"语音记录提取",
-                        )
-                        db.add(sug)
-                        summary = f"💊 新药物「{med_name}」待确认"
-
-                result_items.append({"type": "medication", "summary": summary})
-
-            elif item_type == "food":
-                from app.models.nutrition import NutritionLog
-                log = NutritionLog(
-                    user_id=user.id,
-                    record_id=record.id,
-                    meal_type=data.get("meal_type", "snack"),
-                    food_items=data.get("food_items", []),
-                    calories=data.get("calories"),
-                    protein_g=data.get("protein_g"),
-                    fat_g=data.get("fat_g"),
-                    carb_g=data.get("carb_g"),
-                    logged_at=today,
+                result_item, record_id = await _process_medication(
+                    db, user, data, summary, today, full_text
                 )
-                db.add(log)
-                result_items.append({"type": "food", "summary": summary or "饮食已记录"})
-
+                if record_id:
+                    record_ids_to_embed.append(record_id)
+            elif item_type == "food":
+                result_item, record_id = await _process_food(db, user, data, summary, today)
+                if record_id:
+                    record_ids_to_embed.append(record_id)
             elif item_type == "vitals":
-                indicators = data.get("indicators", [])
-                for ind in indicators:
-                    hi = HealthIndicator(
-                        user_id=user.id,
-                        record_id=record.id,
-                        indicator_type=ind.get("type", "other"),
-                        value=ind.get("value"),
-                        unit=ind.get("unit", ""),
-                        logged_at=today,
-                    )
-                    db.add(hi)
-                result_items.append({"type": "vitals", "summary": summary or "指标已记录"})
-
+                result_item, record_id = await _process_vitals(db, user, data, summary, today)
+                if record_id:
+                    record_ids_to_embed.append(record_id)
+            elif item_type == "insurance":
+                result_item, record_id = await _process_insurance_voice(db, user, data, summary, today)
+                if record_id:
+                    record_ids_to_embed.append(record_id)
+            elif item_type == "symptom":
+                result_item, record_id = await _process_symptom(db, user, data, summary, today, full_text)
+                if record_id:
+                    record_ids_to_embed.append(record_id)
             else:
-                result_items.append({"type": item_type, "summary": summary or "已记录"})
+                result_item, record_id = await _process_memo(db, user, data, summary, today, full_text)
+                if record_id:
+                    record_ids_to_embed.append(record_id)
+
+            result_item["type"] = item_type
+            result_item["summary"] = summary
+            result_items.append(result_item)
 
         except Exception as e:
             logger.error(f"Voice audio item processing error: {e}")
             result_items.append({"type": item_type, "summary": f"处理失败: {str(e)}"})
 
-    await db.commit()
+    if record_ids_to_embed:
+        try:
+            from app.services import embedding_service
+            await db.commit()
+            for rid in record_ids_to_embed:
+                try:
+                    await embedding_service.embed_record(rid)
+                except Exception as emb_err:
+                    logger.warning(f"Embedding failed for record {rid}: {emb_err}")
+        except Exception as e:
+            logger.warning(f"Embedding import failed: {e}")
+            await db.commit()
+    else:
+        await db.commit()
 
-    # 清除缓存
     try:
         from app.services.rag_service import invalidate_user_cache
         await invalidate_user_cache(user.id)
     except Exception:
         pass
-
-    # 生成 Embedding
-    try:
-        from app.services.embedding_service import generate_record_embeddings
-        from app.database import async_session_factory
-        async with async_session_factory() as embed_db:
-            await generate_record_embeddings(embed_db, record.id)
-    except Exception as e:
-        logger.warning(f"Embedding generation failed: {e}")
 
     return {"items": result_items, "text": full_text}

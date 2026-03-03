@@ -1,87 +1,41 @@
-/* ══════════════════════════════
-   FamilyWell — Chat Page Styles
-   ★ 改造：语音输入为主，文字输入为辅
-   ★ Fix: input-bar 不再被遮挡
-   ══════════════════════════════ */
+/* FamilyWell — Chat Page Styles
+   ★ Fix: input-bar 安全区 + 不被遮挡 */
 
 page { background: var(--bg); height: 100vh; overflow: hidden; }
 
 .chat-page {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  /* ★ Fix: 不在外层加大 padding-bottom，改由 input-bar 自带安全区 */
-  padding-bottom: 0;
-  box-sizing: border-box;
-  overflow: hidden;
-  width: 100vw;
+  display: flex; flex-direction: column; height: 100vh;
+  padding-bottom: 0; box-sizing: border-box; overflow: hidden; width: 100vw;
 }
+.safe-top { height: calc(44px + env(safe-area-inset-top)); flex-shrink: 0; background: var(--card); }
 
-.safe-top {
-  height: calc(44px + env(safe-area-inset-top));
-  flex-shrink: 0;
-  background: var(--card);
-}
-
-/* ── Header ── */
-.chat-header {
-  background: var(--card);
-  border-bottom: 1rpx solid var(--border);
-  flex-shrink: 0;
-}
+.chat-header { background: var(--card); border-bottom: 1rpx solid var(--border); flex-shrink: 0; }
 .chat-header-inner { padding: 20rpx 40rpx 24rpx; }
 .chat-title-row { display: flex; justify-content: space-between; align-items: center; }
 .chat-title { font-size: 36rpx; font-weight: 700; color: var(--text); }
 .chat-subtitle { display: block; font-size: 22rpx; color: var(--muted); margin-top: 4rpx; }
 .new-chat-btn {
   padding: 8rpx 24rpx; border-radius: 24rpx;
-  background: var(--primary-light); color: var(--primary);
-  font-size: 22rpx; font-weight: 600;
+  background: var(--primary-light); color: var(--primary); font-size: 22rpx; font-weight: 600;
 }
 
-/* ── Message Area ── */
 .message-area {
-  flex: 1;
-  padding: 20rpx 0;
-  overflow-y: auto;
-  width: 100%;
-  box-sizing: border-box;
-  -webkit-overflow-scrolling: touch;
+  flex: 1; padding: 20rpx 0; overflow-y: auto; width: 100%;
+  box-sizing: border-box; -webkit-overflow-scrolling: touch;
 }
 .scroll-bottom { height: 20rpx; }
 
-/* ── Message Rows ── */
-.msg-row {
-  margin-bottom: 16rpx;
-  padding: 0 32rpx;
-  box-sizing: border-box;
-  width: 100%;
-}
+.msg-row { margin-bottom: 16rpx; padding: 0 32rpx; box-sizing: border-box; width: 100%; }
 .msg-row.user { display: flex; justify-content: flex-end; }
 
-/* ── User Bubble ── */
 .user-bubble {
-  max-width: 75%;
-  background: var(--primary);
-  color: #fff;
-  padding: 20rpx 32rpx;
-  border-radius: 32rpx 8rpx 32rpx 32rpx;
-  font-size: 28rpx;
-  line-height: 1.6;
-  word-break: break-word;
+  max-width: 75%; background: var(--primary); color: #fff;
+  padding: 20rpx 32rpx; border-radius: 32rpx 8rpx 32rpx 32rpx;
+  font-size: 28rpx; line-height: 1.6; word-break: break-word;
 }
+.voice-msg-indicator { display: flex; align-items: center; gap: 8rpx; }
+.voice-msg-icon { font-size: 28rpx; }
 
-/* ★ 语音消息指示器 */
-.voice-msg-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-}
-.voice-msg-icon {
-  font-size: 28rpx;
-}
-
-/* ── AI Bubble ── */
 .ai-row { display: flex; gap: 16rpx; align-items: flex-start; }
 .ai-avatar-sm {
   width: 56rpx; height: 56rpx; border-radius: 28rpx;
@@ -89,34 +43,16 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
   display: flex; align-items: center; justify-content: center;
   font-size: 28rpx; flex-shrink: 0;
 }
-.ai-bubble-group {
-  max-width: calc(100% - 80rpx);
-  display: flex; flex-direction: column; gap: 12rpx;
-}
+.ai-bubble-group { max-width: calc(100% - 80rpx); display: flex; flex-direction: column; gap: 12rpx; }
 .ai-bubble {
-  background: var(--card);
-  padding: 24rpx 28rpx;
-  border-radius: 8rpx 28rpx 28rpx 28rpx;
-  border: 1rpx solid var(--border);
+  background: var(--card); padding: 24rpx 28rpx;
+  border-radius: 8rpx 28rpx 28rpx 28rpx; border: 1rpx solid var(--border);
 }
-.ai-bubble-text {
-  font-size: 28rpx;
-  color: var(--text);
-  line-height: 1.7;
-  word-break: break-word;
-  white-space: pre-wrap;
-}
+.ai-bubble-text { font-size: 28rpx; color: var(--text); line-height: 1.7; word-break: break-word; white-space: pre-wrap; }
 
-/* ── Typing ── */
-.typing-bubble {
-  padding: 20rpx 28rpx;
-}
+.typing-bubble { padding: 20rpx 28rpx; }
 .typing-dots { display: flex; gap: 8rpx; align-items: center; }
-.dot-anim {
-  width: 12rpx; height: 12rpx; border-radius: 50%;
-  background: var(--muted);
-  animation: typing-bounce 1.2s ease-in-out infinite;
-}
+.dot-anim { width: 12rpx; height: 12rpx; border-radius: 50%; background: var(--muted); animation: typing-bounce 1.2s ease-in-out infinite; }
 .dot-anim:nth-child(2) { animation-delay: 0.2s; }
 .dot-anim:nth-child(3) { animation-delay: 0.4s; }
 @keyframes typing-bounce {
@@ -124,11 +60,7 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
   30% { transform: translateY(-8rpx); opacity: 1; }
 }
 
-/* ── Welcome ── */
-.welcome {
-  display: flex; flex-direction: column; align-items: center;
-  padding: 80rpx 48rpx 40rpx;
-}
+.welcome { display: flex; flex-direction: column; align-items: center; padding: 80rpx 48rpx 40rpx; }
 .welcome-avatar {
   width: 120rpx; height: 120rpx; border-radius: 60rpx;
   background: linear-gradient(135deg, #2D8B6F, #4DB892);
@@ -141,30 +73,22 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 .welcome-prompt {
   display: flex; align-items: center; gap: 10rpx;
   padding: 20rpx 28rpx; border-radius: 20rpx;
-  background: var(--card);
-  border: 1rpx solid var(--border);
+  background: var(--card); border: 1rpx solid var(--border);
   box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
-  width: calc(50% - 8rpx);
-  box-sizing: border-box;
+  width: calc(50% - 8rpx); box-sizing: border-box;
 }
 .wp-icon { font-size: 28rpx; }
 .wp-text { font-size: 24rpx; color: var(--sub); }
 
-/* ── Charts ── */
 .chart-card {
-  background: var(--card);
-  border: 1rpx solid var(--border);
-  border-radius: 20rpx;
-  padding: 24rpx;
-  width: 100%;
-  box-sizing: border-box;
+  background: var(--card); border: 1rpx solid var(--border);
+  border-radius: 20rpx; padding: 24rpx; width: 100%; box-sizing: border-box;
 }
 .chart-header { display: flex; align-items: center; gap: 12rpx; margin-bottom: 16rpx; }
 .chart-icon { font-size: 28rpx; }
 .chart-title { font-size: 26rpx; font-weight: 600; color: var(--text); }
 .chart-period { font-size: 20rpx; color: var(--muted); margin-left: auto; }
 
-/* bar chart */
 .bar-chart { display: flex; flex-direction: column; gap: 12rpx; }
 .bar-row { display: flex; align-items: center; gap: 12rpx; }
 .bar-label { font-size: 22rpx; color: var(--sub); width: 80rpx; flex-shrink: 0; }
@@ -172,7 +96,6 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 .bar-fill { height: 100%; border-radius: 12rpx; transition: width 0.6s; }
 .bar-value { font-size: 22rpx; color: var(--text); width: 80rpx; text-align: right; }
 
-/* pie chart */
 .pie-chart { display: flex; flex-direction: column; gap: 12rpx; }
 .pie-row { display: flex; align-items: center; gap: 12rpx; }
 .pie-dot { width: 16rpx; height: 16rpx; border-radius: 8rpx; flex-shrink: 0; }
@@ -180,157 +103,76 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 .pie-value { font-size: 22rpx; color: var(--text); }
 .pie-pct { font-size: 20rpx; color: var(--muted); width: 60rpx; text-align: right; }
 
-/* adherence */
 .med-row { display: flex; align-items: center; gap: 12rpx; margin-bottom: 12rpx; }
 .med-name { font-size: 24rpx; color: var(--sub); width: 120rpx; flex-shrink: 0; }
 .med-bar-bg { flex: 1; height: 24rpx; background: var(--bg); border-radius: 12rpx; overflow: hidden; }
 .med-bar-fill { height: 100%; border-radius: 12rpx; }
 .med-ratio { font-size: 22rpx; color: var(--text); width: 60rpx; text-align: right; }
 
-/* alerts */
 .alert-item { display: flex; gap: 12rpx; margin-bottom: 12rpx; }
 .alert-icon { font-size: 28rpx; flex-shrink: 0; }
 .alert-info { display: flex; flex-direction: column; }
 .alert-title { font-size: 24rpx; font-weight: 500; color: var(--text); }
 .alert-desc { font-size: 22rpx; color: var(--sub); }
 
-/* insurance */
 .ins-item { margin-bottom: 12rpx; }
 .ins-header-row { display: flex; align-items: center; gap: 12rpx; }
 .ins-name { font-size: 24rpx; font-weight: 500; color: var(--text); }
-.ins-urgent {
-  padding: 4rpx 12rpx; border-radius: 12rpx;
-  background: var(--accent-light); color: var(--accent);
-  font-size: 20rpx; font-weight: 600;
-}
+.ins-urgent { padding: 4rpx 12rpx; border-radius: 12rpx; background: var(--accent-light); color: var(--accent); font-size: 20rpx; font-weight: 600; }
 .ins-detail { display: block; font-size: 22rpx; color: var(--sub); margin-top: 4rpx; }
 
-/* chart AI tip */
-.chart-ai-tip {
-  display: flex; gap: 10rpx; align-items: flex-start;
-  margin-top: 16rpx; padding: 16rpx 20rpx;
-  background: #F5F8FF; border-radius: 16rpx;
-}
+.chart-ai-tip { display: flex; gap: 10rpx; align-items: flex-start; margin-top: 16rpx; padding: 16rpx 20rpx; background: #F5F8FF; border-radius: 16rpx; }
 .tip-icon { font-size: 22rpx; flex-shrink: 0; }
 .tip-text { font-size: 22rpx; color: var(--sub); line-height: 1.5; }
 
-/* ── Follow-up Prompts ── */
 .followup-area { padding: 12rpx 32rpx; }
 .followup-wrap { display: flex; flex-wrap: wrap; gap: 12rpx; }
 .followup-chip {
   display: inline-flex; align-items: center; gap: 8rpx;
   padding: 14rpx 28rpx; border-radius: 36rpx;
-  background: var(--card);
-  border: 1rpx solid var(--border);
-  font-size: 22rpx; color: var(--sub);
-  box-shadow: 0 2rpx 4rpx rgba(0,0,0,0.04);
+  background: var(--card); border: 1rpx solid var(--border);
+  font-size: 22rpx; color: var(--sub); box-shadow: 0 2rpx 4rpx rgba(0,0,0,0.04);
 }
 
-/* ══════════════════════════════
-   ★ Input Bar — 语音+文字双模式
-   ★ Fix: 安全区内边距放在 input-bar 上
-   ══════════════════════════════ */
+/* ★ Input Bar — safe area 在这里处理 */
 .input-bar {
   display: flex; align-items: center; gap: 16rpx;
-  /* ★ Fix: 底部增加安全区内边距 */
   padding: 16rpx 32rpx calc(16rpx + env(safe-area-inset-bottom));
-  background: var(--card);
-  border-top: 1rpx solid var(--border);
-  flex-shrink: 0;
-  width: 100%;
-  box-sizing: border-box;
+  background: var(--card); border-top: 1rpx solid var(--border);
+  flex-shrink: 0; width: 100%; box-sizing: border-box;
 }
-
-/* 模式切换按钮 */
 .mode-toggle {
   width: 72rpx; height: 72rpx;
   display: flex; align-items: center; justify-content: center;
-  border-radius: 36rpx;
-  background: var(--bg);
-  border: 1rpx solid var(--border);
-  font-size: 32rpx;
-  flex-shrink: 0;
+  border-radius: 36rpx; background: var(--bg); border: 1rpx solid var(--border);
+  font-size: 32rpx; flex-shrink: 0;
 }
-
-/* 文字输入模式 */
-.input-wrap {
-  flex: 1; min-width: 0;
-  background: var(--bg);
-  border-radius: 44rpx;
-  padding: 20rpx 32rpx;
-  border: 1rpx solid var(--border);
-}
+.input-wrap { flex: 1; min-width: 0; background: var(--bg); border-radius: 44rpx; padding: 20rpx 32rpx; border: 1rpx solid var(--border); }
 .input-field { font-size: 28rpx; color: var(--text); width: 100%; }
 .send-btn {
-  width: 80rpx; height: 80rpx; border-radius: 40rpx;
-  background: var(--border);
+  width: 80rpx; height: 80rpx; border-radius: 40rpx; background: var(--border);
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  transition: background 0.2s;
+  flex-shrink: 0; transition: background 0.2s;
 }
 .send-btn.active { background: var(--primary); }
 .send-arrow { color: #fff; font-size: 32rpx; font-weight: 700; }
 
-/* ★ 语音输入按钮 */
 .voice-input-btn {
-  flex: 1;
-  height: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12rpx;
-  background: var(--bg);
-  border: 2rpx solid var(--border);
-  border-radius: 44rpx;
-  transition: all 0.15s;
+  flex: 1; height: 80rpx;
+  display: flex; align-items: center; justify-content: center; gap: 12rpx;
+  background: var(--bg); border: 2rpx solid var(--border);
+  border-radius: 44rpx; transition: all 0.15s;
 }
-
-.voice-input-btn:active {
-  background: #E8E4DD;
-}
-
-.voice-input-btn.recording {
-  background: #FEF2F2;
-  border-color: #FECACA;
-}
-
+.voice-input-btn:active { background: #E8E4DD; }
+.voice-input-btn.recording { background: #FEF2F2; border-color: #FECACA; }
 .voice-input-icon { font-size: 36rpx; }
 .voice-input-label { font-size: 28rpx; color: var(--text); font-weight: 500; }
 .voice-input-label.recording { color: #DC2626; }
 
-/* 语音录制波形（输入栏内） */
-.voice-recording-wave {
-  display: flex; align-items: center; gap: 4rpx;
-  height: 40rpx;
-}
-.v-wave-bar {
-  width: 5rpx; height: 100%;
-  border-radius: 3rpx;
-  background: #DC2626;
-  animation: v-wave-anim 0.8s ease-in-out infinite alternate;
-}
-@keyframes v-wave-anim {
-  0% { transform: scaleY(0.3); }
-  100% { transform: scaleY(1); }
-}
+.voice-recording-wave { display: flex; align-items: center; gap: 4rpx; height: 40rpx; }
+.v-wave-bar { width: 5rpx; height: 100%; border-radius: 3rpx; background: #DC2626; animation: v-wave-anim 0.8s ease-in-out infinite alternate; }
+@keyframes v-wave-anim { 0% { transform: scaleY(0.3); } 100% { transform: scaleY(1); } }
 
-/* ★ AI 免责声明 */
-.ai-disclaimer-badge {
-  font-size: 20rpx;
-  color: var(--muted, #A9A49E);
-  background: rgba(45, 139, 111, 0.08);
-  padding: 6rpx 16rpx;
-  border-radius: 8rpx;
-  margin-top: 8rpx;
-  display: inline-block;
-}
-
-.ai-disclaimer {
-  padding: 8rpx 0 0;
-}
-
-.disclaimer-text {
-  font-size: 20rpx;
-  color: var(--muted, #A9A49E);
-  line-height: 1.4;
-}
+.ai-disclaimer-badge { font-size: 20rpx; color: var(--muted); background: rgba(45,139,111,0.08); padding: 6rpx 16rpx; border-radius: 8rpx; margin-top: 8rpx; display: inline-block; }
+.ai-disclaimer { padding: 8rpx 0 0; }
+.disclaimer-text { font-size: 20rpx; color: var(--muted); line-height: 1.4; }
