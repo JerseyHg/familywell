@@ -203,27 +203,18 @@ Page({
   _startChatRecording: function () {
     var self = this;
     this._initChatRecorder();
-
-    // ★ 先检查是否已有权限
+    // ★ 先检查权限，避免首次弹窗打断录音
     wx.getSetting({
       success: function (res) {
         if (res.authSetting['scope.record']) {
-          // ✅ 已有权限，直接开始录音
+          // ✅ 已有权限，直接录音
           self._doStartChatRecording();
         } else {
-          // ❌ 没有权限，先请求授权（不录音）
+          // ❌ 首次，弹窗请求权限（不录音，弹窗会打断 touch）
           wx.authorize({
             scope: 'scope.record',
             success: function () {
-              // ★ 授权成功，检查用户是否还在按住
-              if (self._pendingStop === false && self._recordTouchTime !== 0) {
-                // 用户还在按着，可以开始录音
-                // 但注意：_recordTouchTime 在 chat.js 里没有用到
-                // chat.js 用的是 _pendingStop 机制
-                self._doStartChatRecording();
-              } else {
-                wx.showToast({ title: '权限已获取，请再次按住说话', icon: 'none' });
-              }
+              wx.showToast({ title: '权限已获取，请再次按住说话', icon: 'none' });
             },
             fail: function () {
               wx.showModal({
@@ -239,7 +230,6 @@ Page({
     });
   },
 
-// ★ 新增：实际开始录音（权限已确认）
   _doStartChatRecording: function () {
     var self = this;
     self._recorderBusy = true;
@@ -260,7 +250,7 @@ Page({
     var userMsg = { id: 'msg_' + Date.now(), role: 'user', text: '🎙️ 语音提问', isVoice: true };
     var messages = this.data.messages.slice();
     messages.push(userMsg);
-    var userIdx = messages.length - 1;  // ★ 记录用户消息的索引
+    var userIdx = messages.length - 1;  // ★ 记录用户消息索引
 
     var aiMsg = { id: 'ai_' + Date.now(), role: 'assistant', text: '', charts: [] };
     messages.push(aiMsg);
@@ -279,15 +269,12 @@ Page({
             include_family: false,
           },
           {
-            // ★★★ 新增：收到转录文字后，更新用户消息气泡 ★★★
+            // ★ 收到转录文字 → 更新用户气泡
             onTranscript: function (text) {
               if (text) {
-                self.setData({
-                  ['messages[' + userIdx + '].text']: text,
-                });
+                self.setData({ ['messages[' + userIdx + '].text']: text });
               }
             },
-
             onCharts: function (charts) {
               self.setData({ ['messages[' + aiIdx + '].charts']: self._processCharts(charts) });
               self._scrollToBottom();

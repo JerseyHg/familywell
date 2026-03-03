@@ -159,9 +159,9 @@ async def chat_stream_voice(
         family_user_ids = await _get_family_user_ids(db, user.id)
 
     async def event_generator():
-        # ★★★ 新增：先推送转录文字，让前端更新用户气泡 ★★★
-        import json
-        yield f'data: {json.dumps({"type": "transcript", "content": question}, ensure_ascii=False)}\n\n'
+        # ★ 先推送转录文字，让前端更新用户气泡
+        import json as _json
+        yield f'data: {_json.dumps({"type": "transcript", "content": question}, ensure_ascii=False)}\n\n'
 
         async for sse_line in rag_service.chat_stream(
             db=db,
