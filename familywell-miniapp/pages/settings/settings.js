@@ -206,7 +206,7 @@ Page({
     wx.navigateTo({ url: '/pages/onboarding/onboarding?mode=edit&step=' + step });
   },
 
-  goHelpFeedback: function () {
+  onFeedback: function () {
     wx.showModal({
       title: '帮助与反馈',
       content: '如有问题或建议，请联系：support@familywell.cn',
@@ -214,7 +214,7 @@ Page({
     });
   },
 
-  exportData: function () {
+  onExportData: function () {
     if (!this._requireLogin()) return;
     wx.showModal({
       title: '导出数据',
@@ -223,7 +223,7 @@ Page({
     });
   },
 
-  showAbout: function () {
+  onShowAbout: function () {
     this.setData({ showAboutModal: true });
   },
 
@@ -265,5 +265,14 @@ Page({
         }
       },
     });
+  },
+
+  goArchive: function () {
+    wx.switchTab({ url: '/pages/archive/archive' });
+  },
+
+  goAgreement: function (e) {
+    var type = e.currentTarget.dataset.type || 'service';
+    wx.navigateTo({ url: '/pages/agreement/agreement?type=' + type });
   },
 });
