@@ -368,30 +368,56 @@ Page({
   _startRecording: function () {
     var self = this;
     this._initRecorder();
-    wx.authorize({
-      scope: 'scope.record',
-      success: function () {
-        self._recorderBusy = true;
-        self._recorder.start({
-          format: 'mp3',
-          sampleRate: 16000,
-          numberOfChannels: 1,
-          encodeBitRate: 48000,
-          duration: 60000,
-        });
-        self._stopFallbackTimer = setTimeout(function () {
-          if (self.data.isRecording) self._stopRecording();
-        }, 55000);
-      },
-      fail: function () {
-        wx.showModal({
-          title: '需要录音权限',
-          content: '请在设置中允许使用麦克风',
-          confirmText: '去设置',
-          success: function (r) { if (r.confirm) wx.openSetting(); },
-        });
+
+    // ★ 先检查是否已有权限
+    wx.getSetting({
+      success: function (res) {
+        if (res.authSetting['scope.record']) {
+          // ✅ 已有权限，直接开始录音
+          self._doStartRecording();
+        } else {
+          // ❌ 没有权限，先请求授权（不录音）
+          wx.authorize({
+            scope: 'scope.record',
+            success: function () {
+              // ★ 授权成功，但这次 touch 已经被弹窗中断了
+              // 直接开始录音（因为 onRecordStart 的防抖机制会处理松手情况）
+              if (self._recordTouchTime !== 0) {
+                self._doStartRecording();
+              } else {
+                // 用户在弹窗期间已经松手了
+                wx.showToast({ title: '权限已获取，请再次按住说话', icon: 'none' });
+              }
+            },
+            fail: function () {
+              self._recordTouchTime = 0;
+              wx.showModal({
+                title: '需要录音权限',
+                content: '请在设置中允许使用麦克风',
+                confirmText: '去设置',
+                success: function (r) { if (r.confirm) wx.openSetting(); },
+              });
+            },
+          });
+        }
       },
     });
+  },
+
+// ★ 新增：实际开始录音的函数（权限已确认）
+  _doStartRecording: function () {
+    var self = this;
+    this._recorderBusy = true;
+    this._recorder.start({
+      format: 'mp3',
+      sampleRate: 16000,
+      numberOfChannels: 1,
+      encodeBitRate: 48000,
+      duration: 60000,
+    });
+    this._stopFallbackTimer = setTimeout(function () {
+      if (self.data.isRecording) self._stopRecording();
+    }, 55000);
   },
 
   _stopRecording: function () {

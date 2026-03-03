@@ -282,6 +282,7 @@ interface ChatStreamCallbacks {
   onText?: (delta: string) => void
   onDone?: (sessionId: string) => void
   onError?: (err: any) => void
+  onTranscript?: (text: string) => void
   onFallbackComplete?: (fullText: string, charts: any[], sessionId: string) => void
 }
 
@@ -448,6 +449,9 @@ function _handleSSEEvent(evt: any, callbacks: ChatStreamCallbacks) {
       break
     case 'text':
       callbacks.onText?.(evt.content || '')
+      break
+    case 'transcript':
+      callbacks.onTranscript?.(evt.content || '')
       break
     case 'done':
       callbacks.onDone?.(evt.session_id || '')

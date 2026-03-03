@@ -203,30 +203,56 @@ Page({
   _startChatRecording: function () {
     var self = this;
     this._initChatRecorder();
-    wx.authorize({
-      scope: 'scope.record',
-      success: function () {
-        self._recorderBusy = true;  // ★ 标记为忙，直到 onStart/onStop/onError
-        self._recorder.start({
-          format: 'mp3',
-          sampleRate: 16000,
-          numberOfChannels: 1,
-          encodeBitRate: 48000,
-          duration: 60000,
-        });
-        self._stopFallbackTimer = setTimeout(function () {
-          if (self.data.isRecording && self._recorder) self._recorder.stop();
-        }, 55000);
-      },
-      fail: function () {
-        wx.showModal({
-          title: '需要录音权限',
-          content: '请在设置中允许使用麦克风',
-          confirmText: '去设置',
-          success: function (r) { if (r.confirm) wx.openSetting(); },
-        });
+
+    // ★ 先检查是否已有权限
+    wx.getSetting({
+      success: function (res) {
+        if (res.authSetting['scope.record']) {
+          // ✅ 已有权限，直接开始录音
+          self._doStartChatRecording();
+        } else {
+          // ❌ 没有权限，先请求授权（不录音）
+          wx.authorize({
+            scope: 'scope.record',
+            success: function () {
+              // ★ 授权成功，检查用户是否还在按住
+              if (self._pendingStop === false && self._recordTouchTime !== 0) {
+                // 用户还在按着，可以开始录音
+                // 但注意：_recordTouchTime 在 chat.js 里没有用到
+                // chat.js 用的是 _pendingStop 机制
+                self._doStartChatRecording();
+              } else {
+                wx.showToast({ title: '权限已获取，请再次按住说话', icon: 'none' });
+              }
+            },
+            fail: function () {
+              wx.showModal({
+                title: '需要录音权限',
+                content: '请在设置中允许使用麦克风',
+                confirmText: '去设置',
+                success: function (r) { if (r.confirm) wx.openSetting(); },
+              });
+            },
+          });
+        }
       },
     });
+  },
+
+// ★ 新增：实际开始录音（权限已确认）
+  _doStartChatRecording: function () {
+    var self = this;
+    self._recorderBusy = true;
+    self._recorder.start({
+      format: 'mp3',
+      sampleRate: 16000,
+      numberOfChannels: 1,
+      encodeBitRate: 48000,
+      duration: 60000,
+    });
+    self._stopFallbackTimer = setTimeout(function () {
+      if (self.data.isRecording && self._recorder) self._recorder.stop();
+    }, 55000);
   },
 
   _sendVoiceMessage: function (tempFilePath) {
@@ -234,6 +260,7 @@ Page({
     var userMsg = { id: 'msg_' + Date.now(), role: 'user', text: '🎙️ 语音提问', isVoice: true };
     var messages = this.data.messages.slice();
     messages.push(userMsg);
+    var userIdx = messages.length - 1;  // ★ 记录用户消息的索引
 
     var aiMsg = { id: 'ai_' + Date.now(), role: 'assistant', text: '', charts: [] };
     messages.push(aiMsg);
@@ -246,45 +273,54 @@ Page({
 
     (0, upload_1.uploadAudioToCOS)(tempFilePath).then(function (result) {
       self._streamTask = api_1.chatApi.streamVoice(
-        {
-          audio_keys: [result.fileKey],
-          session_id: self.data.sessionId || undefined,
-          include_family: false,
-        },
-        {
-          onCharts: function (charts) {
-            self.setData({ ['messages[' + aiIdx + '].charts']: self._processCharts(charts) });
-            self._scrollToBottom();
+          {
+            audio_keys: [result.fileKey],
+            session_id: self.data.sessionId || undefined,
+            include_family: false,
           },
-          onText: function (delta) {
-            self._streamText += delta;
-            self._throttledUpdateText();
-          },
-          onDone: function (sessionId) {
-            self._clearTimers();
-            if (self._streamText) {
+          {
+            // ★★★ 新增：收到转录文字后，更新用户消息气泡 ★★★
+            onTranscript: function (text) {
+              if (text) {
+                self.setData({
+                  ['messages[' + userIdx + '].text']: text,
+                });
+              }
+            },
+
+            onCharts: function (charts) {
+              self.setData({ ['messages[' + aiIdx + '].charts']: self._processCharts(charts) });
+              self._scrollToBottom();
+            },
+            onText: function (delta) {
+              self._streamText += delta;
+              self._throttledUpdateText();
+            },
+            onDone: function (sessionId) {
+              self._clearTimers();
+              if (self._streamText) {
+                self.setData({
+                  ['messages[' + aiIdx + '].text']: self._streamText,
+                  typing: false,
+                  sessionId: sessionId || self.data.sessionId,
+                });
+              } else {
+                self.setData({ typing: false });
+              }
+              self._scrollToBottom();
+            },
+            onError: function (err) {
+              self._clearTimers();
               self.setData({
-                ['messages[' + aiIdx + '].text']: self._streamText,
+                ['messages[' + aiIdx + '].text']: self._streamText || '抱歉，语音识别出错了，请重试',
                 typing: false,
-                sessionId: sessionId || self.data.sessionId,
               });
-            } else {
-              self.setData({ typing: false });
-            }
-            self._scrollToBottom();
+            },
+            onFallback: function (fullText, sessionId) {
+              self._clearTimers();
+              self._simulateTyping(fullText, aiIdx, sessionId);
+            },
           },
-          onError: function (err) {
-            self._clearTimers();
-            self.setData({
-              ['messages[' + aiIdx + '].text']: self._streamText || '抱歉，语音识别出错了，请重试',
-              typing: false,
-            });
-          },
-          onFallback: function (fullText, sessionId) {
-            self._clearTimers();
-            self._simulateTyping(fullText, aiIdx, sessionId);
-          },
-        },
       );
     }).catch(function (err) {
       self.setData({ ['messages[' + aiIdx + '].text']: '语音上传失败，请重试', typing: false });
