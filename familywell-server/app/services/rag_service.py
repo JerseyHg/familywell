@@ -1,15 +1,12 @@
 """
-RAG Service
-───────────
-本地向量检索 → 组装上下文 → 调豆包 LLM → 生成回答
-
-支持两种模式：
-- chat()        : 同步，等全部生成完一次性返回（fallback / 首页摘要用）
-- chat_stream() : 流式，SSE 逐字推送，图表先行（主力模式）
-
-✅ 新增：
-- Redis 热点缓存：高频模板问题（如"过去7天饮食情况"）缓存回答，减少 LLM 调用
-- 更友善的 SYSTEM_PROMPT：非健康话题温暖拒绝并引导
+app/services/rag_service.py — RAG 问答 + 缓存
+──────────────────────────────────────────────────────
+★ 重构后：上下文组装逻辑已迁移至 context_service.py。
+  本文件仅保留：
+  - Redis 热点缓存层
+  - LLM 调用（chat / chat_stream）
+  - 对话历史持久化（save_chat_history）
+  - 首页摘要（quick_health_summary）
 """
 import json
 import hashlib
@@ -19,18 +16,13 @@ from typing import AsyncGenerator
 
 import redis.asyncio as aioredis
 from openai import AsyncOpenAI
-from sqlalchemy import select, func, text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.models.user import User, UserProfile
-from app.models.medication import Medication, MedicationTask
-from app.models.health_indicator import HealthIndicator
-from app.models.reminder import Reminder
 from app.models.embedding import ChatHistory
 from app.services import embedding_service
-from app.services import chart_service
-from app.models.nutrition import NutritionLog
+from app.services.context_service import prepare_context  # ★ 从 context_service 导入
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -40,11 +32,13 @@ _client = AsyncOpenAI(
     base_url=settings.DOUBAO_BASE_URL,
 )
 
-# ════════════════════════════════════════
-# Redis 连接（热点缓存用）
-# ════════════════════════════════════════
+
+# ══════════════════════════════════════════════════
+# Redis 热点缓存
+# ══════════════════════════════════════════════════
 
 _redis: aioredis.Redis | None = None
+
 
 async def get_redis() -> aioredis.Redis:
     """获取 Redis 连接（懒初始化）。"""
@@ -53,11 +47,11 @@ async def get_redis() -> aioredis.Redis:
         _redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
     return _redis
 
+
 # 热点问题缓存 TTL（秒）：数据每天都在变化，缓存 2 小时
 HOT_CACHE_TTL = 2 * 60 * 60
 
 # ✅ 模板问题列表（和前端 homePrompts 对应）
-# 这些问题会优先检查 Redis 缓存
 HOT_QUESTIONS = {
     "过去7天饮食情况",
     "这周药吃齐了吗",
@@ -89,32 +83,6 @@ async def get_cached_answer(user_id: int, question: str) -> dict | None:
     return None
 
 
-# ════════════════════════════════════════
-# ★ 公共缓存失效函数（所有数据写入点调用）
-# ════════════════════════════════════════
-
-async def invalidate_user_cache(user_id: int):
-    """
-    清除指定用户的所有热点问题缓存。
-
-    任何数据写入后都应调用此函数，包括：
-    - 语音录入（medications.py voice-add）
-    - 拍照上传识别完成（record_processor.py）
-    - 编辑记录（records.py PUT）
-    - 确认处方（records.py confirm-prescription）
-    - 用药打卡（medications.py complete_task）
-    - 手动创建药物（medications.py create）
-    """
-    try:
-        r = await get_redis()
-        keys_to_delete = [_cache_key(user_id, q) for q in HOT_QUESTIONS]
-        if keys_to_delete:
-            deleted = await r.delete(*keys_to_delete)
-            logger.info(f"Cache invalidated for user {user_id}: {deleted} keys cleared")
-    except Exception as e:
-        # 缓存失效失败不应阻断主流程
-        logger.warning(f"Cache invalidation failed for user {user_id} (non-fatal): {e}")
-
 async def set_cached_answer(user_id: int, question: str, answer: dict):
     """将回答写入 Redis 缓存。"""
     try:
@@ -129,212 +97,31 @@ async def set_cached_answer(user_id: int, question: str, answer: dict):
         logger.warning(f"Redis set failed: {e}")
 
 
-# ════════════════════════════════════════
-# System Prompt
-# ════════════════════════════════════════
+async def invalidate_user_cache(user_id: int):
+    """
+    清除指定用户的所有热点问题缓存。
 
-# ✅ 优化：更友善的角色设定
-SYSTEM_PROMPT = """你是 FamilyWell 的 AI 家庭健康助手，名字叫"小康"。
-
-你的核心职责：
-1. 优先基于用户的真实健康档案数据来回答问题
-2. 引用数据时标注来源（如"根据2月24日的同济医院MR报告"）
-3. 涉及疾病诊断时提醒用户咨询医生
-4. 语气温暖专业，像一位懂医学的家人
-
-回答策略（按优先级）：
-A. 如果档案中有相关数据 → 基于数据详细回答，标注来源
-B. 如果档案数据不足但问题涉及健康/医学 → 先说明档案中有什么，然后**结合你的医学知识给出通用解读和建议**，明确标注哪些是通用知识、哪些是个人数据
-C. 如果问题完全无关健康 → 用温暖友好的语气简短回应，自然引导回健康话题
-
-你可以做的事：
-- 解读检查报告（MR、CT、血检、尿检等）的具体内容和含义
-- 解释医学术语和指标的临床意义
-- 分析指标趋势和异常值
-- 汇总用药情况、分析营养摄入
-- 提供健康知识科普（疾病预防、养生、运动、饮食等）
-- 回答"他/她最近怎么样"这类综合问题
-
-重要原则：
-- 不要因为档案数据不全就完全拒绝回答。如果用户问"MR报告怎么看"，即使档案中只有部分信息，你也应该解读已有内容，并补充通用的MR报告阅读指南
-- 回答要具体、有用，避免泛泛而谈或反复让用户"补充上传"
-- 如果确实需要更多数据，在回答完已有信息后，再简短提一句可以补充什么
-
-下面是从用户健康档案中检索到的相关信息：
-
-{context}
-
-{realtime_data}
-
-请基于以上信息回答用户的问题。"""
+    任何数据写入后都应调用此函数，包括：
+    - 语音录入（voice_input.py）
+    - 拍照上传识别完成（record_processor.py）
+    - 编辑记录（records.py PUT）
+    - 确认处方（records.py confirm-prescription）
+    - 用药打卡（medications.py complete_task）
+    - 手动创建药物（medications.py create）
+    """
+    try:
+        r = await get_redis()
+        keys_to_delete = [_cache_key(user_id, q) for q in HOT_QUESTIONS]
+        if keys_to_delete:
+            deleted = await r.delete(*keys_to_delete)
+            logger.info(f"Cache invalidated for user {user_id}: {deleted} keys cleared")
+    except Exception as e:
+        logger.warning(f"Cache invalidation failed for user {user_id} (non-fatal): {e}")
 
 
-# ════════════════════════════════════════
-# 1. 获取实时补充数据
-# ════════════════════════════════════════
-
-async def get_realtime_context(db: AsyncSession, user_id: int) -> str:
-    """查询结构化表获取实时数据，补充向量检索不一定能覆盖的最新信息。"""
-    parts = []
-
-    # ── 今日用药任务 ──
-    today = date.today()
-    tasks_result = await db.execute(
-        select(MedicationTask)
-        .where(MedicationTask.user_id == user_id)
-        .where(MedicationTask.scheduled_date == today)
-    )
-    tasks = tasks_result.scalars().all()
-    if tasks:
-        done = [t for t in tasks if t.status == "done"]
-        pending = [t for t in tasks if t.status == "pending"]
-        missed = [t for t in tasks if t.status == "missed"]
-        parts.append(
-            f"【今日用药】已完成 {len(done)}/{len(tasks)} 次"
-            + (f"，待完成: {', '.join(t.medication_name or '药物' for t in pending)}" if pending else "")
-            + (f"，漏服: {', '.join(t.medication_name or '药物' for t in missed)}" if missed else "")
-        )
-
-    # ── 最近异常指标（30天内） ──
-    thirty_ago = datetime.utcnow() - timedelta(days=30)
-    abnormal_result = await db.execute(
-        select(HealthIndicator)
-        .where(HealthIndicator.user_id == user_id)
-        .where(HealthIndicator.is_abnormal == True)
-        .where(HealthIndicator.measured_at >= thirty_ago)
-        .order_by(HealthIndicator.measured_at.desc())
-        .limit(10)
-    )
-    abnormals = abnormal_result.scalars().all()
-    if abnormals:
-        items = [f"{a.indicator_type}: {a.value} {a.unit or ''}" for a in abnormals]
-        parts.append(f"【近30天异常指标】{'; '.join(items)}")
-
-    # ── 紧急提醒 ──
-    reminders_result = await db.execute(
-        select(Reminder)
-        .where(Reminder.user_id == user_id)
-        .where(Reminder.priority == "urgent")
-        .where(Reminder.is_resolved == False)
-        .limit(5)
-    )
-    reminders = reminders_result.scalars().all()
-    if reminders:
-        items = [f"{r.title}: {r.description or ''}" for r in reminders]
-        parts.append(f"【紧急提醒】{'; '.join(items)}")
-
-    # ── 在用药物 ──
-    meds_result = await db.execute(
-        select(Medication)
-        .where(Medication.user_id == user_id)
-        .where(Medication.is_active == True)
-    )
-    meds = meds_result.scalars().all()
-    if meds:
-        items = [f"{m.name} {m.dosage or ''} {m.frequency or ''}" for m in meds]
-        parts.append(f"【当前用药】{'; '.join(items)}")
-
-    nutrition_result = await db.execute(
-        select(NutritionLog)
-        .where(NutritionLog.user_id == user_id)
-        .where(NutritionLog.logged_at == today)
-    )
-    meals = nutrition_result.scalars().all()
-    if meals:
-        meal_items = []
-        for m in meals:
-            items_str = "、".join(m.food_items) if m.food_items else "未知食物"
-            cal_str = f"，约{m.calories}千卡" if m.calories else ""
-            meal_items.append(f"{m.meal_type or ''}：{items_str}{cal_str}")
-        parts.append(f"【今日饮食】{'；'.join(meal_items)}")
-
-    if not parts:
-        return ""
-
-    return "以下是实时数据（最新状态）：\n" + "\n".join(parts)
-
-
-# ════════════════════════════════════════
-# 2. 获取对话历史
-# ════════════════════════════════════════
-
-async def get_chat_history(
-    db: AsyncSession, user_id: int, session_id: str, limit: int = 10
-) -> list[dict]:
-    """获取最近 N 轮对话作为上下文。"""
-    result = await db.execute(
-        select(ChatHistory)
-        .where(ChatHistory.user_id == user_id)
-        .where(ChatHistory.session_id == session_id)
-        .order_by(ChatHistory.created_at.desc())
-        .limit(limit)
-    )
-    rows = result.scalars().all()
-    return [{"role": r.role, "content": r.content} for r in reversed(rows)]
-
-
-# ════════════════════════════════════════
-# 3. 共用 context 构建（同步/流式都用）
-# ════════════════════════════════════════
-
-async def prepare_context(
-    db: AsyncSession,
-    user_id: int,
-    session_id: str,
-    question: str,
-    family_user_ids: list[int] | None = None,
-) -> dict:
-    """构建 RAG 所需的全部上下文。同步和流式共用。"""
-
-    # 向量检索
-    retrieved = await embedding_service.search_similar(
-        db=db,
-        user_id=user_id,
-        query=question,
-        family_user_ids=family_user_ids,
-    )
-
-    # 组装 context
-    context_parts = []
-    sources = []
-    for i, chunk in enumerate(retrieved):
-        context_parts.append(
-            f"[来源{i+1}] ({chunk['content_type']}, {chunk['source_date'] or '日期未知'}, "
-            f"相关度 {chunk['score']})\n{chunk['content_text']}"
-        )
-        sources.append({
-            "record_id": chunk["record_id"],
-            "content_type": chunk["content_type"],
-            "category": chunk.get("category"),
-            "score": chunk["score"],
-        })
-
-    context = "\n\n".join(context_parts) if context_parts else "（未检索到相关健康档案数据）"
-
-    # 实时数据
-    realtime_data = await get_realtime_context(db, user_id)
-
-    # 对话历史
-    history = await get_chat_history(db, user_id, session_id)
-
-    # 组装 messages
-    system_content = SYSTEM_PROMPT.format(
-        context=context,
-        realtime_data=realtime_data,
-    )
-    messages = [{"role": "system", "content": system_content}]
-    messages.extend(history)
-    messages.append({"role": "user", "content": question})
-
-    # 图表
-    charts = await chart_service.generate_charts(db, user_id, question)
-
-    return {
-        "messages": messages,
-        "sources": sources,
-        "charts": charts,
-    }
-
+# ══════════════════════════════════════════════════
+# 对话历史持久化
+# ══════════════════════════════════════════════════
 
 async def save_chat_history(
     db: AsyncSession,
@@ -363,9 +150,9 @@ async def save_chat_history(
     await db.flush()
 
 
-# ════════════════════════════════════════
-# 4. 同步模式（fallback）
-# ════════════════════════════════════════
+# ══════════════════════════════════════════════════
+# 同步模式（fallback）
+# ══════════════════════════════════════════════════
 
 async def chat(
     db: AsyncSession,
@@ -380,7 +167,6 @@ async def chat(
     if question in HOT_QUESTIONS:
         cached = await get_cached_answer(user_id, question)
         if cached:
-            # 缓存命中，直接返回（仍然保存到 chat_history）
             await save_chat_history(db, user_id, session_id, question, cached["answer"], cached.get("sources", []))
             cached["session_id"] = session_id
             return cached
@@ -421,9 +207,9 @@ async def chat(
     return result
 
 
-# ════════════════════════════════════════
-# 5. 流式模式（SSE 逐字推送）
-# ════════════════════════════════════════
+# ══════════════════════════════════════════════════
+# 流式模式（SSE 逐字推送）
+# ══════════════════════════════════════════════════
 
 async def chat_stream(
     db: AsyncSession,
@@ -442,24 +228,19 @@ async def chat_stream(
     4. type=done    → 结束信号 + session_id
     """
 
-    # ✅ 热点缓存：命中时直接以"伪流式"推送缓存内容
+    # ✅ 热点缓存：命中时以"伪流式"推送
     if question in HOT_QUESTIONS:
         cached = await get_cached_answer(user_id, question)
         if cached:
             logger.info(f"Streaming from cache for user={user_id}")
 
-            # 推图表
             if cached.get("charts"):
                 yield _sse_line({"type": "charts", "charts": cached["charts"]})
-
-            # 推来源
             if cached.get("sources"):
                 yield _sse_line({"type": "sources", "sources": cached["sources"]})
 
-            # 一次性推文本（缓存不需要逐字）
             yield _sse_line({"type": "text", "content": cached["answer"]})
 
-            # 保存历史
             await save_chat_history(
                 db, user_id, session_id, question,
                 cached["answer"], cached.get("sources", []),
@@ -468,10 +249,10 @@ async def chat_stream(
             yield _sse_line({"type": "done", "session_id": session_id})
             return
 
-    # ── 1. 准备上下文（向量检索 + DB 查询 + 图表生成，<200ms） ──
+    # ── 1. 准备上下文 ──
     ctx = await prepare_context(db, user_id, session_id, question, family_user_ids)
 
-    # ── 2. 先推图表（用户最先看到图表） ──
+    # ── 2. 先推图表 ──
     if ctx["charts"]:
         yield _sse_line({"type": "charts", "charts": ctx["charts"]})
 
@@ -498,7 +279,6 @@ async def chat_stream(
                 full_answer += delta
                 yield _sse_line({"type": "text", "content": delta})
 
-            # 最后一个 chunk 可能带 usage
             if hasattr(chunk, "usage") and chunk.usage:
                 token_count = chunk.usage.total_tokens
 
@@ -512,7 +292,7 @@ async def chat_stream(
         db, user_id, session_id, question, full_answer, ctx["sources"], token_count,
     )
 
-    # ✅ 热点缓存：写入 Redis（流式完成后）
+    # ✅ 热点缓存：写入 Redis
     if question in HOT_QUESTIONS and full_answer:
         await set_cached_answer(user_id, question, {
             "answer": full_answer,
@@ -529,9 +309,9 @@ def _sse_line(data: dict) -> str:
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-# ════════════════════════════════════════
-# 6. 快捷问答（首页 AI 提示用）
-# ════════════════════════════════════════
+# ══════════════════════════════════════════════════
+# 首页健康摘要
+# ══════════════════════════════════════════════════
 
 async def quick_health_summary(
     db: AsyncSession, user_id: int

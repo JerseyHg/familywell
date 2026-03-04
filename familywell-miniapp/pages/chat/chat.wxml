@@ -123,6 +123,18 @@
                   </view>
                 </view>
 
+                <!-- pie（营养摄入占比） -->
+                <view class="chart-body" wx:if="{{chart.type === 'pie'}}">
+                  <view class="pie-chart">
+                    <view class="pie-row" wx:for="{{chart.data}}" wx:for-item="d" wx:key="name">
+                      <view class="pie-dot" style="background: {{d.color}};" />
+                      <text class="pie-label">{{d.name}}</text>
+                      <text class="pie-value">{{d.value}}g</text>
+                      <text class="pie-pct">{{d.pct}}%</text>
+                    </view>
+                  </view>
+                </view>
+
                 <!-- indicator_card -->
                 <view class="chart-body" wx:if="{{chart.type === 'indicator_card'}}">
                   <view class="ind-grid">

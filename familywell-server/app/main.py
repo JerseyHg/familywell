@@ -1,8 +1,9 @@
 """
 app/main.py — 应用入口
 ──────────────────────
-[P0-1] 启动时校验 JWT_SECRET_KEY
-[P0-2] 加入 Redis 速率限制中间件
+★ 重构后变更：
+  - 移除 auth_delete_account.router（已合并到 auth.py）
+  - 新增 voice_input.router（从 medications.py 拆出的语音录入）
 """
 import logging
 from contextlib import asynccontextmanager
@@ -13,8 +14,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.database import engine, Base
 from app.config import get_settings
+
 from app.services.cron_service import run_daily_tasks
-from app.routers.auth_delete_account import router as delete_account_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -103,8 +104,21 @@ if settings.RATE_LIMIT_ENABLED:
 
     app.add_middleware(_LazyRateLimitMiddleware, settings=settings)
 
-# Register routers
-from app.routers import auth, profile, records, medications, stats, families, reminders, home, chat, search, projects  # noqa
+# ── Register routers ──
+from app.routers import (          # noqa
+    auth,
+    profile,
+    records,
+    medications,
+    stats,
+    families,
+    reminders,
+    home,
+    chat,
+    search,
+    projects,
+    voice_input,       # ★ 新增：语音/文字录入（从 medications.py 拆出）
+)
 
 app.include_router(auth.router)
 app.include_router(profile.router)
@@ -117,7 +131,8 @@ app.include_router(home.router)
 app.include_router(chat.router)
 app.include_router(search.router)
 app.include_router(projects.router)
-app.include_router(delete_account_router)
+app.include_router(voice_input.router)  # ★ 新增
+# ★ 移除：delete_account_router（已合并到 auth.router）
 
 
 @app.get("/")
