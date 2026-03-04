@@ -30,6 +30,7 @@ from app.models.reminder import Reminder
 from app.models.embedding import ChatHistory
 from app.services import embedding_service
 from app.services import chart_service
+from app.models.nutrition import NutritionLog
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -232,6 +233,20 @@ async def get_realtime_context(db: AsyncSession, user_id: int) -> str:
     if meds:
         items = [f"{m.name} {m.dosage or ''} {m.frequency or ''}" for m in meds]
         parts.append(f"【当前用药】{'; '.join(items)}")
+
+    nutrition_result = await db.execute(
+        select(NutritionLog)
+        .where(NutritionLog.user_id == user_id)
+        .where(NutritionLog.logged_at == today)
+    )
+    meals = nutrition_result.scalars().all()
+    if meals:
+        meal_items = []
+        for m in meals:
+            items_str = "、".join(m.food_items) if m.food_items else "未知食物"
+            cal_str = f"，约{m.calories}千卡" if m.calories else ""
+            meal_items.append(f"{m.meal_type or ''}：{items_str}{cal_str}")
+        parts.append(f"【今日饮食】{'；'.join(meal_items)}")
 
     if not parts:
         return ""
