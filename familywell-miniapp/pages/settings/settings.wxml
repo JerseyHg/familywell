@@ -66,12 +66,9 @@
   <view class="menu-item" bindtap="goEditProfile" data-step="1">
     <text class="mi-icon">👤</text><text class="mi-label">个人资料</text><text class="mi-arrow">›</text>
   </view>
-  <view class="menu-item" bindtap="goEditProfile" data-step="2">
-    <text class="mi-icon">📋</text><text class="mi-label">既往病史</text><text class="mi-arrow">›</text>
-  </view>
-  <view class="menu-item" bindtap="goEditProfile" data-step="3">
-    <text class="mi-icon">⚠️</text><text class="mi-label">过敏信息</text><text class="mi-arrow">›</text>
-  </view>
+<view class="menu-item" bindtap="goEditProfile" data-step="2">
+    <text class="mi-icon">📋</text><text class="mi-label">病史与过敏</text><text class="mi-arrow">›</text>
+</view>
   <view class="menu-item" bindtap="goEditProfile" data-step="4">
     <text class="mi-icon">📞</text><text class="mi-label">紧急联系人</text><text class="mi-arrow">›</text>
   </view>

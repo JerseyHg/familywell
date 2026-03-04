@@ -205,11 +205,11 @@ export const medsApi = {
 
   /** 原有：文字语音记录 */
   voiceAdd: (text: string) =>
-    request({ url: '/medications/voice-add', method: 'POST', data: { text } }),
+      request({ url: '/voice/add', method: 'POST', data: { text } }),
 
   /** ★ 新增：音频文件直接分析（不转文字，后端LLM直接处理音频） */
   voiceAddAudio: (audioKeys: string[]) =>
-    request({ url: '/medications/voice-add-audio', method: 'POST', data: { audio_keys: audioKeys } }),
+      request({ url: '/voice/add-audio', method: 'POST', data: { audio_keys: audioKeys } }),
 
   confirmSuggestion: (id: number, data: {
     times_per_day?: number;

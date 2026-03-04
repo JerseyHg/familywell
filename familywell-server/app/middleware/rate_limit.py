@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 # 路径 → 限流等级映射
 _AUTH_PATHS = {"/api/auth/login", "/api/auth/register", "/api/auth/wx-login"}
-_AI_PATHS = {"/api/records", "/api/chat/stream", "/api/medications/voice-add", "/api/profile/voice-parse"}
+_AI_PATHS = {"/api/records", "/api/chat/stream", "/api/voice/add", "/api/profile/voice-parse"}
 
 
 def _get_client_ip(request: Request) -> str:
