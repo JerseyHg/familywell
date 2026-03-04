@@ -5,7 +5,22 @@
  * ★ 新增 chatApi.streamVoice：语音提问流式聊天
  */
 
-const BASE_URL = 'https://tbowo.top/familywell/api'
+function getBaseUrl(): string {
+  const accountInfo = wx.getAccountInfoSync()
+  const envVersion = accountInfo.miniProgram.envVersion
+  // envVersion: 'develop' | 'trial' | 'release'
+
+  switch (envVersion) {
+    case 'release':
+      return 'https://tbowo.top/familywell/api'        // prod
+    case 'trial':
+      return 'https://zexing9495.space/familywell/api'   // staging
+    default:
+      return 'https://zexing9495.space/familywell/api'   // 开发也走 staging
+  }
+}
+
+const BASE_URL = getBaseUrl()
 
 interface RequestOptions {
   url: string
