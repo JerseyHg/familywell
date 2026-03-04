@@ -1,22 +1,23 @@
 /**
  * services/api.ts — API 请求封装
  * ─────────────────────────────────
- * ★ 新增 medsApi.voiceAddAudio：语音文件直接分析（不转文字）
- * ★ 新增 chatApi.streamVoice：语音提问流式聊天
+ * ★ [Fix-4] SSE 流式请求增加 180s 超时（语音 ASR 可能需要较长时间）
+ * ★ [Fix-4] _collectSSEData 增加 transcript 提取
+ * ★ [Fix-5] 429 状态码：status 轮询静默失败，不弹 toast
+ * ★ [Fix-4] ChatStreamCallbacks 增加 onFallback 兼容
  */
 
 function getBaseUrl(): string {
   const accountInfo = wx.getAccountInfoSync()
   const envVersion = accountInfo.miniProgram.envVersion
-  // envVersion: 'develop' | 'trial' | 'release'
 
   switch (envVersion) {
     case 'release':
-      return 'https://tbowo.top/familywell/api'        // prod
+      return 'https://tbowo.top/familywell/api'
     case 'trial':
-      return 'https://zexing9495.space/familywell/api'   // staging
+      return 'https://zexing9495.space/familywell/api'
     default:
-      return 'https://zexing9495.space/familywell/api'   // 开发也走 staging
+      return 'https://zexing9495.space/familywell/api'
   }
 }
 
@@ -28,6 +29,7 @@ interface RequestOptions {
   data?: any
   header?: Record<string, string>
   showLoading?: boolean
+  silent429?: boolean  // ★ [Fix-5] 新增：429 时是否静默（不弹 toast）
 }
 
 function getToken(): string {
@@ -35,7 +37,7 @@ function getToken(): string {
 }
 
 export function request<T = any>(options: RequestOptions): Promise<T> {
-  const { url, method = 'GET', data, header = {}, showLoading = false } = options
+  const { url, method = 'GET', data, header = {}, showLoading = false, silent429 = false } = options
 
   if (showLoading) {
     wx.showLoading({ title: '加载中', mask: true })
@@ -65,7 +67,10 @@ export function request<T = any>(options: RequestOptions): Promise<T> {
         }
 
         if (res.statusCode === 429) {
-          wx.showToast({ title: '操作太频繁，请稍后再试', icon: 'none' })
+          // ★ [Fix-5] status 轮询等场景静默处理，不弹 toast
+          if (!silent429) {
+            wx.showToast({ title: '操作太频繁，请稍后再试', icon: 'none' })
+          }
           reject(new Error('rate_limited'))
           return
         }
@@ -125,8 +130,9 @@ export const recordsApi = {
   create: (data: { file_key: string; file_type: string; source: string; project_id?: number }) =>
     request({ url: '/records', method: 'POST', data }),
 
+  // ★ [Fix-5] status 轮询使用 silent429，避免频繁弹 toast
   getStatus: (id: number) =>
-    request({ url: `/records/${id}/status` }),
+    request({ url: `/records/${id}/status`, silent429: true }),
 
   list: (params: {
     category?: string;
@@ -203,11 +209,9 @@ export const medsApi = {
   completeTask: (taskId: number) =>
     request({ url: `/medications/tasks/${taskId}/complete`, method: 'PUT' }),
 
-  /** 原有：文字语音记录 */
   voiceAdd: (text: string) =>
       request({ url: '/voice/add', method: 'POST', data: { text } }),
 
-  /** ★ 新增：音频文件直接分析（不转文字，后端LLM直接处理音频） */
   voiceAddAudio: (audioKeys: string[]) =>
       request({ url: '/voice/add-audio', method: 'POST', data: { audio_keys: audioKeys } }),
 
@@ -285,7 +289,6 @@ interface ChatParams {
   include_family?: boolean
 }
 
-/** ★ 语音聊天参数 */
 interface ChatVoiceParams {
   audio_keys: string[]
   session_id?: string
@@ -298,28 +301,21 @@ interface ChatStreamCallbacks {
   onDone?: (sessionId: string) => void
   onError?: (err: any) => void
   onTranscript?: (text: string) => void
+  // ★ [Fix-4] 完整的 fallback 回调（3 参数）
   onFallbackComplete?: (fullText: string, charts: any[], sessionId: string) => void
+  // ★ [Fix-4] 兼容旧版 2 参数的 onFallback（chat.js 旧代码可能还在用）
+  onFallback?: (fullText: string, sessionId: string) => void
 }
 
 export const chatApi = {
-  /**
-   * ★ SSE 流式请求（文字提问）
-   */
   stream(params: ChatParams, callbacks: ChatStreamCallbacks) {
     return _doStreamRequest(`${BASE_URL}/chat/stream`, params, callbacks)
   },
 
-  /**
-   * ★ 新增：SSE 流式请求（语音提问）
-   * 后端接收 audio_keys，下载音频，LLM 分析后流式返回
-   */
   streamVoice(params: ChatVoiceParams, callbacks: ChatStreamCallbacks) {
     return _doStreamRequest(`${BASE_URL}/chat/stream-voice`, params, callbacks)
   },
 
-  /**
-   * 同步模式 fallback
-   */
   send(params: ChatParams) {
     return request({
       url: '/chat',
@@ -340,6 +336,8 @@ function _doStreamRequest(url: string, params: any, callbacks: ChatStreamCallbac
     url,
     method: 'POST',
     data: params,
+    // ★ [Fix-4] 加长超时到 180 秒，给语音 ASR 留足时间
+    timeout: 180000,
     header: {
       'Content-Type': 'application/json',
       Authorization: token ? `Bearer ${token}` : '',
@@ -352,12 +350,23 @@ function _doStreamRequest(url: string, params: any, callbacks: ChatStreamCallbac
 
       if (typeof res.data === 'string') {
         const collected = _collectSSEData(res.data)
+
+        // ★ [Fix-4] 优先用 onFallbackComplete（3 参数），再兼容 onFallback（2 参数）
         if (callbacks.onFallbackComplete) {
           callbacks.onFallbackComplete(
             collected.fullText,
             collected.charts,
             collected.sessionId,
           )
+        } else if (callbacks.onFallback) {
+          // 兼容旧版：先单独触发 transcript 和 charts
+          if (collected.transcript && callbacks.onTranscript) {
+            callbacks.onTranscript(collected.transcript)
+          }
+          if (collected.charts.length > 0 && callbacks.onCharts) {
+            callbacks.onCharts(collected.charts)
+          }
+          callbacks.onFallback(collected.fullText, collected.sessionId)
         } else {
           _parseAllSSELines(res.data, callbacks)
         }
@@ -419,10 +428,17 @@ function _arrayBufferToString(buf: ArrayBuffer): string {
   }
 }
 
-function _collectSSEData(fullData: string): { fullText: string; charts: any[]; sessionId: string } {
+// ★ [Fix-4] 增加 transcript 字段的提取
+function _collectSSEData(fullData: string): {
+  fullText: string;
+  charts: any[];
+  sessionId: string;
+  transcript: string;
+} {
   let fullText = ''
   let charts: any[] = []
   let sessionId = ''
+  let transcript = ''
 
   const lines = fullData.split('\n')
   for (const line of lines) {
@@ -435,10 +451,11 @@ function _collectSSEData(fullData: string): { fullText: string; charts: any[]; s
       if (evt.type === 'text') fullText += (evt.content || '')
       else if (evt.type === 'charts') charts = evt.charts || []
       else if (evt.type === 'done') sessionId = evt.session_id || ''
+      else if (evt.type === 'transcript') transcript = evt.content || ''
     } catch { /* skip */ }
   }
 
-  return { fullText, charts, sessionId }
+  return { fullText, charts, sessionId, transcript }
 }
 
 function _parseAllSSELines(fullData: string, callbacks: ChatStreamCallbacks) {

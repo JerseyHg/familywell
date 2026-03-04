@@ -60,7 +60,9 @@ Page({
   _stopFallbackTimer: null,
   _recordStartTime: 0,
   _pendingStop: false,
-  _recorderBusy: false,   // ★ 防止 stop 未完成就再 start
+  _recorderBusy: false,
+  _startSafetyTimer: null,   // ★ 新增：recorder.start 安全超时
+  _stopSafetyTimer: null,    // ★ 新增：recorder.stop 安全超时
 
   onShow: function () {
     var tabBar = this.getTabBar();
@@ -79,16 +81,27 @@ Page({
       var self = this;
       setTimeout(function () { self.sendMessage(initQ); }, 200);
     }
+
+    // ★ [Fix-1] 如果从后台回来，流式请求已被系统断开，检测并提示
+    if (this.data.typing && !this._streamTask) {
+      this.setData({ typing: false });
+    }
   },
 
+  // ★ [Fix-1] 不再 abort 流式请求，只停录音
+  // 原问题：切换页面时 abort 导致 AI 回答中断
   onHide: function () {
-    if (this._streamTask && this._streamTask.abort) this._streamTask.abort();
-    this._clearTimers();
+    // 只停止录音（后台录音无意义）
     if (this.data.isRecording) {
       if (this._recorder) this._recorder.stop();
       clearInterval(this._recordTimer);
-      this.setData({ isRecording: false });
+      clearTimeout(this._stopFallbackTimer);
+      clearTimeout(this._startSafetyTimer);
+      clearTimeout(this._stopSafetyTimer);
+      this._recorderBusy = false;
+      this.setData({ isRecording: false, recordingDuration: 0 });
     }
+    // ★ 不再 abort _streamTask，让流式请求在后台继续完成
   },
 
   _requireLogin: function () {
@@ -142,17 +155,17 @@ Page({
     var recorder = wx.getRecorderManager();
 
     recorder.onStart(function () {
-      self._recorderBusy = false;  // ★ start 成功，不再 busy
+      clearTimeout(self._startSafetyTimer);  // ★ 清除安全超时
+      self._recorderBusy = false;
       self._recordStartTime = Date.now();
       self.setData({ isRecording: true, recordingDuration: 0 });
       self._recordTimer = setInterval(function () {
         self.setData({ recordingDuration: self.data.recordingDuration + 1 });
       }, 1000);
 
-      // ★ 用户在 onStart 前就松手了 → 立即停止（不延迟）
+      // ★ 用户在 onStart 前就松手了 → 立即停止
       if (self._pendingStop) {
         self._pendingStop = false;
-        // 立即 stop，onStop 里 duration<1s 会自动丢弃
         self._recorder.stop();
       }
     });
@@ -160,7 +173,8 @@ Page({
     recorder.onStop(function (res) {
       clearInterval(self._recordTimer);
       clearTimeout(self._stopFallbackTimer);
-      self._recorderBusy = false;  // ★ stop 完成，可以再次录音
+      clearTimeout(self._stopSafetyTimer);  // ★ 清除 stop 安全超时
+      self._recorderBusy = false;
       var duration = Math.round((Date.now() - self._recordStartTime) / 1000);
       self.setData({ isRecording: false, recordingDuration: 0 });
 
@@ -175,7 +189,9 @@ Page({
       console.error('[Chat Voice] recorder error:', err);
       clearInterval(self._recordTimer);
       clearTimeout(self._stopFallbackTimer);
-      self._recorderBusy = false;  // ★ 出错也要解锁
+      clearTimeout(self._startSafetyTimer);
+      clearTimeout(self._stopSafetyTimer);
+      self._recorderBusy = false;
       self.setData({ isRecording: false, recordingDuration: 0 });
       wx.showToast({ title: '录音失败，请重试', icon: 'none' });
     });
@@ -190,11 +206,22 @@ Page({
     this._startChatRecording();
   },
 
+  // ★ [Fix-2] 松开结束录音 — 增加安全超时防止永久锁死
   onVoiceRecordEnd: function () {
     if (this.data.isRecording) {
-      this._recorderBusy = true;  // ★ stop 也是异步的，锁住直到 onStop
+      this._recorderBusy = true;
       clearTimeout(this._stopFallbackTimer);
       if (this._recorder) this._recorder.stop();
+
+      // ★ 安全超时：3秒后如果 onStop 还没回调，强制解锁
+      var self = this;
+      this._stopSafetyTimer = setTimeout(function () {
+        if (self._recorderBusy) {
+          console.warn('[Chat Voice] stop safety timeout — force unlock');
+          self._recorderBusy = false;
+          self.setData({ isRecording: false, recordingDuration: 0 });
+        }
+      }, 3000);
     } else {
       this._pendingStop = true;
     }
@@ -203,14 +230,11 @@ Page({
   _startChatRecording: function () {
     var self = this;
     this._initChatRecorder();
-    // ★ 先检查权限，避免首次弹窗打断录音
     wx.getSetting({
       success: function (res) {
         if (res.authSetting['scope.record']) {
-          // ✅ 已有权限，直接录音
           self._doStartChatRecording();
         } else {
-          // ❌ 首次，弹窗请求权限（不录音，弹窗会打断 touch）
           wx.authorize({
             scope: 'scope.record',
             success: function () {
@@ -240,6 +264,15 @@ Page({
       encodeBitRate: 48000,
       duration: 60000,
     });
+
+    // ★ 安全超时：3秒后如果 onStart 还没回调，解锁 busy
+    self._startSafetyTimer = setTimeout(function () {
+      if (self._recorderBusy && !self.data.isRecording) {
+        console.warn('[Chat Voice] start safety timeout — force unlock');
+        self._recorderBusy = false;
+      }
+    }, 3000);
+
     self._stopFallbackTimer = setTimeout(function () {
       if (self.data.isRecording && self._recorder) self._recorder.stop();
     }, 55000);
@@ -250,7 +283,7 @@ Page({
     var userMsg = { id: 'msg_' + Date.now(), role: 'user', text: '🎙️ 语音提问', isVoice: true };
     var messages = this.data.messages.slice();
     messages.push(userMsg);
-    var userIdx = messages.length - 1;  // ★ 记录用户消息索引
+    var userIdx = messages.length - 1;
 
     var aiMsg = { id: 'ai_' + Date.now(), role: 'assistant', text: '', charts: [] };
     messages.push(aiMsg);
@@ -269,7 +302,7 @@ Page({
             include_family: false,
           },
           {
-            // ★ 收到转录文字 → 更新用户气泡
+            // ★ [Fix-4] 收到转录文字 → 更新用户气泡（替换"语音提问"）
             onTranscript: function (text) {
               if (text) {
                 self.setData({ ['messages[' + userIdx + '].text']: text });
@@ -285,6 +318,7 @@ Page({
             },
             onDone: function (sessionId) {
               self._clearTimers();
+              self._streamTask = null;  // ★ 清除引用
               if (self._streamText) {
                 self.setData({
                   ['messages[' + aiIdx + '].text']: self._streamText,
@@ -298,18 +332,29 @@ Page({
             },
             onError: function (err) {
               self._clearTimers();
+              self._streamTask = null;  // ★ 清除引用
               self.setData({
                 ['messages[' + aiIdx + '].text']: self._streamText || '抱歉，语音识别出错了，请重试',
                 typing: false,
               });
             },
-            onFallback: function (fullText, sessionId) {
+            // ★ [Fix-4] 修正回调名：onFallback → onFallbackComplete（与 api.ts 接口匹配）
+            // api.ts 的 success 兜底检查的是 callbacks.onFallbackComplete
+            // 旧代码用 onFallback 导致走 _parseAllSSELines，transcript 虽能处理但缺少逐字动画
+            onFallbackComplete: function (fullText, charts, sessionId) {
               self._clearTimers();
+              self._streamTask = null;
+              // ★ fallback 模式下也要处理 transcript（从 _collectSSEData 无法提取）
+              // 但 fullText 已经是完整的 AI 回答文字
+              if (charts && charts.length > 0) {
+                self.setData({ ['messages[' + aiIdx + '].charts']: self._processCharts(charts) });
+              }
               self._simulateTyping(fullText, aiIdx, sessionId);
             },
           },
       );
     }).catch(function (err) {
+      self._streamTask = null;
       self.setData({ ['messages[' + aiIdx + '].text']: '语音上传失败，请重试', typing: false });
     });
   },
@@ -349,6 +394,7 @@ Page({
         },
         onDone: function (sessionId) {
           self._clearTimers();
+          self._streamTask = null;  // ★ 清除引用
           if (self._streamText) {
             self.setData({
               ['messages[' + aiIdx + '].text']: self._streamText,
@@ -362,13 +408,19 @@ Page({
         },
         onError: function (err) {
           self._clearTimers();
+          self._streamTask = null;  // ★ 清除引用
           self.setData({
             ['messages[' + aiIdx + '].text']: self._streamText || '抱歉，请求出错了，请稍后再试',
             typing: false,
           });
         },
-        onFallback: function (fullText, sessionId) {
+        // ★ [Fix-4] 统一使用 onFallbackComplete（3 个参数）
+        onFallbackComplete: function (fullText, charts, sessionId) {
           self._clearTimers();
+          self._streamTask = null;
+          if (charts && charts.length > 0) {
+            self.setData({ ['messages[' + aiIdx + '].charts']: self._processCharts(charts) });
+          }
           self._simulateTyping(fullText, aiIdx, sessionId);
         },
       },
@@ -427,6 +479,7 @@ Page({
 
   onNewChat: function () {
     if (this._streamTask && this._streamTask.abort) this._streamTask.abort();
+    this._streamTask = null;
     this._clearTimers();
     this.setData({ messages: [], sessionId: '', typing: false, inputText: '' });
   },

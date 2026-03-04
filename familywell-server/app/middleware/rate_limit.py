@@ -8,6 +8,8 @@ app/middleware/rate_limit.py — Redis 速率限制中间件
 - 认证接口（登录/注册）：10 次/分钟（防暴力破解）
 - AI 接口（识别/问答）：20 次/分钟（控制成本）
 - 按 IP + 路径分组限流
+
+★ [Fix-5] /records/{id}/status 轮询从 AI 限流中排除，归入 default 组
 """
 import time
 import logging
@@ -21,6 +23,9 @@ logger = logging.getLogger(__name__)
 _AUTH_PATHS = {"/api/auth/login", "/api/auth/register", "/api/auth/wx-login"}
 _AI_PATHS = {"/api/records", "/api/chat/stream", "/api/voice/add", "/api/profile/voice-parse"}
 
+# ★ [Fix-5] AI 路径中排除的后缀 — 这些走 default 限流
+_AI_EXCLUDE_SUFFIXES = ("/status",)
+
 
 def _get_client_ip(request: Request) -> str:
     """从 X-Forwarded-For 或 X-Real-IP 获取真实 IP。"""
@@ -33,14 +38,26 @@ def _get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def _get_rate_limit(path: str, settings) -> int:
-    """根据路径返回对应的每分钟限制数。"""
+def _get_rate_info(path: str, settings) -> tuple:
+    """
+    根据路径返回 (每分钟限制数, 分组名)。
+    
+    ★ [Fix-5] status 轮询不再归入 ai 组：
+    - /api/records (POST, 创建记录) → ai 组, 20/min
+    - /api/records/3/status (GET, 轮询状态) → default 组, 60/min
+    - /api/records/upload-url (POST) → ai 组, 20/min
+    """
     if path in _AUTH_PATHS:
-        return settings.RATE_LIMIT_AUTH
+        return settings.RATE_LIMIT_AUTH, "auth"
+
     for ai_path in _AI_PATHS:
         if path.startswith(ai_path):
-            return settings.RATE_LIMIT_AI
-    return settings.RATE_LIMIT_DEFAULT
+            # ★ [Fix-5] 检查是否属于排除后缀
+            if any(path.endswith(suffix) for suffix in _AI_EXCLUDE_SUFFIXES):
+                return settings.RATE_LIMIT_DEFAULT, "default"
+            return settings.RATE_LIMIT_AI, "ai"
+
+    return settings.RATE_LIMIT_DEFAULT, "default"
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -70,11 +87,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         try:
             client_ip = _get_client_ip(request)
-            limit = _get_rate_limit(path, self.settings)
+            limit, path_group = _get_rate_info(path, self.settings)
             window = 60  # 60 秒窗口
 
             # Redis sorted set key: rl:{ip}:{path_group}
-            path_group = "auth" if path in _AUTH_PATHS else "ai" if any(path.startswith(p) for p in _AI_PATHS) else "default"
             key = f"rl:{client_ip}:{path_group}"
 
             now = time.time()

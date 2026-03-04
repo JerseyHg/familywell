@@ -33,6 +33,8 @@ Page({
   _recordStartTime: 0,
   _pendingStop: false,
   _recorderBusy: false,
+  _startSafetyTimer: null,   // ★ [Fix-3] 新增：recorder.start 安全超时
+  _stopSafetyTimer: null,    // ★ [Fix-3] 新增：recorder.stop 安全超时
 
   // ════════════════════════════════════════
   //  生命周期
@@ -287,7 +289,14 @@ Page({
 
   hideVoiceModal: function () {
     if (this.data.isRecording) { if (this._recorder) this._recorder.stop(); }
-    this.setData({ showVoiceModal: false });
+    // ★ [Fix-3] 关闭弹窗时清理所有录音状态，防止残留锁
+    clearTimeout(this._startSafetyTimer);
+    clearTimeout(this._stopSafetyTimer);
+    clearTimeout(this._stopFallbackTimer);
+    clearInterval(this._recordTimer);
+    this._recorderBusy = false;
+    this._pendingStop = false;
+    this.setData({ showVoiceModal: false, isRecording: false, recordingDuration: 0 });
   },
 
   noop: function () {},
@@ -306,11 +315,21 @@ Page({
     this._startRecording();
   },
 
-  // ── ★ 松开结束 ──
+  // ── ★ 松开结束 — 增加安全超时 ──
   onRecordEnd: function () {
     if (this.data.isRecording) {
       this._recorderBusy = true;
       this._stopRecording();
+
+      // ★ [Fix-3] 安全超时：3秒后如果 onStop 还没回调，强制解锁
+      var self = this;
+      this._stopSafetyTimer = setTimeout(function () {
+        if (self._recorderBusy) {
+          console.warn('[Home Voice] stop safety timeout — force unlock');
+          self._recorderBusy = false;
+          self.setData({ isRecording: false, recordingDuration: 0 });
+        }
+      }, 3000);
     } else {
       // recorder.start() 是异步的，onStart 还没回调
       this._pendingStop = true;
@@ -323,6 +342,7 @@ Page({
     var recorder = wx.getRecorderManager();
 
     recorder.onStart(function () {
+      clearTimeout(self._startSafetyTimer);  // ★ [Fix-3] 清除 start 安全超时
       self._recorderBusy = false;
       self._recordStartTime = Date.now();
       self.setData({ isRecording: true, recordingDuration: 0 });
@@ -340,6 +360,7 @@ Page({
     recorder.onStop(function (res) {
       clearInterval(self._recordTimer);
       clearTimeout(self._stopFallbackTimer);
+      clearTimeout(self._stopSafetyTimer);  // ★ [Fix-3] 清除 stop 安全超时
       self._recorderBusy = false;
       var duration = Math.round((Date.now() - self._recordStartTime) / 1000);
       self.setData({ isRecording: false });
@@ -353,12 +374,16 @@ Page({
       }
     });
 
+    // ★ [Fix-3] onError 已有，确保所有 timer 都清理
     recorder.onError(function (err) {
       console.error('[Voice] recorder error:', err);
       clearInterval(self._recordTimer);
       clearTimeout(self._stopFallbackTimer);
+      clearTimeout(self._startSafetyTimer);
+      clearTimeout(self._stopSafetyTimer);
       self._recorderBusy = false;
-      self.setData({ isRecording: false });
+      self._pendingStop = false;
+      self.setData({ isRecording: false, recordingDuration: 0 });
       wx.showToast({ title: '录音失败，请重试', icon: 'none' });
     });
 
@@ -368,14 +393,11 @@ Page({
   _startRecording: function () {
     var self = this;
     this._initRecorder();
-    // ★ 先检查权限，避免首次弹窗打断录音
     wx.getSetting({
       success: function (res) {
         if (res.authSetting['scope.record']) {
-          // ✅ 已有权限，直接录音
           self._doStartRecording();
         } else {
-          // ❌ 首次，弹窗请求权限（不录音）
           wx.authorize({
             scope: 'scope.record',
             success: function () {
@@ -405,6 +427,16 @@ Page({
       encodeBitRate: 48000,
       duration: 60000,
     });
+
+    // ★ [Fix-3] 安全超时：3秒后如果 onStart 还没回调，解锁 busy
+    // 这是 issue 3 的核心修复：防止 _recorderBusy 永久卡住
+    self._startSafetyTimer = setTimeout(function () {
+      if (self._recorderBusy && !self.data.isRecording) {
+        console.warn('[Home Voice] start safety timeout — force unlock');
+        self._recorderBusy = false;
+      }
+    }, 3000);
+
     self._stopFallbackTimer = setTimeout(function () {
       if (self.data.isRecording) self._stopRecording();
     }, 55000);
@@ -440,7 +472,6 @@ Page({
     var audioKeys = [];
     var uploadNext = function (i) {
       if (i >= segs.length) {
-        // 全部上传完成，调用后端
         api_1.medsApi.voiceAddAudio(audioKeys).then(function (res) {
           var items = (res && res.items) || [];
           var typeIcons = { medication: '💊', food: '🍽️', vitals: '❤️', symptom: '📝', insurance: '🛡️', memo: '📋' };
