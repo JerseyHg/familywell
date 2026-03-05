@@ -13,11 +13,11 @@ function getBaseUrl(): string {
 
   switch (envVersion) {
     case 'release':
-      return 'https://tbowo.top/familywell/api'
+      return 'https://api.tbowo.top/familywell/api'
     case 'trial':
-      return 'https://zexing9495.space/familywell/api'
+      return 'https://api.tbowo.top/familywell/api'
     default:
-      return 'https://zexing9495.space/familywell/api'
+      return 'https://api.tbowo.top/familywell/api'
   }
 }
 

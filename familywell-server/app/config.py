@@ -27,8 +27,9 @@ class Settings(BaseSettings):
     # 腾讯云 COS
     COS_SECRET_ID: str = ""
     COS_SECRET_KEY: str = ""
-    COS_REGION: str = "ap-beijing"
+    COS_REGION: str = "ap-shanghai"
     COS_BUCKET: str = ""
+    COS_ACCELERATE_DOMAIN: str = ""
 
     # 豆包 API
     DOUBAO_API_KEY: str = ""

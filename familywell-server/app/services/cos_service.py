@@ -9,6 +9,7 @@ _cos_config = CosConfig(
     Region=settings.COS_REGION,
     SecretId=settings.COS_SECRET_ID,
     SecretKey=settings.COS_SECRET_KEY,
+    Domain=settings.COS_ACCELERATE_DOMAIN or None,
 )
 _client = CosS3Client(_cos_config)
 
