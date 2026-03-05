@@ -1,3 +1,5 @@
+"""app/routers/profile.py — 个人档案路由"""
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +11,7 @@ from app.services import ai_service
 from app.utils.deps import get_current_user
 
 router = APIRouter(prefix="/api/profile", tags=["profile"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=ProfileResponse)
@@ -48,6 +51,16 @@ async def update_profile(
         profile.onboarding_completed = True
 
     await db.flush()
+    await db.commit()
+
+    # ★ 异步触发 profile embedding（非阻塞，失败不影响响应）
+    try:
+        from app.services.embedding_service import embed_user_profile
+        import asyncio
+        asyncio.create_task(embed_user_profile(user.id))
+    except Exception as e:
+        logger.warning(f"Profile embed trigger failed (non-fatal): {e}")
+
     return profile
 
 

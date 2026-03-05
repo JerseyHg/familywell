@@ -19,7 +19,6 @@ import json
 import logging
 from datetime import date, timedelta
 
-from openai import AsyncOpenAI
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,15 +29,10 @@ from app.models.medication import Medication, MedicationTask
 from app.models.insurance import Insurance
 from app.models.reminder import Reminder
 from app.models.record import Record
+from app.services.llm_client import get_llm_client
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
-
-# 复用一个 AsyncOpenAI 客户端
-_client = AsyncOpenAI(
-    api_key=settings.DOUBAO_API_KEY,
-    base_url=settings.DOUBAO_BASE_URL,
-)
 
 # 所有合法的图表 handler 名称（用于校验 LLM 返回值）
 VALID_HANDLERS = {
@@ -86,7 +80,7 @@ async def detect_chart_intent_llm(question: str) -> list[str]:
     返回: handler 名称列表，如 ["medication_adherence"]
     异常: 任何错误都会抛出，由调用方降级到关键词模式
     """
-    response = await _client.chat.completions.create(
+    response = await get_llm_client().chat.completions.create(
         model=settings.DOUBAO_CHAT_MODEL,
         messages=[
             {"role": "user", "content": INTENT_PROMPT.format(question=question)},

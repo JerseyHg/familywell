@@ -15,7 +15,6 @@ from datetime import datetime, date, timedelta
 from typing import AsyncGenerator
 
 import redis.asyncio as aioredis
-from openai import AsyncOpenAI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,14 +22,10 @@ from app.config import get_settings
 from app.models.embedding import ChatHistory
 from app.services import embedding_service
 from app.services.context_service import prepare_context  # ★ 从 context_service 导入
+from app.services.llm_client import get_llm_client
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
-
-_client = AsyncOpenAI(
-    api_key=settings.DOUBAO_API_KEY,
-    base_url=settings.DOUBAO_BASE_URL,
-)
 
 
 # ══════════════════════════════════════════════════
@@ -174,7 +169,7 @@ async def chat(
     ctx = await prepare_context(db, user_id, session_id, question, family_user_ids)
 
     try:
-        response = await _client.chat.completions.create(
+        response = await get_llm_client().chat.completions.create(
             model=settings.DOUBAO_CHAT_MODEL,
             messages=ctx["messages"],
             max_tokens=1500,
@@ -265,7 +260,7 @@ async def chat_stream(
     token_count = None
 
     try:
-        stream = await _client.chat.completions.create(
+        stream = await get_llm_client().chat.completions.create(
             model=settings.DOUBAO_CHAT_MODEL,
             messages=ctx["messages"],
             max_tokens=1500,
@@ -332,7 +327,7 @@ async def quick_health_summary(
     context = "\n".join([r["content_text"] for r in retrieved])
 
     try:
-        response = await _client.chat.completions.create(
+        response = await get_llm_client().chat.completions.create(
             model=settings.DOUBAO_CHAT_MODEL,
             messages=[
                 {

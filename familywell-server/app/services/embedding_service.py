@@ -22,6 +22,7 @@ from app.config import get_settings
 from app.database import async_session
 from app.models.record import Record
 from app.models.embedding import RecordEmbedding
+from app.models.user import UserProfile
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -417,3 +418,116 @@ async def search_similar(
         for row in rows
         if float(row.score) >= settings.RAG_SCORE_THRESHOLD
     ]
+
+# ════════════════════════════════════════
+# 5. User Profile Embedding
+# ════════════════════════════════════════
+
+def _profile_to_text(profile: "UserProfile") -> str | None:
+    """
+    将 UserProfile 的关键字段拼成一段自然语言文本，用于 embedding。
+    只包含对健康咨询有意义的字段。
+    返回 None 表示 profile 内容不足，跳过 embedding。
+    """
+    parts = []
+
+    if profile.real_name:
+        parts.append(f"姓名：{profile.real_name}")
+    if profile.gender:
+        gender_label = "男" if profile.gender == "male" else "女"
+        parts.append(f"性别：{gender_label}")
+    if profile.birthday:
+        from datetime import date
+        age = date.today().year - profile.birthday.year
+        parts.append(f"出生日期：{profile.birthday}（约{age}岁）")
+    if profile.blood_type:
+        parts.append(f"血型：{profile.blood_type}型")
+    if profile.height_cm:
+        parts.append(f"身高：{profile.height_cm}cm")
+    if profile.weight_kg:
+        parts.append(f"体重：{profile.weight_kg}kg")
+        if profile.height_cm:
+            bmi = round(float(profile.weight_kg) / (float(profile.height_cm) / 100) ** 2, 1)
+            parts.append(f"BMI：{bmi}")
+
+    # 过敏史——最重要的字段，拼接时强调
+    allergies = profile.allergies or []
+    if isinstance(allergies, list) and allergies:
+        parts.append(f"过敏史：{', '.join(str(a) for a in allergies)}")
+    else:
+        parts.append("过敏史：无已知过敏")
+
+    # 既往病史
+    history = profile.medical_history or []
+    if isinstance(history, list) and history:
+        parts.append(f"既往病史：{', '.join(str(h) for h in history)}")
+    else:
+        parts.append("既往病史：无")
+
+    if profile.emergency_contact_name:
+        parts.append(f"紧急联系人：{profile.emergency_contact_name}（{profile.emergency_contact_phone or '无电话'}）")
+
+    if len(parts) < 2:
+        return None  # 信息太少，不值得 embed
+
+    return "【个人健康档案】\n" + "\n".join(parts)
+
+
+async def embed_user_profile(user_id: int) -> bool:
+    """
+    将用户 profile 的关键字段生成 embedding，存入 record_embedding。
+    - record_id = None（不关联具体 record）
+    - content_type = 'profile'
+    - 每次调用先删旧 embedding，再写新的（幂等）
+
+    在以下时机调用：
+    1. onboarding 完成时（profile.onboarding_completed 变为 True）
+    2. 用户更新 profile 时（PUT /api/profile）
+
+    返回 True 表示成功，False 表示 profile 内容不足或失败。
+    """
+    async with async_session() as db:
+        try:
+            from app.models.user import UserProfile
+            result = await db.execute(
+                select(UserProfile).where(UserProfile.user_id == user_id)
+            )
+            profile = result.scalar_one_or_none()
+            if not profile:
+                logger.warning(f"embed_user_profile: no profile for user {user_id}")
+                return False
+
+            text = _profile_to_text(profile)
+            if not text:
+                logger.info(f"embed_user_profile: profile too sparse for user {user_id}, skipped")
+                return False
+
+            # 先删除旧的 profile embedding
+            await db.execute(
+                delete(RecordEmbedding).where(
+                    RecordEmbedding.user_id == user_id,
+                    RecordEmbedding.content_type == "profile",
+                )
+            )
+
+            # 生成新 embedding
+            vec = await generate_embedding(text)
+            emb = RecordEmbedding(
+                record_id=None,        # profile 不关联具体 record
+                user_id=user_id,
+                content_type="profile",
+                content_text=text,
+                embedding=vec,
+                category="profile",
+                source_date=None,
+            )
+            db.add(emb)
+            await db.commit()
+
+            logger.info(f"embed_user_profile: user {user_id} profile embedded ({len(text)} chars)")
+            return True
+
+        except Exception as e:
+            logger.error(f"embed_user_profile failed for user {user_id}: {e}")
+            await db.rollback()
+            return False
