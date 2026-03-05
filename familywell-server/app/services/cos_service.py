@@ -2,7 +2,9 @@ import uuid
 from datetime import datetime
 from qcloud_cos import CosConfig, CosS3Client
 from app.config import get_settings
+import logging
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 _cos_config = CosConfig(
@@ -31,6 +33,7 @@ def get_presigned_upload_url(file_key: str, content_type: str = "image/jpeg") ->
         Expired=600,  # 10 minutes
         Headers={"Content-Type": content_type},
     )
+    logger.info(f"[COS] presigned upload URL domain: {url.split('/')[2]}")
     return url
 
 
