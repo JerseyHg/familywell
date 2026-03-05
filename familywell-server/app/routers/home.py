@@ -15,7 +15,7 @@ from app.models.user import User, UserProfile
 from app.models.record import Record
 from app.models.medication import MedicationTask, MedicationSuggestion
 from app.models.reminder import Reminder
-from app.schemas.common import HomeResponse
+from app.schemas.home import HomeResponse
 from app.utils.deps import get_current_user
 from app.services import rag_service
 
@@ -30,13 +30,12 @@ async def get_home_data(
     """Simplified homepage data for v2 chat-centric design."""
     today = date.today()
 
-    # 1. Profile summary — ★ 优先使用 real_name
+    # 1. Profile summary — 优先使用 real_name
     profile_result = await db.execute(
         select(UserProfile).where(UserProfile.user_id == user.id)
     )
     profile = profile_result.scalar_one_or_none()
 
-    # 取名字优先级：real_name > nickname > "我"
     display_name = user.nickname or "我"
     if profile and profile.real_name:
         display_name = profile.real_name
@@ -79,7 +78,7 @@ async def get_home_data(
     except Exception:
         ai_tip = None
 
-    # 4. Recent activity (last 5 records, including processing/failed)
+    # 4. Recent activity (last 5 records)
     records_result = await db.execute(
         select(Record)
         .where(
@@ -110,7 +109,7 @@ async def get_home_data(
     )
     alert_count = alert_result.scalar() or 0
 
-    # 6. ★ 待确认药物建议
+    # 6. 待确认药物建议
     suggestions_result = await db.execute(
         select(MedicationSuggestion)
         .where(

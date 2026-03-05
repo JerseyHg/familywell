@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.user import User
 from app.models.reminder import Reminder, ReminderSetting
-from app.schemas.common import ReminderResponse, ReminderSettingUpdate, ReminderSettingResponse
+from app.schemas.reminder import ReminderResponse, ReminderSettingUpdate, ReminderSettingResponse
 from app.utils.deps import get_current_user
 
 router = APIRouter(prefix="/api/reminders", tags=["reminders"])

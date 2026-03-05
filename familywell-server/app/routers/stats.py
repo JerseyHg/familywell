@@ -8,7 +8,7 @@ from app.models.user import User
 from app.models.health_indicator import HealthIndicator
 from app.models.nutrition import NutritionLog
 from app.models.medication import MedicationTask, Medication
-from app.schemas.common import (
+from app.schemas.stats import (
     IndicatorTrendResponse, IndicatorDataPoint,
     NutritionTrendResponse, NutritionDayData,
     MedAdherenceResponse, MedAdherenceDayData,
@@ -101,7 +101,6 @@ async def get_nutrition_trend(
         for r in rows
     ]
 
-    # Averages
     n = len(data) or 1
     avg_p = sum(d.protein_g or 0 for d in data) / n
     avg_f = sum(d.fat_g or 0 for d in data) / n
@@ -111,7 +110,7 @@ async def get_nutrition_trend(
     return NutritionTrendResponse(
         avg={"protein_g": round(avg_p, 1), "fat_g": round(avg_f, 1),
              "carb_g": round(avg_c, 1), "calories": round(avg_cal, 1)},
-        trend={},  # Could compute week-over-week change
+        trend={},
         data=data,
     )
 
@@ -168,7 +167,6 @@ async def get_medication_adherence(
 ):
     start = _get_start_date(period)
 
-    # Daily rates
     daily_result = await db.execute(
         select(
             MedicationTask.scheduled_date,
@@ -197,7 +195,6 @@ async def get_medication_adherence(
     missed = total_tasks - completed
     overall_rate = round(completed / total_tasks * 100, 1) if total_tasks > 0 else 0
 
-    # By medication
     by_med_result = await db.execute(
         select(
             Medication.name,
