@@ -241,6 +241,7 @@ export async function uploadAudioToCOS(
   tempFilePath: string
 ): Promise<{ fileKey: string }> {
   const fileName = `voice_${Date.now()}.mp3`
+  console.log('[COS] starting audio upload:', fileName)
 
   // 1. 获取预签名上传 URL
   const urlRes: any = await recordsApi.getUploadUrl({
@@ -250,6 +251,7 @@ export async function uploadAudioToCOS(
 
   // 2. 上传到 COS
   await uploadToCOS(tempFilePath, urlRes.upload_url, 'audio/mpeg')
+  console.log('[COS] audio uploaded successfully')
 
   return { fileKey: urlRes.file_key }
 }
@@ -263,6 +265,7 @@ function uploadToCOS(
   uploadUrl: string,
   contentType: string = 'image/jpeg'
 ): Promise<void> {
+  console.log('[COS] upload URL:', uploadUrl)
   return new Promise((resolve, reject) => {
     const fs = wx.getFileSystemManager()
     fs.readFile({

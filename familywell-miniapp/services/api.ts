@@ -78,6 +78,7 @@ export function request<T = any>(options: RequestOptions): Promise<T> {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data as T)
         } else {
+          console.log('[request] error status:', res.statusCode, JSON.stringify(res.data))
           const msg = (res.data as any)?.detail || '请求失败'
           wx.showToast({ title: msg, icon: 'none' })
           reject(new Error(msg))
@@ -85,6 +86,7 @@ export function request<T = any>(options: RequestOptions): Promise<T> {
       },
       fail(err) {
         if (showLoading) wx.hideLoading()
+        console.log('[request] fail details:', JSON.stringify(err))
         wx.showToast({ title: '网络错误', icon: 'none' })
         reject(err)
       },
