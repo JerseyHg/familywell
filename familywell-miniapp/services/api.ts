@@ -56,6 +56,8 @@ export function request<T = any>(options: RequestOptions): Promise<T> {
     header['Authorization'] = `Bearer ${token}`
   }
   header['Content-Type'] = header['Content-Type'] || 'application/json'
+  // ★ 发送用户时区偏移，让后端使用用户本地日期（而非服务器日期）
+  header['X-Timezone-Offset'] = String(new Date().getTimezoneOffset())
 
   return new Promise((resolve, reject) => {
     wx.request({
@@ -352,6 +354,7 @@ function _doStreamRequest(url: string, params: any, callbacks: ChatStreamCallbac
     header: {
       'Content-Type': 'application/json',
       Authorization: token ? `Bearer ${token}` : '',
+      'X-Timezone-Offset': String(new Date().getTimezoneOffset()),
     },
     enableChunkedTransfer: true,
     responseType: 'text',

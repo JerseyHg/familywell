@@ -14,15 +14,16 @@ from app.schemas.stats import (
     MedAdherenceResponse, MedAdherenceDayData,
 )
 from app.utils.deps import get_current_user
+from app.utils.timezone import get_tz_offset, user_today
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
 PERIOD_DAYS = {"7d": 7, "30d": 30, "3m": 90, "6m": 180, "1y": 365}
 
 
-def _get_start_date(period: str) -> date:
+def _get_start_date(period: str, tz_offset: int | None = None) -> date:
     days = PERIOD_DAYS.get(period, 30)
-    return date.today() - timedelta(days=days)
+    return user_today(tz_offset) - timedelta(days=days)
 
 
 @router.get("/indicators", response_model=IndicatorTrendResponse)
@@ -31,8 +32,9 @@ async def get_indicator_trend(
     period: str = Query("6m"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    tz_offset: int | None = Depends(get_tz_offset),
 ):
-    start = _get_start_date(period)
+    start = _get_start_date(period, tz_offset)
     result = await db.execute(
         select(HealthIndicator)
         .where(
@@ -74,8 +76,9 @@ async def get_nutrition_trend(
     period: str = Query("7d"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    tz_offset: int | None = Depends(get_tz_offset),
 ):
-    start = _get_start_date(period)
+    start = _get_start_date(period, tz_offset)
     result = await db.execute(
         select(
             NutritionLog.logged_at,
@@ -120,9 +123,10 @@ async def get_bp_trend(
     period: str = Query("30d"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    tz_offset: int | None = Depends(get_tz_offset),
 ):
     """Get blood pressure trend (systolic + diastolic paired)."""
-    start = _get_start_date(period)
+    start = _get_start_date(period, tz_offset)
 
     sys_result = await db.execute(
         select(HealthIndicator)
@@ -164,8 +168,9 @@ async def get_medication_adherence(
     period: str = Query("7d"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    tz_offset: int | None = Depends(get_tz_offset),
 ):
-    start = _get_start_date(period)
+    start = _get_start_date(period, tz_offset)
 
     daily_result = await db.execute(
         select(

@@ -13,14 +13,22 @@ const MED_TYPE_OPTIONS = [
   { val: 'temporary', icon: '🤒', label: '临时' },
 ]
 
+// ★ Fix: 使用本地时间而非 toISOString()（UTC），避免跨时区日期偏移
+function _localDateStr(d: Date): string {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 function calcEndDate(startDate: string, days: number): string {
   const d = new Date(startDate)
   d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
+  return _localDateStr(d)
 }
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10)
+  return _localDateStr(new Date())
 }
 
 Page({

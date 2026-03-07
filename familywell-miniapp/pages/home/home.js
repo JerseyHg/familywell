@@ -228,7 +228,7 @@ Page({
         id: r.id,
         category: r.category,
         title: r.title || '未命名',
-        date: r.record_date ? self._formatLocalDate(r.record_date) : '',
+        date: r.record_date ? self._formatLocalDate(r.record_date) : (r.date || ''),
         ai_status: r.ai_status,
       };
     });

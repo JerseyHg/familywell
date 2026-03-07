@@ -7,6 +7,7 @@ app/routers/voice_input.py — 语音/文字录入路由
 端点：
   POST /api/voice/add        文字录入（多类型自动拆分）
   POST /api/voice/add-audio  音频录入（ASR 转文字后走同一套逻辑）
+★ 修复：传入用户时区偏移，确保日期按用户本地时间记录
 """
 import logging
 
@@ -17,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.user import User
 from app.utils.deps import get_current_user
+from app.utils.timezone import get_tz_offset
 from app.services.voice_service import analyze_text_to_items, dispatch_items
 
 router = APIRouter(prefix="/api/voice", tags=["voice_input"])
@@ -40,6 +42,7 @@ async def voice_add(
     req: VoiceTextRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    tz_offset: int | None = Depends(get_tz_offset),
 ):
     """
     文字录入入口。支持多类型拆分：
@@ -52,7 +55,7 @@ async def voice_add(
         logger.error(f"Voice add parse failed: {e}")
         raise HTTPException(status_code=500, detail="AI 分析失败，请重试")
 
-    return await dispatch_items(db, user, items, req.text)
+    return await dispatch_items(db, user, items, req.text, tz_offset=tz_offset)
 
 
 @router.post("/add-audio")
@@ -60,6 +63,7 @@ async def voice_add_audio(
     req: VoiceAudioRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    tz_offset: int | None = Depends(get_tz_offset),
 ):
     """
     音频录入入口：接收音频文件 key → ASR 转文字 → 多类型拆分。
@@ -86,6 +90,6 @@ async def voice_add_audio(
         logger.error(f"Voice audio parse failed: {e}")
         raise HTTPException(status_code=500, detail="AI 分析失败，请重试")
 
-    result = await dispatch_items(db, user, items, full_text)
+    result = await dispatch_items(db, user, items, full_text, tz_offset=tz_offset)
     result["text"] = full_text
     return result

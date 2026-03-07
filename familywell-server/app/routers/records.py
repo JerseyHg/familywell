@@ -28,6 +28,7 @@ from app.schemas.record import (
 from app.services import cos_service
 from app.services.record_processor import process_record
 from app.utils.deps import get_current_user
+from app.utils.timezone import get_tz_offset, user_today
 
 router = APIRouter(prefix="/api/records", tags=["records"])
 logger = logging.getLogger(__name__)
@@ -270,6 +271,7 @@ async def confirm_prescription(
     req: PrescriptionConfirmRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    tz_offset: int | None = Depends(get_tz_offset),
 ):
     """
     用户确认处方中的药物。
@@ -304,7 +306,7 @@ async def confirm_prescription(
             dosage=med_confirm.dosage,
             frequency=med_confirm.frequency,
             scheduled_times=med_confirm.times or ["08:00"],
-            start_date=record.record_date or date.today(),
+            start_date=record.record_date or user_today(tz_offset),
             is_active=True,
         )
         db.add(medication)
@@ -317,7 +319,7 @@ async def confirm_prescription(
     # 生成当天用药任务
     if created:
         from app.routers.medications import _generate_tasks_for_med
-        today = date.today()
+        today = user_today(tz_offset)
         meds_result = await db.execute(
             select(Medication).where(
                 Medication.prescription_record_id == record_id,
