@@ -34,7 +34,7 @@ function _genId(): string {
 export function getQueue(): QueuedItem[] {
   try {
     return wx.getStorageSync(STORAGE_KEY) || []
-  } catch {
+  } catch (_e) {
     return []
   }
 }
@@ -107,7 +107,7 @@ async function _processItem(item: QueuedItem): Promise<boolean> {
     // 检查临时文件是否还存在
     try {
       wx.getFileSystemManager().accessSync(item.tempFilePath)
-    } catch {
+    } catch (_e) {
       // 临时文件已被清理，无法重试
       console.warn('[UploadQueue] Temp file no longer exists:', item.tempFilePath)
       return false
