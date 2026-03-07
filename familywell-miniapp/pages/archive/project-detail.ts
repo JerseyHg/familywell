@@ -6,10 +6,11 @@ import { projectsApi, recordsApi } from '../../services/api'
 import { formatDate as helperFormatDate, parseLocalDate } from '../../utils/helpers'
 
 const CATEGORY_CONFIG: { key: string; label: string; icon: string; cats: string[] }[] = [
-  { key: 'medical', label: '医疗', icon: '🩺', cats: ['checkup', 'lab', 'visit', 'bp_reading'] },
+  { key: 'medical', label: '医疗', icon: '🩺', cats: ['checkup', 'lab', 'visit'] },
   { key: 'prescription', label: '用药', icon: '💊', cats: ['prescription', 'medication_log'] },
   { key: 'nutrition', label: '饮食', icon: '🍽️', cats: ['food', 'weight'] },
   { key: 'insurance', label: '保险', icon: '🛡️', cats: ['insurance'] },
+  { key: 'bp', label: '血压', icon: '❤️', cats: ['bp_reading'] },
   { key: 'other', label: '其他', icon: '📄', cats: ['other'] },
 ]
 
@@ -168,6 +169,7 @@ Page({
       this.loadData()
     } catch (e) {
       this.setData({ saving: false })
+      wx.showToast({ title: '保存失败', icon: 'none' })
       console.error('Failed to update project:', e)
     }
   },
@@ -180,9 +182,14 @@ Page({
       content: '标记为已结束？记录不会被删除。',
       success: async (res) => {
         if (res.confirm) {
-          await projectsApi.update(this.data.projectId, { status: 'archived' })
-          wx.showToast({ title: '已结束', icon: 'success' })
-          this.loadData()
+          try {
+            await projectsApi.update(this.data.projectId, { status: 'archived' })
+            wx.showToast({ title: '已结束', icon: 'success' })
+            this.loadData()
+          } catch (e) {
+            console.error('Failed to end project:', e)
+            wx.showToast({ title: '操作失败', icon: 'none' })
+          }
         }
       },
     })
@@ -197,9 +204,14 @@ Page({
       confirmColor: '#E85D3A',
       success: async (res) => {
         if (res.confirm) {
-          await projectsApi.delete(this.data.projectId)
-          wx.showToast({ title: '已删除', icon: 'success' })
-          wx.navigateBack()
+          try {
+            await projectsApi.delete(this.data.projectId)
+            wx.showToast({ title: '已删除', icon: 'success' })
+            wx.navigateBack()
+          } catch (e) {
+            console.error('Failed to delete project:', e)
+            wx.showToast({ title: '删除失败', icon: 'none' })
+          }
         }
       },
     })

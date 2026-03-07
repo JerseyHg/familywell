@@ -107,8 +107,13 @@ async def list_records(
     count_query = select(func.count(Record.id)).where(Record.user_id == user.id)
 
     if category:
-        query = query.where(Record.category == category)
-        count_query = count_query.where(Record.category == category)
+        if "," in category:
+            cats = [c.strip() for c in category.split(",") if c.strip()]
+            query = query.where(Record.category.in_(cats))
+            count_query = count_query.where(Record.category.in_(cats))
+        else:
+            query = query.where(Record.category == category)
+            count_query = count_query.where(Record.category == category)
 
     if project_id is not None:
         query = query.where(Record.project_id == project_id)
