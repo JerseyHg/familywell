@@ -327,8 +327,11 @@ async def _process_food(
     fat = ai_result.get("fat_g")
     carb = ai_result.get("carb_g")
 
-    if protein is None and fat is None and carb is None and calories:
-        # 有热量无三大营养素：按常规中餐比例粗略拆分
+    if protein is None and fat is None and carb is None:
+        if not calories:
+            # 连热量都没有：按每道菜约 300kcal 粗估
+            food_items = ai_result.get("food_items", [])
+            calories = len(food_items) * 300 if food_items else 500
         cal = float(calories)
         protein = round(cal * 0.15 / 4, 1)   # 15% 热量来自蛋白质
         fat = round(cal * 0.30 / 9, 1)        # 30% 热量来自脂肪
