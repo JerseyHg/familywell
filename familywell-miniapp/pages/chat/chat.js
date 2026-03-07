@@ -467,7 +467,75 @@ Page({
 
   _processCharts: function (charts) {
     return (charts || []).map(function (chart) {
-      // pie: compute conic-gradient for donut ring visualization
+
+      // ── adherence → med_adherence (type mapping + data restructure) ──
+      if (chart.type === 'adherence') {
+        chart.type = 'med_adherence';
+        if (Array.isArray(chart.medications)) {
+          chart.data = chart.medications.map(function (m) {
+            var pct = m.total > 0 ? Math.round(m.done / m.total * 100) : 0;
+            return { name: m.name, pct: pct, done: m.done, total: m.total };
+          });
+        }
+        if (chart.summary && typeof chart.summary === 'object' && !chart.summary.text) {
+          chart.summary = {
+            text: '总体依从率 ' + (chart.summary.rate || 0) + '%，已完成 ' + (chart.summary.done || 0) + '/' + (chart.summary.total || 0) + ' 次'
+          };
+        }
+      }
+
+      // ── dual_line → pre-compute val1/val2/pct1/pct2 for WXML ──
+      if (chart.type === 'dual_line' && Array.isArray(chart.data)) {
+        var key1 = chart.key1 || '';
+        var key2 = chart.key2 || '';
+        chart.key1Name = key1;
+        chart.key2Name = key2;
+        var maxV = 0;
+        for (var k = 0; k < chart.data.length; k++) {
+          var v1 = chart.data[k][key1] || 0;
+          var v2 = chart.data[k][key2] || 0;
+          if (v1 > maxV) maxV = v1;
+          if (v2 > maxV) maxV = v2;
+        }
+        chart.data = chart.data.map(function (d) {
+          return {
+            label: d.label,
+            val1: d[key1] || 0,
+            val2: d[key2] || 0,
+            pct1: maxV > 0 ? Math.round((d[key1] || 0) / maxV * 100) : 50,
+            pct2: maxV > 0 ? Math.round((d[key2] || 0) / maxV * 100) : 50,
+          };
+        });
+        if (chart.summary && typeof chart.summary === 'object' && !chart.summary.text) {
+          chart.summary = {
+            text: '最近血压 ' + (chart.summary.latest || '') + ' mmHg，共 ' + (chart.summary.count || 0) + ' 次记录'
+          };
+        }
+      }
+
+      // ── line → add pct for horizontal bar width ──
+      if (chart.type === 'line' && Array.isArray(chart.data)) {
+        var lineMax = 0;
+        for (var li = 0; li < chart.data.length; li++) {
+          if ((chart.data[li].value || 0) > lineMax) lineMax = chart.data[li].value;
+        }
+        chart.data = chart.data.map(function (d) {
+          return Object.assign({}, d, {
+            pct: lineMax > 0 ? Math.round(d.value / lineMax * 100) : 50
+          });
+        });
+        if (chart.summary && typeof chart.summary === 'object' && !chart.summary.text) {
+          var lineParts = [];
+          if (chart.summary.latest !== undefined) lineParts.push('最新值 ' + chart.summary.latest + (chart.unit || ''));
+          if (chart.summary.change_pct !== undefined) {
+            var dir = chart.summary.change_pct >= 0 ? '↑' : '↓';
+            lineParts.push(dir + ' ' + Math.abs(chart.summary.change_pct) + '%');
+          }
+          chart.summary = { text: lineParts.join('，') };
+        }
+      }
+
+      // ── pie: compute conic-gradient for donut ring visualization ──
       if (chart.type === 'pie' && Array.isArray(chart.data)) {
         var total = chart.data.reduce(function (s, d) { return s + (d.value || 0); }, 0);
         var cumPct = 0;
@@ -487,8 +555,16 @@ Page({
         }
         chart.conicGradient = parts.join(', ');
         chart.total = total;
+        if (chart.summary && typeof chart.summary === 'object' && !chart.summary.text) {
+          var pieParts = [];
+          if (chart.summary.total_calories) pieParts.push('总热量 ' + chart.summary.total_calories + 'kcal');
+          if (chart.summary.avg_calories) pieParts.push('日均 ' + chart.summary.avg_calories + 'kcal');
+          if (chart.summary.days) pieParts.push('共 ' + chart.summary.days + ' 天');
+          chart.summary = { text: pieParts.join('，') };
+        }
       }
-      // donut: same ring visualization
+
+      // ── donut: compute conic-gradient ──
       if (chart.type === 'donut' && Array.isArray(chart.data)) {
         var defColors = ['#4DB892', '#5B9BD5', '#F5A623', '#E55B5B', '#9B59B6'];
         var colors = chart.colors || defColors;
@@ -514,6 +590,12 @@ Page({
         chart.conicGradient = parts2.join(', ');
         chart.total = total2;
       }
+
+      // ── Fallback: convert any remaining object summary to {text: ''} ──
+      if (chart.summary && typeof chart.summary === 'object' && !chart.summary.text) {
+        chart.summary = { text: '' };
+      }
+
       return chart;
     });
   },

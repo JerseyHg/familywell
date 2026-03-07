@@ -156,6 +156,20 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 .hbar-fill { height: 100%; border-radius: 10rpx; transition: width 0.8s ease; }
 .hbar-value { font-size: 24rpx; font-weight: 600; color: var(--text); min-width: 80rpx; text-align: right; }
 
+/* ── Dual Line / Blood Pressure Trend ── */
+.dual-legend { display: flex; gap: 24rpx; margin-bottom: 16rpx; }
+.dual-legend-item { display: flex; align-items: center; gap: 8rpx; }
+.dual-legend-dot { width: 16rpx; height: 16rpx; border-radius: 4rpx; }
+.dual-legend-text { font-size: 22rpx; color: var(--sub); }
+.dual-row { display: flex; align-items: center; gap: 16rpx; margin-bottom: 14rpx; }
+.dual-row:last-child { margin-bottom: 0; }
+.dual-date { font-size: 22rpx; color: var(--muted); width: 80rpx; flex-shrink: 0; }
+.dual-vals { flex: 1; display: flex; flex-direction: column; gap: 6rpx; }
+.dual-bar-group { display: flex; align-items: center; gap: 12rpx; }
+.dual-bar-track { flex: 1; height: 14rpx; background: var(--bg); border-radius: 7rpx; overflow: hidden; }
+.dual-bar-fill { height: 100%; border-radius: 7rpx; transition: width 0.8s ease; min-width: 8rpx; }
+.dual-bar-val { font-size: 22rpx; font-weight: 600; min-width: 56rpx; text-align: right; }
+
 /* ── Stacked Bar Chart ── */
 .stack-chart {
   display: flex; align-items: flex-end; gap: 20rpx;

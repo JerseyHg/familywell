@@ -107,6 +107,37 @@
                   </view>
                 </view>
 
+                <!-- dual_line → 双值趋势图（血压等） -->
+                <view class="chart-body" wx:if="{{chart.type === 'dual_line'}}">
+                  <view class="dual-legend">
+                    <view class="dual-legend-item">
+                      <view class="dual-legend-dot" style="background: {{chart.color1 || '#E85D3A'}};" />
+                      <text class="dual-legend-text">{{chart.key1Name}}</text>
+                    </view>
+                    <view class="dual-legend-item">
+                      <view class="dual-legend-dot" style="background: {{chart.color2 || '#3B7DD8'}};" />
+                      <text class="dual-legend-text">{{chart.key2Name}}</text>
+                    </view>
+                  </view>
+                  <view class="dual-row" wx:for="{{chart.data}}" wx:for-item="d" wx:key="label">
+                    <text class="dual-date">{{d.label}}</text>
+                    <view class="dual-vals">
+                      <view class="dual-bar-group">
+                        <view class="dual-bar-track">
+                          <view class="dual-bar-fill" style="width: {{d.pct1}}%; background: {{chart.color1 || '#E85D3A'}};" />
+                        </view>
+                        <text class="dual-bar-val" style="color: {{chart.color1 || '#E85D3A'}};">{{d.val1}}</text>
+                      </view>
+                      <view class="dual-bar-group">
+                        <view class="dual-bar-track">
+                          <view class="dual-bar-fill" style="width: {{d.pct2}}%; background: {{chart.color2 || '#3B7DD8'}};" />
+                        </view>
+                        <text class="dual-bar-val" style="color: {{chart.color2 || '#3B7DD8'}};">{{d.val2}}</text>
+                      </view>
+                    </view>
+                  </view>
+                </view>
+
                 <!-- donut → 环形图 -->
                 <view class="chart-body" wx:if="{{chart.type === 'donut'}}">
                   <view class="pie-visual">

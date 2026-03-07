@@ -364,6 +364,10 @@ function _doStreamRequest(url: string, params: any, callbacks: ChatStreamCallbac
 
         // ★ [Fix-4] 优先用 onFallbackComplete（3 参数），再兼容 onFallback（2 参数）
         if (callbacks.onFallbackComplete) {
+          // ★ [Fix-6] fallback 路径也要触发 onTranscript（语音消息显示实际内容）
+          if (collected.transcript && callbacks.onTranscript) {
+            callbacks.onTranscript(collected.transcript)
+          }
           callbacks.onFallbackComplete(
             collected.fullText,
             collected.charts,
