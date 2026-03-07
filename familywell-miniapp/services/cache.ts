@@ -110,7 +110,7 @@ export function invalidateCache(...keys: string[]): void {
   for (const key of keys) {
     delete memoryCache[key]
     try {
-      wx.removeStorage({ key })
+      wx.removeStorageSync(key)
     } catch { /* ignore */ }
   }
 }
