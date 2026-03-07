@@ -22,6 +22,12 @@ Page({
     ],
     greeting: '',
 
+    // ★ 首页仪表盘
+    dashAlerts: [],
+    dashIndicators: [],
+    dashMedAdherence: null,
+    dashNutrition: null,
+
     showVoiceModal: false,
     voiceSegments: [],
     isRecording: false,
@@ -233,6 +239,35 @@ Page({
       };
     });
 
+    // ★ 处理 dashboard 仪表盘数据
+    var dash = homeData.dashboard || {};
+    var dashAlerts = dash.alerts || [];
+    var dashIndicators = dash.health_indicators || [];
+    var dashMedAdherence = dash.med_adherence || null;
+    var dashNutrition = null;
+
+    if (dash.nutrition_7d) {
+      var n = dash.nutrition_7d;
+      var totalG = (n.protein || 0) + (n.fat || 0) + (n.carb || 0);
+      var conicGradient = '';
+      if (totalG > 0) {
+        var pPct = Math.round(n.protein / totalG * 100);
+        var fPct = Math.round(n.fat / totalG * 100);
+        var cPct = 100 - pPct - fPct;
+        conicGradient = '#2D8B6F 0% ' + pPct + '%, #F5A623 ' + pPct + '% ' + (pPct + fPct) + '%, #E85D3A ' + (pPct + fPct) + '% 100%';
+      }
+      var avgCal = n.days ? Math.round(n.total_calories / n.days) : 0;
+      dashNutrition = {
+        protein: n.protein || 0,
+        fat: n.fat || 0,
+        carb: n.carb || 0,
+        totalCalories: n.total_calories || 0,
+        avgCalories: avgCal,
+        days: n.days || 0,
+        conicGradient: conicGradient,
+      };
+    }
+
     self.setData({
       profile: profile,
       avatarText: profile.nickname ? profile.nickname.slice(0, 1) : '👤',
@@ -249,6 +284,10 @@ Page({
           frequency: s.frequency || '',
         });
       }),
+      dashAlerts: dashAlerts,
+      dashIndicators: dashIndicators,
+      dashMedAdherence: dashMedAdherence,
+      dashNutrition: dashNutrition,
     });
   },
 
