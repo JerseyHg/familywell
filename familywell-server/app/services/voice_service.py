@@ -58,6 +58,7 @@ type=medication:
 
 type=food:
   {"meal_type":"breakfast|lunch|dinner|snack","food_items":["食物1","食物2"],"calories":估算总卡路里,"protein_g":蛋白质克,"fat_g":脂肪克,"carb_g":碳水克}
+  ★★ food 的 calories/protein_g/fat_g/carb_g 必须给出数值，绝对不能为null！根据常见中餐份量大致估算即可（如一碗米饭约200g≈230kcal，一盘炒菜约200-300kcal）。
 
 type=vitals (血压/体重/血糖等):
   {"indicators":[{"type":"bp_systolic|bp_diastolic|heart_rate|weight|glucose_fasting|temperature","value":数值,"unit":"单位"}]}
@@ -349,12 +350,15 @@ async def _process_food(
     db.add(record)
     await db.flush()
 
-    # 如果 LLM 未返回营养数据，根据热量做粗略估算
+    # 如果 LLM 未返回营养数据，根据热量或食物数量做粗略估算
     protein = data.get("protein_g")
     fat = data.get("fat_g")
     carb = data.get("carb_g")
 
-    if protein is None and fat is None and carb is None and calories:
+    if protein is None and fat is None and carb is None:
+        if not calories:
+            # 连热量都没有：按每道菜约 300kcal 粗估
+            calories = len(food_items) * 300 if food_items else 500
         cal = float(calories)
         protein = round(cal * 0.15 / 4, 1)
         fat = round(cal * 0.30 / 9, 1)
