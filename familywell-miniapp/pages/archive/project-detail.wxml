@@ -11,6 +11,9 @@
     </view>
   </view>
   <view class="ph-actions">
+    <view class="action-btn add" catchtap="onOpenAddModal">
+      <text>+ 添加记录</text>
+    </view>
     <view class="action-btn edit" catchtap="onEditProject">
       <text>编辑</text>
     </view>
@@ -96,6 +99,44 @@
       <button class="em-submit" catchtap="onSubmitEdit" loading="{{saving}}">保存修改</button>
       <view style="height: 60rpx;" />
     </scroll-view>
+  </view>
+</view>
+
+<!-- ════ 添加记录弹窗 ════ -->
+<view class="modal-mask" wx:if="{{showAddModal}}" bindtap="hideAddModal">
+  <view class="add-modal" catchtap="noop">
+    <view class="am-header">
+      <text class="am-title">添加记录</text>
+      <view class="em-close" bindtap="hideAddModal">✕</view>
+    </view>
+    <scroll-view scroll-y class="am-scroll">
+      <view wx:if="{{loadingUnassigned}}" class="am-loading">
+        <text class="empty-text">加载中...</text>
+      </view>
+      <view wx:elif="{{!unassignedRecords.length}}" class="am-empty">
+        <text class="empty-text">暂无可添加的记录</text>
+      </view>
+      <block wx:else>
+        <view
+          class="am-record {{selectedRecordIds.indexOf(item.id) >= 0 ? 'selected' : ''}}"
+          wx:for="{{unassignedRecords}}"
+          wx:key="id"
+          data-id="{{item.id}}"
+          catchtap="onToggleRecord"
+        >
+          <view class="am-check">{{selectedRecordIds.indexOf(item.id) >= 0 ? '✓' : ''}}</view>
+          <view class="am-rec-info">
+            <text class="am-rec-title">{{item.title || '未命名'}}</text>
+            <text class="am-rec-meta">{{item.categoryName}} · {{item.displayDate}}</text>
+          </view>
+        </view>
+      </block>
+    </scroll-view>
+    <view class="am-footer" wx:if="{{unassignedRecords.length}}">
+      <button class="am-submit" catchtap="onSubmitAdd" loading="{{adding}}" disabled="{{!selectedRecordIds.length}}">
+        确认添加{{selectedRecordIds.length ? ' (' + selectedRecordIds.length + ')' : ''}}
+      </button>
+    </view>
   </view>
 </view>
 

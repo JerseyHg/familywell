@@ -75,7 +75,7 @@
   </view>
 
   <!-- 未归项目的记录 -->
-  <view class="section-label" wx:if="{{unassignedRecords.length}}">未归项目</view>
+  <view class="section-label" wx:if="{{unassignedRecords.length}}">日常记录</view>
   <view class="record-list">
     <view class="record-item" wx:for="{{unassignedRecords}}" wx:key="id" data-id="{{item.id}}" bindtap="onRecordTap">
       <text class="ri-icon">

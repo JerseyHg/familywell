@@ -16,6 +16,12 @@ const CATEGORY_CONFIG: { key: string; label: string; icon: string; cats: string[
 
 const ICON_OPTIONS = ['📁', '💉', '📊', '🤰', '🏥', '⚖️', '🦿', '💊', '🫀', '🧪', '🩺', '🏋️']
 
+const CATEGORY_MAP: Record<string, string> = {
+  checkup: '体检', lab: '化验', prescription: '处方',
+  medication_log: '服药记录', insurance: '保险', food: '饮食',
+  bp_reading: '血压', weight: '体重', visit: '就诊', other: '其他',
+}
+
 // ★ Fix: 使用 helpers 中的时区感知日期格式化
 function formatDate(d: string | null): string {
   if (!d) return ''
@@ -59,6 +65,13 @@ Page({
       end_date: '',
     },
     saving: false,
+
+    // 添加记录
+    showAddModal: false,
+    unassignedRecords: [] as any[],
+    selectedRecordIds: [] as number[],
+    loadingUnassigned: false,
+    adding: false,
   },
 
   onLoad(options: any) {
@@ -215,6 +228,65 @@ Page({
         }
       },
     })
+  },
+
+  // ── 添加记录 ──
+
+  async onOpenAddModal() {
+    this.setData({ showAddModal: true, loadingUnassigned: true, selectedRecordIds: [] })
+
+    try {
+      const res: any = await recordsApi.list({ unassigned: true, size: 50 })
+      this.setData({
+        unassignedRecords: (res.items || []).map((r: any) => ({
+          ...r,
+          displayDate: formatDate(r.record_date || r.created_at),
+          categoryName: CATEGORY_MAP[r.category] || r.category,
+        })),
+        loadingUnassigned: false,
+      })
+    } catch (e) {
+      console.error('Failed to load unassigned records:', e)
+      this.setData({ loadingUnassigned: false })
+      wx.showToast({ title: '加载失败', icon: 'none' })
+    }
+  },
+
+  hideAddModal() {
+    this.setData({ showAddModal: false, selectedRecordIds: [], unassignedRecords: [] })
+  },
+
+  onToggleRecord(e: any) {
+    const id = e.currentTarget.dataset.id
+    const selected = [...this.data.selectedRecordIds]
+    const idx = selected.indexOf(id)
+    if (idx >= 0) {
+      selected.splice(idx, 1)
+    } else {
+      selected.push(id)
+    }
+    this.setData({ selectedRecordIds: selected })
+  },
+
+  async onSubmitAdd() {
+    const ids = this.data.selectedRecordIds
+    if (!ids.length) {
+      wx.showToast({ title: '请选择记录', icon: 'none' })
+      return
+    }
+
+    this.setData({ adding: true })
+
+    try {
+      await projectsApi.assignRecords(this.data.projectId, ids)
+      wx.showToast({ title: '已添加', icon: 'success' })
+      this.setData({ showAddModal: false, adding: false, selectedRecordIds: [], unassignedRecords: [] })
+      this.loadData()
+    } catch (e) {
+      this.setData({ adding: false })
+      wx.showToast({ title: '添加失败', icon: 'none' })
+      console.error('Failed to assign records:', e)
+    }
   },
 
   // ── ★ Fix 4: 移出记录 — 乐观更新 ──
