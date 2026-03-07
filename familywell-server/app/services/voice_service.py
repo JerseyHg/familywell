@@ -59,6 +59,7 @@ type=medication:
 type=food:
   {"meal_type":"breakfast|lunch|dinner|snack","food_items":["食物1","食物2"],"calories":估算总卡路里,"protein_g":蛋白质克,"fat_g":脂肪克,"carb_g":碳水克}
   ★★ food 的 calories/protein_g/fat_g/carb_g 必须给出数值，绝对不能为null！根据常见中餐份量大致估算即可（如一碗米饭约200g≈230kcal，一盘炒菜约200-300kcal）。
+  ★★ 永远按"一次合理食用量"估算，不要按整包/整瓶/整罐的量。例如速溶咖啡按1杯（约15g粉≈70kcal），牛奶按1杯（250ml），零食按合理一次食用量。
 
 type=vitals (血压/体重/血糖等):
   {"indicators":[{"type":"bp_systolic|bp_diastolic|heart_rate|weight|glucose_fasting|temperature","value":数值,"unit":"单位"}]}
