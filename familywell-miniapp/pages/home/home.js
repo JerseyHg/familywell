@@ -26,6 +26,16 @@ Page({
     voiceSegments: [],
     isRecording: false,
     recordingDuration: 0,
+
+    // ★ 药物确认弹窗
+    showMedConfirm: false,
+    medConfirmId: null,
+    medConfirmName: '',
+    medConfirmDosage: '',
+    medConfirmType: 'long_term',
+    medConfirmTimes: 1,
+    medConfirmDays: '',
+    medConfirmSubmitting: false,
   },
 
   _recorder: null,
@@ -332,32 +342,85 @@ Page({
   //  药物建议
   // ════════════════════════════════════════
 
+  // ★ 打开药物确认弹窗（收集详细信息）
   onConfirmSuggestion: function (e) {
-    var self = this;
     var id = e.currentTarget.dataset.id;
     if (!id) return;
     var name = '该药物';
-    var suggestions = self.data.medSuggestions || [];
+    var dosage = '';
+    var suggestions = this.data.medSuggestions || [];
     for (var i = 0; i < suggestions.length; i++) {
-      if (suggestions[i].id === id) { name = suggestions[i].name; break; }
-    }
-    wx.showModal({
-      title: '确认添加',
-      content: '确认将「' + name + '」添加到用药管理？',
-      success: function (res) {
-        if (!res.confirm) return;
-        api_1.medsApi.confirmSuggestion(id, {}).then(function () {
-          var remaining = [];
-          for (var j = 0; j < self.data.medSuggestions.length; j++) {
-            if (self.data.medSuggestions[j].id !== id) remaining.push(self.data.medSuggestions[j]);
-          }
-          self.setData({ medSuggestions: remaining });
-          cache_1.invalidation.onMedicationChange();
-          wx.showToast({ title: '已添加', icon: 'success' });
-        }).catch(function () {
-          wx.showToast({ title: '添加失败', icon: 'none' });
-        });
+      if (suggestions[i].id === id) {
+        name = suggestions[i].name;
+        dosage = suggestions[i].dosage || '';
+        break;
       }
+    }
+    this.setData({
+      showMedConfirm: true,
+      medConfirmId: id,
+      medConfirmName: name,
+      medConfirmDosage: dosage,
+      medConfirmType: 'long_term',
+      medConfirmTimes: 1,
+      medConfirmDays: '',
+      medConfirmSubmitting: false,
+    });
+  },
+
+  hideMedConfirm: function () {
+    this.setData({ showMedConfirm: false });
+  },
+
+  onMedConfirmDosage: function (e) {
+    this.setData({ medConfirmDosage: e.detail.value });
+  },
+
+  onMedConfirmType: function (e) {
+    this.setData({ medConfirmType: e.currentTarget.dataset.val });
+  },
+
+  onMedConfirmTimes: function (e) {
+    this.setData({ medConfirmTimes: e.currentTarget.dataset.val });
+  },
+
+  onMedConfirmDays: function (e) {
+    this.setData({ medConfirmDays: e.detail.value });
+  },
+
+  onSubmitMedConfirm: function () {
+    var self = this;
+    var id = this.data.medConfirmId;
+    var medType = this.data.medConfirmType;
+    var timesPerDay = this.data.medConfirmTimes;
+    var dosage = this.data.medConfirmDosage.trim() || null;
+    var totalDays = null;
+
+    if ((medType === 'course' || medType === 'temporary') && !this.data.medConfirmDays) {
+      wx.showToast({ title: '请输入服用天数', icon: 'none' });
+      return;
+    }
+    if (medType === 'course' || medType === 'temporary') {
+      totalDays = parseInt(this.data.medConfirmDays) || null;
+    }
+
+    this.setData({ medConfirmSubmitting: true });
+    api_1.medsApi.confirmSuggestion(id, {
+      med_type: medType,
+      times_per_day: timesPerDay,
+      dosage: dosage,
+      total_days: totalDays,
+    }).then(function () {
+      var remaining = [];
+      for (var j = 0; j < self.data.medSuggestions.length; j++) {
+        if (self.data.medSuggestions[j].id !== id) remaining.push(self.data.medSuggestions[j]);
+      }
+      self.setData({ medSuggestions: remaining, showMedConfirm: false, medConfirmSubmitting: false });
+      cache_1.invalidation.onMedicationChange();
+      wx.showToast({ title: '已添加', icon: 'success' });
+    }).catch(function () {
+      self.setData({ medConfirmSubmitting: false });
+      wx.showToast({ title: '添加失败', icon: 'none' });
     });
   },
 

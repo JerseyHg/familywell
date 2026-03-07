@@ -335,3 +335,60 @@ page { background: var(--bg, #F4F1EB); }
   background: var(--primary, #2D8B6F);
   color: #fff;
 }
+
+/* ════════════════════════════════════════
+   ★ 药物确认弹窗
+   ════════════════════════════════════════ */
+.med-confirm-modal {
+  width: 100%;
+  background: #fff; border-radius: 28rpx;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  max-height: 80vh;
+}
+.mc-body {
+  padding: 0 36rpx 24rpx;
+  max-height: 60vh;
+}
+.mc-drug-name {
+  font-size: 36rpx; font-weight: 700; color: var(--text, #2C2820);
+  padding: 16rpx 0 24rpx; text-align: center;
+}
+.mc-field { margin-bottom: 24rpx; }
+.mc-label {
+  font-size: 26rpx; color: var(--text2, #8B8680);
+  display: block; margin-bottom: 12rpx;
+}
+.mc-input {
+  width: 100%; height: 80rpx; padding: 0 24rpx;
+  border: 2rpx solid var(--border, #E8E4DD); border-radius: 12rpx;
+  font-size: 28rpx; color: var(--text, #2C2820);
+  box-sizing: border-box;
+}
+.mc-tag-row { display: flex; gap: 16rpx; flex-wrap: wrap; }
+.mc-tag {
+  padding: 16rpx 28rpx; border-radius: 12rpx;
+  background: var(--bg, #F4F1EB); color: var(--text2, #8B8680);
+  font-size: 26rpx; font-weight: 500;
+  border: 2rpx solid transparent;
+}
+.mc-tag.active {
+  background: rgba(45, 139, 111, 0.1); color: var(--primary, #2D8B6F);
+  border-color: var(--primary, #2D8B6F); font-weight: 600;
+}
+.mc-footer {
+  display: flex; gap: 16rpx;
+  padding: 16rpx 36rpx 36rpx;
+  flex-shrink: 0;
+}
+.mc-cancel {
+  flex: 1; text-align: center; padding: 20rpx 0;
+  background: var(--bg, #F4F1EB); color: var(--text2, #8B8680);
+  border-radius: 12rpx; font-size: 28rpx;
+}
+.mc-submit {
+  flex: 2; text-align: center; padding: 20rpx 0;
+  background: var(--primary, #2D8B6F); color: #fff;
+  border-radius: 12rpx; font-size: 28rpx; font-weight: 600;
+}
+.mc-submit.disabled { opacity: 0.6; }
