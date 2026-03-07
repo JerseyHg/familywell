@@ -17,11 +17,11 @@ const CATEGORY_MAP: Record<string, string> = {
 
 const CATEGORIES = [
   { key: '', icon: '📋', label: '全部' },
-  { key: 'checkup,lab', icon: '🏥', label: '医疗' },
+  { key: 'checkup,lab,visit', icon: '🏥', label: '医疗' },
   { key: 'prescription,medication_log', icon: '💊', label: '用药' },
-  { key: 'food', icon: '🍽️', label: '饮食' },
+  { key: 'food,weight', icon: '🍽️', label: '饮食' },
   { key: 'insurance', icon: '🛡️', label: '保险' },
-  { key: 'bp_reading,weight', icon: '❤️', label: '健康数据' },
+  { key: 'bp_reading', icon: '❤️', label: '血压' },
 ]
 
 const TEMPLATES = [
@@ -141,13 +141,13 @@ Page({
       )
       const projects = Array.isArray(res) ? res : (res.data || res.items || [])
       const active = projects
-        .filter((p: any) => !p.is_archived)
+        .filter((p: any) => p.status !== 'archived')
         .map((p: any) => ({
           ...p,
           dateRange: formatDateRange(p.start_date, p.end_date),
         }))
-      const archived = (projects || [])
-        .filter((p: any) => p.is_archived)
+      const archived = projects
+        .filter((p: any) => p.status === 'archived')
         .map((p: any) => ({
           ...p,
           dateRange: formatDateRange(p.start_date, p.end_date),
@@ -157,7 +157,7 @@ Page({
 
       // 加载未归项目的记录
       try {
-        const unassigned: any = await recordsApi.list({ no_project: true, size: 20 })
+        const unassigned: any = await recordsApi.list({ unassigned: true, size: 20 })
         this.setData({
           unassignedRecords: (unassigned.items || []).map((r: any) => ({
             ...r,
@@ -286,9 +286,11 @@ Page({
 
       wx.showToast({ title: '创建成功', icon: 'success' })
       this.setData({ showCreateModal: false, creating: false })
+      invalidation.onRecordChange()  // 清除项目缓存
       this.loadProjects()
     } catch (e) {
       this.setData({ creating: false })
+      wx.showToast({ title: '创建失败', icon: 'none' })
       console.error('Failed to create project:', e)
     }
   },
@@ -304,13 +306,13 @@ Page({
   _applyProjects(res: any) {
     const projects = Array.isArray(res) ? res : (res.data || res.items || [])
     const active = projects
-      .filter((p: any) => !p.is_archived)
+      .filter((p: any) => p.status !== 'archived')
       .map((p: any) => ({
         ...p,
         dateRange: formatDateRange(p.start_date, p.end_date),
       }))
     const archived = projects
-      .filter((p: any) => p.is_archived)
+      .filter((p: any) => p.status === 'archived')
       .map((p: any) => ({
         ...p,
         dateRange: formatDateRange(p.start_date, p.end_date),
