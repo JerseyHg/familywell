@@ -336,15 +336,22 @@ Page({
     var self = this;
     var id = e.currentTarget.dataset.id;
     if (!id) return;
-    var suggestion = self.data.medSuggestions.find(function (s) { return s.id === id; });
-    var name = suggestion ? suggestion.name : '该药物';
+    var name = '该药物';
+    var suggestions = self.data.medSuggestions || [];
+    for (var i = 0; i < suggestions.length; i++) {
+      if (suggestions[i].id === id) { name = suggestions[i].name; break; }
+    }
     wx.showModal({
       title: '确认添加',
       content: '确认将「' + name + '」添加到用药管理？',
       success: function (res) {
         if (!res.confirm) return;
         api_1.medsApi.confirmSuggestion(id, {}).then(function () {
-          self.setData({ medSuggestions: self.data.medSuggestions.filter(function (s) { return s.id !== id; }) });
+          var remaining = [];
+          for (var j = 0; j < self.data.medSuggestions.length; j++) {
+            if (self.data.medSuggestions[j].id !== id) remaining.push(self.data.medSuggestions[j]);
+          }
+          self.setData({ medSuggestions: remaining });
           cache_1.invalidation.onMedicationChange();
           wx.showToast({ title: '已添加', icon: 'success' });
         }).catch(function () {
@@ -359,7 +366,11 @@ Page({
     var id = e.currentTarget.dataset.id;
     if (!id) return;
     api_1.medsApi.dismissSuggestion(id).then(function () {
-      self.setData({ medSuggestions: self.data.medSuggestions.filter(function (s) { return s.id !== id; }) });
+      var remaining = [];
+      for (var j = 0; j < self.data.medSuggestions.length; j++) {
+        if (self.data.medSuggestions[j].id !== id) remaining.push(self.data.medSuggestions[j]);
+      }
+      self.setData({ medSuggestions: remaining });
       cache_1.invalidation.onMedicationChange();
       wx.showToast({ title: '已忽略', icon: 'none' });
     }).catch(function () {
