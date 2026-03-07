@@ -145,6 +145,193 @@ page { background: var(--bg, #F4F1EB); }
 .tip-icon { font-size: 28rpx; flex-shrink: 0; }
 .tip-text { font-size: 26rpx; color: var(--text2); line-height: 1.5; }
 
+/* ══════════════════════════════════════
+   ★ 首页仪表盘
+   ══════════════════════════════════════ */
+
+/* ── 紧急提醒横幅 ── */
+.dash-alert-card {
+  display: flex; align-items: center; gap: 16rpx;
+  background: #fff; border-radius: 16rpx; padding: 24rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+  margin-bottom: 12rpx;
+  border-left: 6rpx solid #F5A623;
+}
+.dash-alert-card.urgent {
+  border-left-color: #E55B5B;
+  background: #FFF8F6;
+}
+.dash-alert-icon-wrap {
+  width: 56rpx; height: 56rpx; border-radius: 14rpx;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.dash-alert-icon-wrap.med { background: rgba(155,89,182,0.1); }
+.dash-alert-icon-wrap.ins { background: rgba(45,139,111,0.1); }
+.dash-alert-icon-wrap.check { background: rgba(91,155,213,0.1); }
+.dash-alert-icon { font-size: 28rpx; }
+.dash-alert-body { flex: 1; display: flex; flex-direction: column; gap: 4rpx; }
+.dash-alert-title { font-size: 28rpx; font-weight: 600; color: var(--text, #2C2820); }
+.dash-alert-desc { font-size: 22rpx; color: var(--text2, #8B8680); }
+.dash-alert-badge {
+  font-size: 20rpx; color: #E55B5B; background: #FEE;
+  padding: 4rpx 14rpx; border-radius: 16rpx; flex-shrink: 0;
+  font-weight: 600;
+}
+
+/* ── 健康指标仪表盘 ── */
+.dash-ind-grid {
+  display: flex; flex-wrap: wrap; gap: 16rpx;
+}
+.dash-ind-card {
+  flex: 1; min-width: calc(50% - 8rpx);
+  background: #fff; border-radius: 16rpx; padding: 24rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+  display: flex; flex-direction: column; position: relative;
+  border: 2rpx solid transparent;
+}
+.dash-ind-card.danger {
+  background: rgba(229,91,91,0.04);
+  border-color: rgba(229,91,91,0.15);
+}
+.dash-ind-card.warning {
+  background: rgba(245,166,35,0.04);
+  border-color: rgba(245,166,35,0.15);
+}
+.dash-ind-card.normal {
+  background: rgba(45,139,111,0.04);
+  border-color: rgba(45,139,111,0.1);
+}
+.dash-ind-dot {
+  position: absolute; top: 16rpx; right: 16rpx;
+  width: 14rpx; height: 14rpx; border-radius: 50%;
+}
+.dash-ind-dot.danger { background: #E55B5B; }
+.dash-ind-dot.warning { background: #F5A623; }
+.dash-ind-dot.normal { background: #2D8B6F; }
+.dash-ind-val {
+  font-size: 44rpx; font-weight: 700; line-height: 1.2;
+}
+.dash-ind-unit {
+  font-size: 22rpx; color: var(--text2, #8B8680); margin-top: 2rpx;
+}
+.dash-ind-label {
+  font-size: 24rpx; color: var(--text2, #8B8680); margin-top: 8rpx;
+  font-weight: 500;
+}
+
+/* ── 用药依从性环形图 ── */
+.dash-adh-card {
+  background: #fff; border-radius: 16rpx; padding: 28rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+}
+.dash-adh-top {
+  display: flex; align-items: center; gap: 32rpx;
+}
+.dash-adh-ring {
+  width: 160rpx; height: 160rpx; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.dash-adh-ring-hole {
+  width: 110rpx; height: 110rpx; border-radius: 50%;
+  background: #fff;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.dash-adh-pct {
+  font-size: 36rpx; font-weight: 700; color: var(--text, #2C2820);
+  line-height: 1.2;
+}
+.dash-adh-sub {
+  font-size: 20rpx; color: var(--text2, #8B8680);
+}
+.dash-adh-summary {
+  display: flex; flex-direction: column; gap: 12rpx;
+}
+.dash-adh-stat {
+  font-size: 28rpx; color: var(--text, #2C2820); font-weight: 500;
+}
+.dash-adh-badge {
+  display: inline-flex; padding: 6rpx 20rpx; border-radius: 20rpx;
+  font-size: 22rpx; font-weight: 600; align-self: flex-start;
+}
+.dash-adh-badge.good { background: rgba(45,139,111,0.1); color: #2D8B6F; }
+.dash-adh-badge.warn { background: rgba(245,166,35,0.1); color: #F5A623; }
+
+.dash-adh-meds {
+  margin-top: 24rpx; padding-top: 20rpx;
+  border-top: 1rpx solid var(--border, #E8E4DD);
+  display: flex; flex-direction: column; gap: 16rpx;
+}
+.dash-adh-med-item {
+  display: flex; flex-direction: column; gap: 8rpx;
+}
+.dash-adh-med-name {
+  font-size: 24rpx; color: var(--text, #2C2820); font-weight: 500;
+}
+.dash-adh-med-bar-wrap {
+  display: flex; align-items: center; gap: 12rpx;
+}
+.dash-adh-med-bar-bg {
+  flex: 1; height: 16rpx; background: var(--bg, #F4F1EB);
+  border-radius: 8rpx; overflow: hidden;
+}
+.dash-adh-med-bar-fill {
+  height: 100%; border-radius: 8rpx;
+  transition: width 0.8s ease;
+}
+.dash-adh-med-pct {
+  font-size: 22rpx; color: var(--text2, #8B8680); min-width: 60rpx;
+  text-align: right;
+}
+
+/* ── 营养摄入饼图 ── */
+.dash-nutri-card {
+  background: #fff; border-radius: 16rpx; padding: 28rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+}
+.dash-nutri-visual {
+  display: flex; align-items: center; gap: 32rpx;
+}
+.dash-nutri-pie {
+  width: 160rpx; height: 160rpx; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.dash-nutri-pie-hole {
+  width: 100rpx; height: 100rpx; border-radius: 50%;
+  background: #fff;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.dash-nutri-cal-val {
+  font-size: 28rpx; font-weight: 700; color: var(--text, #2C2820);
+  line-height: 1.2;
+}
+.dash-nutri-cal-unit {
+  font-size: 18rpx; color: var(--text2, #8B8680);
+}
+.dash-nutri-legend {
+  flex: 1; display: flex; flex-direction: column; gap: 16rpx;
+}
+.dash-nutri-legend-row {
+  display: flex; align-items: center; gap: 10rpx;
+}
+.dash-nutri-legend-dot {
+  width: 16rpx; height: 16rpx; border-radius: 4rpx; flex-shrink: 0;
+}
+.dash-nutri-legend-name {
+  font-size: 26rpx; color: var(--text, #2C2820); flex: 1;
+}
+.dash-nutri-legend-val {
+  font-size: 26rpx; color: var(--text2, #8B8680); font-weight: 500;
+}
+.dash-nutri-footer {
+  display: block; text-align: center; margin-top: 16rpx;
+  font-size: 22rpx; color: var(--text2, #8B8680);
+}
+
 /* ── Med Suggestions ── */
 .med-sug-card {
   background: #fff; border-radius: 16rpx; padding: 24rpx;

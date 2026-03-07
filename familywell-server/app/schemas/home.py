@@ -9,3 +9,4 @@ class HomeResponse(BaseModel):
     recent_activity: list[dict]        # 最近 2-3 条动态
     alert_count: int                   # 未解决提醒数（红点用）
     medication_suggestions: list[dict] # 待确认的药物建议
+    dashboard: dict | None = None      # 首页仪表盘数据（指标/用药/营养/提醒）
