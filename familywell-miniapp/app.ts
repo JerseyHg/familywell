@@ -6,8 +6,7 @@ App<IAppOption>({
   },
 
   onLaunch() {
-    // 临时开启调试
-    wx.setEnableDebug({ enableDebug: true })
+    wx.setEnableDebug({ enableDebug: false })
 
     const token = wx.getStorageSync('token')
     if (token) {
