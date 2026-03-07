@@ -91,88 +91,42 @@
   </view>
 </view>
 
-<!-- ── ❤️ 健康指标仪表盘 ── -->
-<view class="section" wx:if="{{isLoggedIn && dashIndicators.length > 0}}">
-  <view class="section-header">
-    <text class="section-title">❤️ 健康指标</text>
-  </view>
-  <view class="dash-ind-grid">
-    <view class="dash-ind-card {{item.status}}" wx:for="{{dashIndicators}}" wx:key="label">
-      <view class="dash-ind-dot {{item.status}}" />
-      <text class="dash-ind-val" style="color: {{item.status === 'danger' ? '#E55B5B' : item.status === 'warning' ? '#F5A623' : '#2D8B6F'}};">{{item.value}}</text>
-      <text class="dash-ind-unit">{{item.unit}}</text>
-      <text class="dash-ind-label">{{item.label}}</text>
-    </view>
-  </view>
-</view>
+<!-- ── 三合一仪表盘卡片行 ── -->
+<view class="dash-row" wx:if="{{isLoggedIn && (dashIndicators.length > 0 || dashMedAdherence || dashNutrition)}}">
 
-<!-- ── 💊 本周用药依从性 ── -->
-<view class="section" wx:if="{{isLoggedIn && dashMedAdherence}}">
-  <view class="section-header">
-    <text class="section-title">💊 本周用药</text>
-  </view>
-  <view class="dash-adh-card">
-    <view class="dash-adh-top">
-      <view class="dash-adh-ring" style="background: conic-gradient({{dashMedAdherence.rate >= 80 ? '#2D8B6F' : '#F5A623'}} 0% {{dashMedAdherence.rate}}%, var(--border, #E8E4DD) {{dashMedAdherence.rate}}% 100%);">
-        <view class="dash-adh-ring-hole">
-          <text class="dash-adh-pct">{{dashMedAdherence.rate}}%</text>
-          <text class="dash-adh-sub">完成率</text>
-        </view>
-      </view>
-      <view class="dash-adh-summary">
-        <text class="dash-adh-stat">已完成 {{dashMedAdherence.done}}/{{dashMedAdherence.total}} 次</text>
-        <view class="dash-adh-badge {{dashMedAdherence.rate >= 80 ? 'good' : 'warn'}}">
-          <text>{{dashMedAdherence.rate >= 90 ? '优秀' : dashMedAdherence.rate >= 80 ? '良好' : '待改善'}}</text>
-        </view>
-      </view>
+  <!-- ❤️ 健康指标 -->
+  <view class="dash-mini-card" wx:if="{{dashIndicators.length > 0}}">
+    <text class="dash-mini-title">❤️ 指标</text>
+    <view class="dash-mini-ind" wx:for="{{dashIndicators}}" wx:key="label" wx:if="{{index < 3}}">
+      <view class="dash-mini-ind-dot {{item.status}}" />
+      <text class="dash-mini-ind-label">{{item.label}}</text>
+      <text class="dash-mini-ind-val" style="color: {{item.status === 'danger' ? '#E55B5B' : item.status === 'warning' ? '#F5A623' : '#2D8B6F'}};">{{item.value}}</text>
     </view>
-    <view class="dash-adh-meds" wx:if="{{dashMedAdherence.medications.length > 0}}">
-      <view class="dash-adh-med-item" wx:for="{{dashMedAdherence.medications}}" wx:key="name">
-        <text class="dash-adh-med-name">{{item.name}}</text>
-        <view class="dash-adh-med-bar-wrap">
-          <view class="dash-adh-med-bar-bg">
-            <view class="dash-adh-med-bar-fill" style="width: {{item.pct}}%; background: linear-gradient(90deg, {{item.pct >= 80 ? '#2D8B6F' : '#F5A623'}}, {{item.pct >= 80 ? '#4DB892' : '#F7C948'}});" />
-          </view>
-          <text class="dash-adh-med-pct">{{item.pct}}%</text>
-        </view>
-      </view>
-    </view>
+    <text class="dash-mini-more" wx:if="{{dashIndicators.length > 3}}">+{{dashIndicators.length - 3}}项</text>
   </view>
-</view>
 
-<!-- ── 🍽️ 近7日营养摄入 ── -->
-<view class="section" wx:if="{{isLoggedIn && dashNutrition}}">
-  <view class="section-header">
-    <text class="section-title">🍽️ 近7日营养</text>
-  </view>
-  <view class="dash-nutri-card">
-    <view class="dash-nutri-visual">
-      <view class="dash-nutri-pie" style="background: conic-gradient({{dashNutrition.conicGradient}});">
-        <view class="dash-nutri-pie-hole">
-          <text class="dash-nutri-cal-val">{{dashNutrition.avgCalories}}</text>
-          <text class="dash-nutri-cal-unit">kcal/日</text>
-        </view>
-      </view>
-      <view class="dash-nutri-legend">
-        <view class="dash-nutri-legend-row">
-          <view class="dash-nutri-legend-dot" style="background: #2D8B6F;" />
-          <text class="dash-nutri-legend-name">蛋白质</text>
-          <text class="dash-nutri-legend-val">{{dashNutrition.protein}}g</text>
-        </view>
-        <view class="dash-nutri-legend-row">
-          <view class="dash-nutri-legend-dot" style="background: #F5A623;" />
-          <text class="dash-nutri-legend-name">脂肪</text>
-          <text class="dash-nutri-legend-val">{{dashNutrition.fat}}g</text>
-        </view>
-        <view class="dash-nutri-legend-row">
-          <view class="dash-nutri-legend-dot" style="background: #E85D3A;" />
-          <text class="dash-nutri-legend-name">碳水</text>
-          <text class="dash-nutri-legend-val">{{dashNutrition.carb}}g</text>
-        </view>
+  <!-- 💊 用药依从性 -->
+  <view class="dash-mini-card" wx:if="{{dashMedAdherence}}">
+    <text class="dash-mini-title">💊 用药</text>
+    <view class="dash-mini-ring" style="background: conic-gradient({{dashMedAdherence.rate >= 80 ? '#2D8B6F' : '#F5A623'}} 0% {{dashMedAdherence.rate}}%, var(--border, #E8E4DD) {{dashMedAdherence.rate}}% 100%);">
+      <view class="dash-mini-ring-hole">
+        <text class="dash-mini-ring-pct">{{dashMedAdherence.rate}}%</text>
       </view>
     </view>
-    <text class="dash-nutri-footer">{{dashNutrition.days}}天共{{dashNutrition.totalCalories}}kcal</text>
+    <text class="dash-mini-sub">{{dashMedAdherence.done}}/{{dashMedAdherence.total}}次</text>
   </view>
+
+  <!-- 🍽️ 营养摄入 -->
+  <view class="dash-mini-card" wx:if="{{dashNutrition}}">
+    <text class="dash-mini-title">🍽️ 营养</text>
+    <view class="dash-mini-pie" style="background: conic-gradient({{dashNutrition.conicGradient}});">
+      <view class="dash-mini-pie-hole">
+        <text class="dash-mini-pie-val">{{dashNutrition.avgCalories}}</text>
+      </view>
+    </view>
+    <text class="dash-mini-sub">kcal/日</text>
+  </view>
+
 </view>
 
 <!-- ── 药物建议 ── -->

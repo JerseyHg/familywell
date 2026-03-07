@@ -179,157 +179,66 @@ page { background: var(--bg, #F4F1EB); }
   font-weight: 600;
 }
 
-/* ── 健康指标仪表盘 ── */
-.dash-ind-grid {
-  display: flex; flex-wrap: wrap; gap: 16rpx;
+/* ── 三合一仪表盘行 ── */
+.dash-row {
+  display: flex; gap: 16rpx;
+  padding: 0 32rpx; margin-bottom: 24rpx;
 }
-.dash-ind-card {
-  flex: 1; min-width: calc(50% - 8rpx);
-  background: #fff; border-radius: 16rpx; padding: 24rpx;
+.dash-mini-card {
+  flex: 1;
+  background: #fff; border-radius: 16rpx; padding: 20rpx 16rpx;
   box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
-  display: flex; flex-direction: column; position: relative;
-  border: 2rpx solid transparent;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 12rpx;
 }
-.dash-ind-card.danger {
-  background: rgba(229,91,91,0.04);
-  border-color: rgba(229,91,91,0.15);
-}
-.dash-ind-card.warning {
-  background: rgba(245,166,35,0.04);
-  border-color: rgba(245,166,35,0.15);
-}
-.dash-ind-card.normal {
-  background: rgba(45,139,111,0.04);
-  border-color: rgba(45,139,111,0.1);
-}
-.dash-ind-dot {
-  position: absolute; top: 16rpx; right: 16rpx;
-  width: 14rpx; height: 14rpx; border-radius: 50%;
-}
-.dash-ind-dot.danger { background: #E55B5B; }
-.dash-ind-dot.warning { background: #F5A623; }
-.dash-ind-dot.normal { background: #2D8B6F; }
-.dash-ind-val {
-  font-size: 44rpx; font-weight: 700; line-height: 1.2;
-}
-.dash-ind-unit {
-  font-size: 22rpx; color: var(--text2, #8B8680); margin-top: 2rpx;
-}
-.dash-ind-label {
-  font-size: 24rpx; color: var(--text2, #8B8680); margin-top: 8rpx;
-  font-weight: 500;
+.dash-mini-title {
+  font-size: 22rpx; font-weight: 600; color: var(--text2, #8B8680);
 }
 
-/* ── 用药依从性环形图 ── */
-.dash-adh-card {
-  background: #fff; border-radius: 16rpx; padding: 28rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+/* 指标迷你列表 */
+.dash-mini-ind {
+  display: flex; align-items: center; gap: 6rpx; width: 100%;
 }
-.dash-adh-top {
-  display: flex; align-items: center; gap: 32rpx;
+.dash-mini-ind-dot {
+  width: 10rpx; height: 10rpx; border-radius: 50%; flex-shrink: 0;
 }
-.dash-adh-ring {
-  width: 160rpx; height: 160rpx; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+.dash-mini-ind-dot.danger { background: #E55B5B; }
+.dash-mini-ind-dot.warning { background: #F5A623; }
+.dash-mini-ind-dot.normal { background: #2D8B6F; }
+.dash-mini-ind-label {
+  font-size: 20rpx; color: var(--text2, #8B8680); flex: 1;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
-.dash-adh-ring-hole {
-  width: 110rpx; height: 110rpx; border-radius: 50%;
-  background: #fff;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
+.dash-mini-ind-val {
+  font-size: 26rpx; font-weight: 700; flex-shrink: 0;
 }
-.dash-adh-pct {
-  font-size: 36rpx; font-weight: 700; color: var(--text, #2C2820);
-  line-height: 1.2;
-}
-.dash-adh-sub {
+.dash-mini-more {
   font-size: 20rpx; color: var(--text2, #8B8680);
 }
-.dash-adh-summary {
-  display: flex; flex-direction: column; gap: 12rpx;
-}
-.dash-adh-stat {
-  font-size: 28rpx; color: var(--text, #2C2820); font-weight: 500;
-}
-.dash-adh-badge {
-  display: inline-flex; padding: 6rpx 20rpx; border-radius: 20rpx;
-  font-size: 22rpx; font-weight: 600; align-self: flex-start;
-}
-.dash-adh-badge.good { background: rgba(45,139,111,0.1); color: #2D8B6F; }
-.dash-adh-badge.warn { background: rgba(245,166,35,0.1); color: #F5A623; }
 
-.dash-adh-meds {
-  margin-top: 24rpx; padding-top: 20rpx;
-  border-top: 1rpx solid var(--border, #E8E4DD);
-  display: flex; flex-direction: column; gap: 16rpx;
-}
-.dash-adh-med-item {
-  display: flex; flex-direction: column; gap: 8rpx;
-}
-.dash-adh-med-name {
-  font-size: 24rpx; color: var(--text, #2C2820); font-weight: 500;
-}
-.dash-adh-med-bar-wrap {
-  display: flex; align-items: center; gap: 12rpx;
-}
-.dash-adh-med-bar-bg {
-  flex: 1; height: 16rpx; background: var(--bg, #F4F1EB);
-  border-radius: 8rpx; overflow: hidden;
-}
-.dash-adh-med-bar-fill {
-  height: 100%; border-radius: 8rpx;
-  transition: width 0.8s ease;
-}
-.dash-adh-med-pct {
-  font-size: 22rpx; color: var(--text2, #8B8680); min-width: 60rpx;
-  text-align: right;
-}
-
-/* ── 营养摄入饼图 ── */
-.dash-nutri-card {
-  background: #fff; border-radius: 16rpx; padding: 28rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
-}
-.dash-nutri-visual {
-  display: flex; align-items: center; gap: 32rpx;
-}
-.dash-nutri-pie {
-  width: 160rpx; height: 160rpx; border-radius: 50%;
+/* 迷你环形/饼图 */
+.dash-mini-ring, .dash-mini-pie {
+  width: 110rpx; height: 110rpx; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
 }
-.dash-nutri-pie-hole {
-  width: 100rpx; height: 100rpx; border-radius: 50%;
+.dash-mini-ring-hole {
+  width: 76rpx; height: 76rpx; border-radius: 50%;
   background: #fff;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
+  display: flex; align-items: center; justify-content: center;
 }
-.dash-nutri-cal-val {
-  font-size: 28rpx; font-weight: 700; color: var(--text, #2C2820);
-  line-height: 1.2;
+.dash-mini-ring-pct {
+  font-size: 26rpx; font-weight: 700; color: var(--text, #2C2820);
 }
-.dash-nutri-cal-unit {
-  font-size: 18rpx; color: var(--text2, #8B8680);
+.dash-mini-pie-hole {
+  width: 70rpx; height: 70rpx; border-radius: 50%;
+  background: #fff;
+  display: flex; align-items: center; justify-content: center;
 }
-.dash-nutri-legend {
-  flex: 1; display: flex; flex-direction: column; gap: 16rpx;
+.dash-mini-pie-val {
+  font-size: 22rpx; font-weight: 700; color: var(--text, #2C2820);
 }
-.dash-nutri-legend-row {
-  display: flex; align-items: center; gap: 10rpx;
-}
-.dash-nutri-legend-dot {
-  width: 16rpx; height: 16rpx; border-radius: 4rpx; flex-shrink: 0;
-}
-.dash-nutri-legend-name {
-  font-size: 26rpx; color: var(--text, #2C2820); flex: 1;
-}
-.dash-nutri-legend-val {
-  font-size: 26rpx; color: var(--text2, #8B8680); font-weight: 500;
-}
-.dash-nutri-footer {
-  display: block; text-align: center; margin-top: 16rpx;
-  font-size: 22rpx; color: var(--text2, #8B8680);
+.dash-mini-sub {
+  font-size: 20rpx; color: var(--text2, #8B8680); margin-top: -4rpx;
 }
 
 /* ── Med Suggestions ── */
