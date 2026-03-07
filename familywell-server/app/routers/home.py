@@ -3,14 +3,16 @@ app/routers/home.py — 首页聚合接口
 ──────────────────────────────────
 ★ 修复：nickname 优先使用 profile.real_name
 ★ 新增：返回 medication_suggestions（待确认药物建议）
+★ 优化：AI tip 与 DB 查询并行执行，避免 LLM 调用阻塞首页渲染
 """
+import asyncio
 from datetime import date
 from fastapi import APIRouter, Depends
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.database import get_db
+from app.database import get_db, async_session
 from app.models.user import User, UserProfile
 from app.models.record import Record
 from app.models.medication import MedicationTask, MedicationSuggestion
@@ -29,6 +31,20 @@ async def get_home_data(
 ):
     """Simplified homepage data for v2 chat-centric design."""
     today = date.today()
+
+    # ── AI tip 使用独立 session，与下方 DB 查询并行执行 ──
+    # quick_health_summary 包含 embedding 搜索 + LLM 调用（1-3s），
+    # 用独立 session 让它不阻塞其他快速 DB 查询
+    async def _fetch_ai_tip() -> str | None:
+        async with async_session() as tip_db:
+            try:
+                return await rag_service.quick_health_summary(tip_db, user.id)
+            except Exception:
+                return None
+
+    ai_tip_task = asyncio.create_task(_fetch_ai_tip())
+
+    # ── 以下 DB 查询在同一 session 上顺序执行（均为索引查询，总计 ~10-20ms）──
 
     # 1. Profile summary — 优先使用 real_name
     profile_result = await db.execute(
@@ -72,13 +88,7 @@ async def get_home_data(
         "time": t.scheduled_time.strftime("%H:%M"),
     } for t in tasks]
 
-    # 3. AI proactive tip
-    try:
-        ai_tip = await rag_service.quick_health_summary(db, user.id)
-    except Exception:
-        ai_tip = None
-
-    # 4. Recent activity (last 5 records)
+    # 3. Recent activity (last 5 records)
     records_result = await db.execute(
         select(Record)
         .where(
@@ -102,14 +112,14 @@ async def get_home_data(
         "ai_status": r.ai_status,
     } for r in records]
 
-    # 5. Unresolved alert count
+    # 4. Unresolved alert count
     alert_result = await db.execute(
         select(func.count(Reminder.id))
         .where(Reminder.user_id == user.id, Reminder.is_resolved == False)
     )
     alert_count = alert_result.scalar() or 0
 
-    # 6. 待确认药物建议
+    # 5. 待确认药物建议
     suggestions_result = await db.execute(
         select(MedicationSuggestion)
         .where(
@@ -128,6 +138,9 @@ async def get_home_data(
         "frequency": s.frequency,
         "created_at": s.created_at.strftime("%m/%d") if s.created_at else None,
     } for s in suggestions]
+
+    # ── 等待 AI tip 完成（此时 DB 查询已全部结束）──
+    ai_tip = await ai_tip_task
 
     return HomeResponse(
         profile=profile_data,

@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import BigInteger, String, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import BigInteger, String, DateTime, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -20,7 +20,10 @@ class Family(Base):
 
 class FamilyMember(Base):
     __tablename__ = "family_member"
-    __table_args__ = (UniqueConstraint("family_id", "user_id"),)
+    __table_args__ = (
+        UniqueConstraint("family_id", "user_id"),
+        Index("idx_fm_user", "user_id"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     family_id: Mapped[int] = mapped_column(
