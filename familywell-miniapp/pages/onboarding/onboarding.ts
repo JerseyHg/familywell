@@ -1,4 +1,5 @@
 import { profileApi, medsApi } from '../../services/api'
+import { getCached, CACHE_KEYS } from '../../services/cache'
 
 const DEFAULT_TIMES: Record<number, string[]> = {
   1: ['08:00'],
@@ -77,10 +78,10 @@ Page({
     }
   },
 
-  /** 编辑模式下加载现有资料 */
+  /** 编辑模式下加载现有资料（优先用缓存，避免重复请求） */
   async loadExistingProfile() {
     try {
-      const p: any = await profileApi.get()
+      const p: any = getCached(CACHE_KEYS.PROFILE) || await profileApi.get()
       if (!p) return
 
       const medHistory = p.medical_history || []
