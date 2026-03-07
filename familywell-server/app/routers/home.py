@@ -100,7 +100,7 @@ async def _build_dashboard(
     adh_result = await db.execute(
         select(
             func.count(MedicationTask.id).label("total"),
-            func.sum(case((MedicationTask.status == "done", 1), else_=0)).label("done"),
+            func.sum(case((MedicationTask.status.in_(["done", "completed"]), 1), else_=0)).label("done"),
         )
         .where(
             MedicationTask.user_id == user_id,
@@ -120,7 +120,7 @@ async def _build_dashboard(
                 Medication.name,
                 Medication.dosage,
                 func.count(MedicationTask.id).label("total"),
-                func.sum(case((MedicationTask.status == "done", 1), else_=0)).label("done"),
+                func.sum(case((MedicationTask.status.in_(["done", "completed"]), 1), else_=0)).label("done"),
             )
             .join(MedicationTask, MedicationTask.medication_id == Medication.id)
             .where(
