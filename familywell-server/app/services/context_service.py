@@ -262,7 +262,13 @@ async def get_realtime_context(db: AsyncSession, user_id: int) -> str:
     if meals:
         meal_items = []
         for m in meals:
-            items_str = "、".join(m.food_items) if m.food_items else "未知食物"
+            if m.food_items:
+                items_str = "、".join(
+                    item.get("name", str(item)) if isinstance(item, dict) else str(item)
+                    for item in m.food_items
+                )
+            else:
+                items_str = "未知食物"
             cal_str = f"，约{m.calories}千卡" if m.calories else ""
             meal_items.append(f"{m.meal_type or ''}：{items_str}{cal_str}")
         parts.append(f"【今日饮食】{'；'.join(meal_items)}")

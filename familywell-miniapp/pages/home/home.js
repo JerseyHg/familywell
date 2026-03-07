@@ -333,18 +333,33 @@ Page({
   // ════════════════════════════════════════
 
   onConfirmSuggestion: function (e) {
-    var item = e.currentTarget.dataset.item || { id: e.currentTarget.dataset.id };
-    if (!item || !item.id) return;
-    wx.navigateTo({ url: '/pages/confirm-med/confirm-med?id=' + item.id + '&name=' + encodeURIComponent(item.name || '') });
+    var self = this;
+    var id = e.currentTarget.dataset.id;
+    if (!id) return;
+    var suggestion = self.data.medSuggestions.find(function (s) { return s.id === id; });
+    var name = suggestion ? suggestion.name : '该药物';
+    wx.showModal({
+      title: '确认添加',
+      content: '确认将「' + name + '」添加到用药管理？',
+      success: function (res) {
+        if (!res.confirm) return;
+        api_1.medsApi.confirmSuggestion(id, {}).then(function () {
+          self.setData({ medSuggestions: self.data.medSuggestions.filter(function (s) { return s.id !== id; }) });
+          cache_1.invalidation.onMedicationChange();
+          wx.showToast({ title: '已添加', icon: 'success' });
+        }).catch(function () {
+          wx.showToast({ title: '添加失败', icon: 'none' });
+        });
+      }
+    });
   },
 
   onDismissSuggestion: function (e) {
     var self = this;
-    var item = e.currentTarget.dataset.item || { id: e.currentTarget.dataset.id };
-    if (!item || !item.id) return;
-    api_1.medsApi.dismissSuggestion(item.id).then(function () {
-      self.setData({ medSuggestions: self.data.medSuggestions.filter(function (s) { return s.id !== item.id; }) });
-      // ★ 忽略建议后失效 home 缓存
+    var id = e.currentTarget.dataset.id;
+    if (!id) return;
+    api_1.medsApi.dismissSuggestion(id).then(function () {
+      self.setData({ medSuggestions: self.data.medSuggestions.filter(function (s) { return s.id !== id; }) });
       cache_1.invalidation.onMedicationChange();
       wx.showToast({ title: '已忽略', icon: 'none' });
     }).catch(function () {

@@ -78,7 +78,7 @@
   <view class="med-sug-card" wx:for="{{medSuggestions}}" wx:key="id">
     <view class="sug-info">
       <text class="sug-name">{{item.name}}</text>
-      <text class="sug-detail">{{item.dosage}} · {{item.reason}}</text>
+      <text class="sug-detail" wx:if="{{item.dosage || item.frequency}}">{{item.dosage}}{{item.dosage && item.frequency ? ' · ' : ''}}{{item.frequency}}</text>
     </view>
     <view class="sug-actions">
       <view class="sug-confirm" data-id="{{item.id}}" bindtap="onConfirmSuggestion">确认添加</view>
