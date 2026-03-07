@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 var api_1 = require("../../services/api");
 var upload_1 = require("../../services/upload");
+var cache_1 = require("../../services/cache");
 
 Page({
   data: {
@@ -33,8 +34,8 @@ Page({
   _recordStartTime: 0,
   _pendingStop: false,
   _recorderBusy: false,
-  _startSafetyTimer: null,   // ★ [Fix-3] 新增：recorder.start 安全超时
-  _stopSafetyTimer: null,    // ★ [Fix-3] 新增：recorder.stop 安全超时
+  _startSafetyTimer: null,
+  _stopSafetyTimer: null,
 
   // ════════════════════════════════════════
   //  生命周期
@@ -55,17 +56,31 @@ Page({
     var user = wx.getStorageSync('user');
     var isLoggedIn = !!token;
 
+    // ★ 立即用缓存的 profile 数据显示（避免闪烁）
+    var cachedProfile = cache_1.getCached(cache_1.CACHE_KEYS.PROFILE);
+    var displayName = '';
+    if (cachedProfile && (cachedProfile.real_name || cachedProfile.nickname)) {
+      displayName = cachedProfile.real_name || cachedProfile.nickname;
+    } else if (user && user.nickname) {
+      displayName = user.nickname;
+    }
+
     this.setData({
       isLoggedIn: isLoggedIn,
-      avatarText: (user && user.nickname) ? user.nickname.slice(0, 1) : '👤',
-      'profile.nickname': (user && user.nickname) ? user.nickname : '',
+      avatarText: displayName ? displayName.slice(0, 1) : '👤',
+      'profile.nickname': displayName,
     });
+
+    // ★ 立即用缓存的 home 数据渲染（stale-while-revalidate 的 "stale" 部分）
+    var cachedHome = cache_1.getCached(cache_1.CACHE_KEYS.HOME_DATA);
+    if (cachedHome && isLoggedIn) {
+      this._applyHomeData(cachedHome, cachedProfile);
+    }
 
     var tabBar = this.getTabBar();
     if (tabBar) tabBar.setData({ active: 0 });
 
     if (isLoggedIn) {
-      this.checkOnboarding();
       this.loadHomeData();
     }
   },
@@ -73,7 +88,7 @@ Page({
   onPullDownRefresh: function () {
     var self = this;
     if (this.data.isLoggedIn) {
-      this.loadHomeData()
+      this.loadHomeData(true)
         .then(function () { wx.stopPullDownRefresh(); })
         .catch(function () { wx.stopPullDownRefresh(); });
     } else {
@@ -117,56 +132,107 @@ Page({
   //  数据加载
   // ════════════════════════════════════════
 
-  checkOnboarding: function () {
-    api_1.profileApi.get().then(function (profile) {
-      if (profile && !profile.onboarding_completed) {
-        wx.redirectTo({ url: '/pages/onboarding/onboarding' });
-      }
-    }).catch(function () {});
-  },
-
-  loadHomeData: function () {
+  /**
+   * ★ 优化：合并 checkOnboarding + loadHomeData
+   * - 使用 swr 缓存，避免重复请求
+   * - profile 只请求一次，同时用于 onboarding 检查和数据展示
+   * - forceRefresh 用于下拉刷新
+   */
+  loadHomeData: function (forceReload) {
     var self = this;
-    return Promise.all([
-      api_1.homeApi.getData(),
-      api_1.profileApi.get(),
-    ]).then(function (results) {
+
+    // 选择 swr（带缓存）还是 forceRefresh（强制刷新）
+    var fetchProfile = forceReload
+      ? cache_1.forceRefresh(cache_1.CACHE_KEYS.PROFILE, function () { return api_1.profileApi.get(); })
+      : cache_1.swr(cache_1.CACHE_KEYS.PROFILE, function () { return api_1.profileApi.get(); },
+          function (freshProfile) { self._applyProfileData(freshProfile); });
+
+    var fetchHome = forceReload
+      ? cache_1.forceRefresh(cache_1.CACHE_KEYS.HOME_DATA, function () { return api_1.homeApi.getData(); })
+      : cache_1.swr(cache_1.CACHE_KEYS.HOME_DATA, function () { return api_1.homeApi.getData(); },
+          function (freshHome) {
+            var profile = cache_1.getCached(cache_1.CACHE_KEYS.PROFILE);
+            self._applyHomeData(freshHome, profile);
+          });
+
+    return Promise.all([fetchHome, fetchProfile]).then(function (results) {
       var homeData = results[0] || {};
       var profileData = results[1] || {};
 
-      var profile = {
-        nickname: profileData.real_name || profileData.nickname || (wx.getStorageSync('user') || {}).nickname || '',
-        age: profileData.age,
-        tags: [],
-      };
+      // ★ onboarding 检查（复用同一个 profile 请求）
+      if (profileData && !profileData.onboarding_completed) {
+        wx.redirectTo({ url: '/pages/onboarding/onboarding' });
+        return;
+      }
+
+      self._applyHomeData(homeData, profileData);
+    }).catch(function (err) {
+      console.error('loadHomeData error:', err);
+    });
+  },
+
+  /**
+   * ★ 新增：将 profile 数据应用到页面
+   */
+  _applyProfileData: function (profileData) {
+    if (!profileData) return;
+    var profile = {
+      nickname: profileData.real_name || profileData.nickname || (wx.getStorageSync('user') || {}).nickname || '',
+      age: profileData.age,
+      tags: [],
+    };
+    if (profileData.blood_type) profile.tags.push(profileData.blood_type + '型血');
+    if (profileData.allergies && profileData.allergies.length) {
+      profile.tags.push('过敏: ' + profileData.allergies.join('、'));
+    }
+    this.setData({
+      profile: profile,
+      avatarText: profile.nickname ? profile.nickname.slice(0, 1) : '👤',
+    });
+  },
+
+  /**
+   * ★ 新增：将 home + profile 数据应用到页面
+   */
+  _applyHomeData: function (homeData, profileData) {
+    if (!homeData) return;
+    var self = this;
+
+    var profile = {
+      nickname: '',
+      age: null,
+      tags: [],
+    };
+
+    if (profileData) {
+      profile.nickname = profileData.real_name || profileData.nickname || (wx.getStorageSync('user') || {}).nickname || '';
+      profile.age = profileData.age;
       if (profileData.blood_type) profile.tags.push(profileData.blood_type + '型血');
       if (profileData.allergies && profileData.allergies.length) {
         profile.tags.push('过敏: ' + profileData.allergies.join('、'));
       }
+    }
 
-      var recentActivity = (homeData.recent_activity || []).map(function (r) {
-        return {
-          id: r.id,
-          category: r.category,
-          title: r.title || '未命名',
-          date: r.record_date ? self._formatLocalDate(r.record_date) : '',
-          ai_status: r.ai_status,
-        };
-      });
+    var recentActivity = (homeData.recent_activity || []).map(function (r) {
+      return {
+        id: r.id,
+        category: r.category,
+        title: r.title || '未命名',
+        date: r.record_date ? self._formatLocalDate(r.record_date) : '',
+        ai_status: r.ai_status,
+      };
+    });
 
-      self.setData({
-        profile: profile,
-        avatarText: profile.nickname ? profile.nickname.slice(0, 1) : '👤',
-        pendingTasks: (homeData.pending_tasks || []).map(function (t) {
-          return Object.assign({}, t, { completing: false });
-        }),
-        aiTip: homeData.ai_tip || '',
-        recentActivity: recentActivity.slice(0, 5),
-        alertCount: homeData.alert_count || 0,
-        medSuggestions: homeData.medication_suggestions || [],
-      });
-    }).catch(function (err) {
-      console.error('loadHomeData error:', err);
+    self.setData({
+      profile: profile,
+      avatarText: profile.nickname ? profile.nickname.slice(0, 1) : '👤',
+      pendingTasks: (homeData.pending_tasks || []).map(function (t) {
+        return Object.assign({}, t, { completing: false });
+      }),
+      aiTip: homeData.ai_tip || '',
+      recentActivity: recentActivity.slice(0, 5),
+      alertCount: homeData.alert_count || 0,
+      medSuggestions: homeData.medication_suggestions || [],
     });
   },
 
@@ -196,7 +262,9 @@ Page({
     if (!this._requireLogin()) return;
     (0, upload_1.batchUpload)({ maxCount: 9 })
       .then(function (result) {
-        (0, upload_1.pollBatchAIStatus)(result.recordIds, function () { self.loadHomeData(); });
+        // ★ 上传成功后失效相关缓存
+        cache_1.invalidation.onRecordChange();
+        (0, upload_1.pollBatchAIStatus)(result.recordIds, function () { self.loadHomeData(true); });
       })
       .catch(function () {});
   },
@@ -211,7 +279,9 @@ Page({
     }
     (0, upload_1.chooseAndUploadFile)({ maxCount: 5 })
         .then(function (result) {
-          (0, upload_1.pollBatchAIStatus)(result.recordIds, function () { self.loadHomeData(); });
+          // ★ 上传成功后失效相关缓存
+          cache_1.invalidation.onRecordChange();
+          (0, upload_1.pollBatchAIStatus)(result.recordIds, function () { self.loadHomeData(true); });
         })
         .catch(function (err) { console.error('[onFileUpload] error:', err); });
   },
@@ -244,6 +314,8 @@ Page({
     api_1.medsApi.completeTask(taskId).then(function () {
       var tasks = self.data.pendingTasks.filter(function (_, i) { return i !== idx; });
       self.setData({ pendingTasks: tasks });
+      // ★ 打卡后失效 home 缓存
+      cache_1.invalidation.onMedicationChange();
       wx.showToast({ title: '✅ 已打卡', icon: 'none' });
     }).catch(function () {
       self.setData({ ['pendingTasks[' + idx + '].completing']: false });
@@ -272,6 +344,8 @@ Page({
     if (!item || !item.id) return;
     api_1.medsApi.dismissSuggestion(item.id).then(function () {
       self.setData({ medSuggestions: self.data.medSuggestions.filter(function (s) { return s.id !== item.id; }) });
+      // ★ 忽略建议后失效 home 缓存
+      cache_1.invalidation.onMedicationChange();
       wx.showToast({ title: '已忽略', icon: 'none' });
     }).catch(function () {
       wx.showToast({ title: '操作失败', icon: 'none' });
@@ -289,7 +363,6 @@ Page({
 
   hideVoiceModal: function () {
     if (this.data.isRecording) { if (this._recorder) this._recorder.stop(); }
-    // ★ [Fix-3] 关闭弹窗时清理所有录音状态，防止残留锁
     clearTimeout(this._startSafetyTimer);
     clearTimeout(this._stopSafetyTimer);
     clearTimeout(this._stopFallbackTimer);
@@ -308,20 +381,17 @@ Page({
     this.setData({ voiceSegments: segs });
   },
 
-  // ── ★ 按住说话：立即开始 ──
   onRecordStart: function () {
     if (this.data.isRecording || this._recorderBusy) return;
     this._pendingStop = false;
     this._startRecording();
   },
 
-  // ── ★ 松开结束 — 增加安全超时 ──
   onRecordEnd: function () {
     if (this.data.isRecording) {
       this._recorderBusy = true;
       this._stopRecording();
 
-      // ★ [Fix-3] 安全超时：3秒后如果 onStop 还没回调，强制解锁
       var self = this;
       this._stopSafetyTimer = setTimeout(function () {
         if (self._recorderBusy) {
@@ -331,7 +401,6 @@ Page({
         }
       }, 3000);
     } else {
-      // recorder.start() 是异步的，onStart 还没回调
       this._pendingStop = true;
     }
   },
@@ -342,7 +411,7 @@ Page({
     var recorder = wx.getRecorderManager();
 
     recorder.onStart(function () {
-      clearTimeout(self._startSafetyTimer);  // ★ [Fix-3] 清除 start 安全超时
+      clearTimeout(self._startSafetyTimer);
       self._recorderBusy = false;
       self._recordStartTime = Date.now();
       self.setData({ isRecording: true, recordingDuration: 0 });
@@ -350,7 +419,6 @@ Page({
         self.setData({ recordingDuration: self.data.recordingDuration + 1 });
       }, 1000);
 
-      // ★ 用户在 onStart 前就松手了 → 立即停止
       if (self._pendingStop) {
         self._pendingStop = false;
         self._recorder.stop();
@@ -360,7 +428,7 @@ Page({
     recorder.onStop(function (res) {
       clearInterval(self._recordTimer);
       clearTimeout(self._stopFallbackTimer);
-      clearTimeout(self._stopSafetyTimer);  // ★ [Fix-3] 清除 stop 安全超时
+      clearTimeout(self._stopSafetyTimer);
       self._recorderBusy = false;
       var duration = Math.round((Date.now() - self._recordStartTime) / 1000);
       self.setData({ isRecording: false });
@@ -374,7 +442,6 @@ Page({
       }
     });
 
-    // ★ [Fix-3] onError 已有，确保所有 timer 都清理
     recorder.onError(function (err) {
       console.error('[Voice] recorder error:', err);
       clearInterval(self._recordTimer);
@@ -428,8 +495,6 @@ Page({
       duration: 60000,
     });
 
-    // ★ [Fix-3] 安全超时：3秒后如果 onStart 还没回调，解锁 busy
-    // 这是 issue 3 的核心修复：防止 _recorderBusy 永久卡住
     self._startSafetyTimer = setTimeout(function () {
       if (self._recorderBusy && !self.data.isRecording) {
         console.warn('[Home Voice] start safety timeout — force unlock');
@@ -481,7 +546,9 @@ Page({
           } else {
             wx.showToast({ title: '✅ 记录成功', icon: 'none' });
           }
-          self.loadHomeData();
+          // ★ 语音记录成功后失效缓存
+          cache_1.invalidation.onRecordChange();
+          self.loadHomeData(true);
         }).catch(function (err) {
           self.setData({
             recentActivity: self.data.recentActivity.map(function (item) {

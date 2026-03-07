@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var api_1 = require("../../services/api");
+var cache_1 = require("../../services/cache");
 
 Page({
   data: {
@@ -33,6 +34,15 @@ Page({
     this.setData({ isLoggedIn: isLoggedIn });
 
     if (isLoggedIn) {
+      // ★ 立即用缓存数据渲染
+      var cachedProfile = cache_1.getCached(cache_1.CACHE_KEYS.PROFILE);
+      if (cachedProfile) {
+        this._applyProfile(cachedProfile);
+      }
+      var cachedFamily = cache_1.getCached(cache_1.CACHE_KEYS.FAMILY);
+      if (cachedFamily) {
+        this.setData({ family: cachedFamily });
+      }
       this.loadData();
     }
   },
@@ -60,51 +70,71 @@ Page({
   loadData: function () {
     var self = this;
     Promise.all([
-      api_1.profileApi.get().catch(function () { return null; }),
-      api_1.familyApi.mine().catch(function () { return null; }),
-      api_1.recordsApi.list({ page: 1, size: 1 }).catch(function () { return null; }),
+      cache_1.swr(cache_1.CACHE_KEYS.PROFILE,
+        function () { return api_1.profileApi.get(); },
+        function (fresh) { self._applyProfile(fresh); }),
+      cache_1.swr(cache_1.CACHE_KEYS.FAMILY,
+        function () { return api_1.familyApi.mine().catch(function () { return null; }); },
+        function (fresh) { self._applyFamily(fresh); }),
+      cache_1.swr(cache_1.CACHE_KEYS.RECORDS_COUNT,
+        function () { return api_1.recordsApi.list({ page: 1, size: 1 }).catch(function () { return null; }); },
+        function (fresh) { self.setData({ recordCount: (fresh && fresh.total) || 0 }); }),
     ]).then(function (results) {
       var profile = results[0];
       var family = results[1];
       var records = results[2];
 
-      var p = profile || {};
-      self.setData({
-        emergency: {
-          name: p.real_name || '',
-          bloodType: p.blood_type || '',
-          age: p.age || '',
-          allergies: (p.allergies || []).join('、'),
-          diseases: (p.medical_history || []).join('·'),
-          medications: (p.active_medications || []).join('·'),
-        },
-        recordCount: (records && records.total) || 0,
-      });
-
-      if (family) {
-        self.setData({ family: family });
-        self.loadFamilyMembers(family.id);
-      } else {
-        self.setData({ family: null, myRole: '', familyMembers: [] });
-      }
+      self._applyProfile(profile);
+      self.setData({ recordCount: (records && records.total) || 0 });
+      self._applyFamily(family);
     }).catch(function (err) {
       console.error('Settings load failed:', err);
     });
   },
 
+  _applyProfile: function (profile) {
+    var p = profile || {};
+    this.setData({
+      emergency: {
+        name: p.real_name || '',
+        bloodType: p.blood_type || '',
+        age: p.age || '',
+        allergies: (p.allergies || []).join('、'),
+        diseases: (p.medical_history || []).join('·'),
+        medications: (p.active_medications || []).join('·'),
+      },
+    });
+  },
+
+  _applyFamily: function (family) {
+    if (family) {
+      this.setData({ family: family });
+      this.loadFamilyMembers(family.id);
+    } else {
+      this.setData({ family: null, myRole: '', familyMembers: [] });
+    }
+  },
+
   loadFamilyMembers: function (familyId) {
     var self = this;
-    api_1.familyApi.members(familyId).then(function (members) {
-      var myInfo = wx.getStorageSync('user');
-      var myMember = (members || []).find(function (m) {
-        return m.user_id === (myInfo && myInfo.id);
-      });
-      self.setData({
-        familyMembers: members || [],
-        myRole: (myMember && myMember.role) || 'member',
-      });
+    cache_1.swr(cache_1.CACHE_KEYS.FAMILY_MEMBERS,
+      function () { return api_1.familyApi.members(familyId); },
+      function (freshMembers) { self._applyFamilyMembers(freshMembers); }
+    ).then(function (members) {
+      self._applyFamilyMembers(members);
     }).catch(function (err) {
       console.error('Load family members failed:', err);
+    });
+  },
+
+  _applyFamilyMembers: function (members) {
+    var myInfo = wx.getStorageSync('user');
+    var myMember = (members || []).find(function (m) {
+      return m.user_id === (myInfo && myInfo.id);
+    });
+    this.setData({
+      familyMembers: members || [],
+      myRole: (myMember && myMember.role) || 'member',
     });
   },
 
@@ -130,6 +160,8 @@ Page({
           api_1.familyApi.create(res.content || undefined).then(function (family) {
             wx.hideLoading();
             wx.showToast({ title: '创建成功', icon: 'success' });
+            // ★ 失效家庭缓存
+            cache_1.invalidation.onFamilyChange();
             self.setData({ family: family, myRole: 'admin' });
             self.loadFamilyMembers(family.id);
           }).catch(function () {
@@ -165,6 +197,8 @@ Page({
     this.setData({ joining: true });
     api_1.familyApi.join(code).then(function () {
       wx.showToast({ title: '加入成功', icon: 'success' });
+      // ★ 失效家庭缓存
+      cache_1.invalidation.onFamilyChange();
       self.setData({ showJoinModal: false, joining: false });
       self.loadData();
     }).catch(function () {
@@ -193,6 +227,8 @@ Page({
         if (res.confirm) {
           api_1.familyApi.removeMember(self.data.family.id, userId).then(function () {
             wx.showToast({ title: '已移除', icon: 'success' });
+            // ★ 失效家庭成员缓存
+            cache_1.invalidation.onFamilyChange();
             self.loadFamilyMembers(self.data.family.id);
           }).catch(function () {});
         }
@@ -239,6 +275,8 @@ Page({
         if (res.confirm) {
           wx.removeStorageSync('token');
           wx.removeStorageSync('user');
+          // ★ 登出时清除所有缓存
+          cache_1.clearAllCache();
           wx.reLaunch({ url: '/pages/home/home' });
         }
       },
@@ -257,6 +295,8 @@ Page({
           api_1.authApi.deleteAccount().then(function () {
             wx.removeStorageSync('token');
             wx.removeStorageSync('user');
+            // ★ 注销时清除所有缓存
+            cache_1.clearAllCache();
             wx.showToast({ title: '账号已注销', icon: 'none' });
             setTimeout(function () { wx.reLaunch({ url: '/pages/home/home' }); }, 1000);
           }).catch(function () {

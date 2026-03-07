@@ -12,7 +12,7 @@ App<IAppOption>({
     const token = wx.getStorageSync('token')
     if (token) {
       this.globalData.token = token
-      this.globalData.userInfo = wx.getStorageSync('userInfo')
+      this.globalData.userInfo = wx.getStorageSync('user')
     }
   },
 
@@ -20,14 +20,19 @@ App<IAppOption>({
     this.globalData.token = token
     this.globalData.userInfo = userInfo
     wx.setStorageSync('token', token)
-    wx.setStorageSync('userInfo', userInfo)
+    wx.setStorageSync('user', userInfo)
   },
 
   clearToken() {
     this.globalData.token = ''
     this.globalData.userInfo = null
     wx.removeStorageSync('token')
-    wx.removeStorageSync('userInfo')
+    wx.removeStorageSync('user')
+    // 清除所有业务缓存
+    try {
+      const { clearAllCache } = require('./services/cache')
+      clearAllCache()
+    } catch { /* ignore */ }
   },
 
   isLoggedIn(): boolean {
