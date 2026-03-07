@@ -8,6 +8,7 @@
  * URL: /pages/record-detail/record-detail?id=123
  */
 import { recordsApi } from '../../services/api'
+import { invalidation } from '../../services/cache'
 
 // 分类中文映射
 const CATEGORY_MAP: Record<string, string> = {
@@ -173,6 +174,35 @@ Page({
     } catch (e) {
       wx.hideLoading()
       wx.showToast({ title: '确认失败', icon: 'none' })
+    }
+  },
+
+  // ── 删除记录 ──
+  onDeleteRecord() {
+    wx.showModal({
+      title: '删除记录',
+      content: '删除后无法恢复，确定要删除这条记录吗？',
+      confirmColor: '#E53935',
+      success: (res) => {
+        if (res.confirm) {
+          this._doDelete()
+        }
+      },
+    })
+  },
+
+  async _doDelete() {
+    const { recordId } = this.data
+    try {
+      wx.showLoading({ title: '删除中...', mask: true })
+      await recordsApi.delete(recordId)
+      wx.hideLoading()
+      wx.showToast({ title: '已删除', icon: 'success' })
+      invalidation.onRecordChange()
+      setTimeout(() => wx.navigateBack(), 500)
+    } catch (e) {
+      wx.hideLoading()
+      wx.showToast({ title: '删除失败', icon: 'none' })
     }
   },
 

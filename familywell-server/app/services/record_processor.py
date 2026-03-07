@@ -25,6 +25,13 @@ from app.services.health_validator import validate_indicators_batch
 logger = logging.getLogger(__name__)
 
 
+CATEGORY_LABELS = {
+    "checkup": "体检", "lab": "化验", "prescription": "处方",
+    "insurance": "保险", "visit": "就诊", "food": "饮食",
+    "bp_reading": "血压", "weight": "体重", "other": "记录",
+}
+
+
 def _parse_date(date_str: str | None) -> date | None:
     if not date_str:
         return None
@@ -32,6 +39,19 @@ def _parse_date(date_str: str | None) -> date | None:
         return date.fromisoformat(date_str)
     except (ValueError, TypeError):
         return None
+
+
+def _format_title(category: str, record_date: date | None, ai_title: str | None) -> str:
+    """格式化记录标题：类别 · 日期 · AI标题(截断至15字)"""
+    label = CATEGORY_LABELS.get(category, "记录")
+    date_str = record_date.strftime("%m/%d") if record_date else ""
+    ai_short = (ai_title or "")[:15]
+    parts = [label]
+    if date_str:
+        parts.append(date_str)
+    if ai_short and ai_short != label:
+        parts.append(ai_short)
+    return " · ".join(parts)
 
 
 # ════════════════════════════════════════
@@ -100,9 +120,9 @@ async def process_record(record_id: int):
 
             category = ai_result.get("category", "other")
             record.category = category
-            record.title = ai_result.get("title")
             record.hospital = ai_result.get("hospital")
             record.record_date = _parse_date(ai_result.get("date"))
+            record.title = _format_title(category, record.record_date, ai_result.get("title"))
             record.ai_status = "completed"
 
             # 7. Dispatch to sub-tables
@@ -236,7 +256,7 @@ async def _process_indicators(
     """Extract health indicators from checkup/lab reports."""
     raw_indicators = ai_result.get("indicators", [])
     valid_indicators, warnings = validate_indicators_batch(raw_indicators)
-    measured_at = record.record_date or datetime.utcnow()
+    measured_at = record.record_date or date.today()
     if warnings:
         logger.warning(f"Record {record.id} validation warnings: {warnings}")
         ai_result["_validation_warnings"] = warnings
@@ -357,7 +377,7 @@ async def _process_bp(
     db: AsyncSession, user_id: int, record: Record, ai_result: dict
 ):
     """Extract blood pressure readings."""
-    measured = record.record_date or datetime.utcnow()
+    measured = record.record_date or date.today()
 
     if ai_result.get("systolic"):
         db.add(HealthIndicator(

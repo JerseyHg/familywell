@@ -30,7 +30,10 @@
           <text class="info-title">{{record.title || '未命名'}}</text>
           <text class="info-category">{{categoryName}}</text>
         </view>
-        <view class="edit-btn" bindtap="onStartEdit" wx:if="{{!editing && !needConfirm}}">✏️ 编辑</view>
+        <view class="header-actions" wx:if="{{!editing && !needConfirm}}">
+          <view class="edit-btn" bindtap="onStartEdit">✏️ 编辑</view>
+          <view class="delete-btn" bindtap="onDeleteRecord">🗑️ 删除</view>
+        </view>
       </view>
 
       <!-- 非编辑模式 -->

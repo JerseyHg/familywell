@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var api_1 = require("../../services/api");
 var upload_1 = require("../../services/upload");
 var cache_1 = require("../../services/cache");
+var upload_queue_1 = require("../../services/upload-queue");
 
 Page({
   data: {
@@ -98,6 +99,8 @@ Page({
 
     if (isLoggedIn) {
       this.loadHomeData();
+      // ★ 检查离线上传队列，自动重试失败的上传
+      upload_queue_1.processQueue();
     }
   },
 
@@ -677,18 +680,46 @@ Page({
       }].concat(self.data.recentActivity).slice(0, 5),
     });
 
+    // ★ 带重试的音频上传（单段最多重试 2 次）
+    var _uploadWithRetry = function (filePath, retriesLeft) {
+      if (retriesLeft === undefined) retriesLeft = 2;
+      return (0, upload_1.uploadAudioToCOS)(filePath).catch(function (err) {
+        if (retriesLeft > 0) {
+          return new Promise(function (resolve) { setTimeout(resolve, 1000); })
+            .then(function () { return _uploadWithRetry(filePath, retriesLeft - 1); });
+        }
+        throw err;
+      });
+    };
+
     var audioKeys = [];
+    var failedCount = 0;
     var uploadNext = function (i) {
       if (i >= segs.length) {
+        // 所有段上传完毕
+        if (audioKeys.length === 0) {
+          // 全部失败
+          self.setData({
+            recentActivity: self.data.recentActivity.map(function (item) {
+              if (item.id === tempId) return Object.assign({}, item, { ai_status: 'failed' });
+              return item;
+            }),
+          });
+          wx.showToast({ title: '语音上传失败，请重试', icon: 'none' });
+          return;
+        }
         api_1.medsApi.voiceAddAudio(audioKeys).then(function (res) {
           var items = (res && res.items) || [];
           var typeIcons = { medication: '💊', food: '🍽️', vitals: '❤️', symptom: '📝', insurance: '🛡️', memo: '📋' };
+          var msg = '';
           if (items.length > 0) {
             var labels = items.map(function (i) { return (typeIcons[i.type] || '✅') + (i.summary || ''); }).join(' ');
-            wx.showToast({ title: labels.slice(0, 40) || '✅ 记录成功', icon: 'none', duration: 2500 });
+            msg = labels.slice(0, 40) || '✅ 记录成功';
           } else {
-            wx.showToast({ title: '✅ 记录成功', icon: 'none' });
+            msg = '✅ 记录成功';
           }
+          if (failedCount > 0) msg += '（' + failedCount + '段上传失败）';
+          wx.showToast({ title: msg, icon: 'none', duration: 2500 });
           // ★ 语音记录成功后失效缓存
           cache_1.invalidation.onRecordChange();
           self.loadHomeData(true);
@@ -703,11 +734,14 @@ Page({
         });
         return;
       }
-      (0, upload_1.uploadAudioToCOS)(segs[i].tempFilePath).then(function (result) {
+      _uploadWithRetry(segs[i].tempFilePath).then(function (result) {
         audioKeys.push(result.fileKey);
         uploadNext(i + 1);
       }).catch(function (err) {
-        wx.showToast({ title: '上传失败', icon: 'none' });
+        // ★ 单段失败后继续处理剩余段，不中断
+        console.error('Voice segment ' + i + ' upload failed after retries:', err);
+        failedCount++;
+        uploadNext(i + 1);
       });
     };
     uploadNext(0);

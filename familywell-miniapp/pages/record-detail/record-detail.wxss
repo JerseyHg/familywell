@@ -57,9 +57,15 @@ page { background: var(--bg); }
 .info-category {
   display: block; font-size: 24rpx; color: var(--sub); margin-top: 4rpx;
 }
+.header-actions { display: flex; gap: 12rpx; }
 .edit-btn {
   padding: 12rpx 28rpx; border-radius: 20rpx;
   background: var(--primary-light); color: var(--primary);
+  font-size: 24rpx; font-weight: 600;
+}
+.delete-btn {
+  padding: 12rpx 28rpx; border-radius: 20rpx;
+  background: #FEF2F2; color: #E53935;
   font-size: 24rpx; font-weight: 600;
 }
 

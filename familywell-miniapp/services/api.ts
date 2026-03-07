@@ -172,6 +172,9 @@ export const recordsApi = {
       method: 'POST',
       data: { medications },
     }),
+
+  delete: (id: number) =>
+    request({ url: `/records/${id}`, method: 'DELETE' }),
 }
 
 // ─── Projects ───
