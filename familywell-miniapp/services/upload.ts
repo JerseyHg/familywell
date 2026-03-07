@@ -6,6 +6,7 @@
  */
 
 import { recordsApi } from './api'
+import { addToQueue } from './upload-queue'
 
 /**
  * Single upload flow (backward compatible):
@@ -105,17 +106,26 @@ export function batchUpload(options?: {
             success++
           } catch (err) {
             console.error(`Upload failed for file ${i}:`, err)
+            // ★ 失败时存入离线队列，稍后自动重试
+            addToQueue({
+              type: 'image',
+              tempFilePath: filePath,
+              fileName,
+              contentType: 'image/jpeg',
+              fileType: 'image',
+              projectId,
+            })
             failed++
           }
         }
 
         if (success > 0) {
           const msg = failed > 0
-            ? `${success} 张上传成功，${failed} 张失败`
+            ? `${success} 张上传成功，${failed} 张已加入重试队列`
             : `${success} 张上传成功，AI 识别中...`
           wx.showToast({ title: msg, icon: 'none', duration: 2500 })
         } else {
-          wx.showToast({ title: '上传失败', icon: 'none' })
+          wx.showToast({ title: '上传失败，已加入重试队列', icon: 'none' })
         }
 
         if (recordIds.length > 0) {
@@ -196,17 +206,26 @@ export function chooseAndUploadFile(options?: {
             success++
           } catch (err) {
             console.error(`Upload failed for file ${i}:`, err)
+            // ★ 失败时存入离线队列
+            addToQueue({
+              type: 'file',
+              tempFilePath: filePath,
+              fileName,
+              contentType,
+              fileType,
+              projectId,
+            })
             failed++
           }
         }
 
         if (success > 0) {
           const msg = failed > 0
-            ? `${success} 个上传成功，${failed} 个失败`
+            ? `${success} 个上传成功，${failed} 个已加入重试队列`
             : `${success} 个上传成功，AI 识别中...`
           wx.showToast({ title: msg, icon: 'none', duration: 2500 })
         } else {
-          wx.showToast({ title: '上传失败', icon: 'none' })
+          wx.showToast({ title: '上传失败，已加入重试队列', icon: 'none' })
         }
 
         if (recordIds.length > 0) {

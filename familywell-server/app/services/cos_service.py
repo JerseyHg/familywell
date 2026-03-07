@@ -56,6 +56,14 @@ def get_file_url(file_key: str) -> str:
         Expired=3600,
     )
 
+def delete_file(file_key: str) -> None:
+    """Delete a file from COS."""
+    _client.delete_object(
+        Bucket=settings.COS_BUCKET,
+        Key=file_key,
+    )
+
+
 def generate_presigned_url(file_key: str, expires: int = 1800) -> str:
     """生成 COS 预签名下载 URL（让火山 ASR 能下载音频）"""
     return _client.get_presigned_url(

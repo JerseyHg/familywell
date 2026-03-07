@@ -11,13 +11,17 @@ import asyncio
 import logging
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.user import User
 from app.models.record import Record
-from app.models.medication import Medication
+from app.models.medication import Medication, MedicationTask, MedicationSuggestion
+from app.models.health_indicator import HealthIndicator
+from app.models.nutrition import NutritionLog
+from app.models.insurance import Insurance
+from app.models.reminder import Reminder
 from app.schemas.record import (
     UploadUrlRequest, UploadUrlResponse,
     RecordCreate, RecordStatusResponse,
@@ -264,6 +268,85 @@ async def update_record(
         ai_raw_result=record.ai_raw_result,
         image_url=image_url,
     )
+
+
+# ────────────────────────────────────────
+# 删除记录（级联删除关联数据）
+# ────────────────────────────────────────
+
+@router.delete("/{record_id}")
+async def delete_record(
+    record_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    删除记录及所有关联数据：
+    - health_indicator, nutrition_log, insurance, medication_suggestion
+    - medication + medication_task（处方关联的药物及其任务）
+    - reminder（related_type='record' 的提醒）
+    - record_embedding（已有 CASCADE，自动删除）
+    - COS 文件
+    """
+    result = await db.execute(
+        select(Record).where(Record.id == record_id, Record.user_id == user.id)
+    )
+    record = result.scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=404, detail="记录不存在")
+
+    # 1. 删除关联的用药任务（通过 medication）
+    med_result = await db.execute(
+        select(Medication.id).where(Medication.prescription_record_id == record_id)
+    )
+    med_ids = [row[0] for row in med_result.all()]
+    if med_ids:
+        await db.execute(
+            delete(MedicationTask).where(MedicationTask.medication_id.in_(med_ids))
+        )
+        await db.execute(
+            delete(Medication).where(Medication.id.in_(med_ids))
+        )
+
+    # 2. 删除其他关联表数据
+    await db.execute(
+        delete(HealthIndicator).where(HealthIndicator.record_id == record_id)
+    )
+    await db.execute(
+        delete(NutritionLog).where(NutritionLog.record_id == record_id)
+    )
+    await db.execute(
+        delete(Insurance).where(Insurance.record_id == record_id)
+    )
+    await db.execute(
+        delete(MedicationSuggestion).where(MedicationSuggestion.record_id == record_id)
+    )
+    await db.execute(
+        delete(Reminder).where(
+            Reminder.related_id == record_id,
+            Reminder.related_type == "record",
+        )
+    )
+
+    # 3. 删除 COS 文件
+    if record.file_key:
+        try:
+            cos_service.delete_file(record.file_key)
+        except Exception as e:
+            logger.warning(f"Failed to delete COS file {record.file_key}: {e}")
+
+    # 4. 删除记录本身（record_embedding 会通过 CASCADE 自动删除）
+    await db.delete(record)
+    await db.flush()
+
+    # 5. 清除 RAG 缓存
+    try:
+        from app.services.rag_service import invalidate_user_cache
+        await invalidate_user_cache(user.id)
+    except Exception:
+        pass
+
+    return {"ok": True, "message": "记录已删除"}
 
 
 # ────────────────────────────────────────

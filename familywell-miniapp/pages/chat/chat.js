@@ -294,7 +294,18 @@ Page({
     this._clearTimers();
     this.setData({ messages: messages, typing: true, scrollToView: 'msg-' + aiIdx });
 
-    (0, upload_1.uploadAudioToCOS)(tempFilePath).then(function (result) {
+    // ★ 带重试的音频上传（最多重试 2 次）
+    var _uploadRetry = function (path, retries) {
+      if (retries === undefined) retries = 2;
+      return (0, upload_1.uploadAudioToCOS)(path).catch(function (err) {
+        if (retries > 0) {
+          return new Promise(function (r) { setTimeout(r, 1000); })
+            .then(function () { return _uploadRetry(path, retries - 1); });
+        }
+        throw err;
+      });
+    };
+    _uploadRetry(tempFilePath).then(function (result) {
       self._streamTask = api_1.chatApi.streamVoice(
           {
             audio_keys: [result.fileKey],
