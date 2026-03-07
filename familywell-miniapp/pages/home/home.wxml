@@ -77,8 +77,8 @@
   </view>
   <view class="med-sug-card" wx:for="{{medSuggestions}}" wx:key="id">
     <view class="sug-info">
-      <text class="sug-name">{{item.name}}</text>
-      <text class="sug-detail" wx:if="{{item.dosage || item.frequency}}">{{item.dosage}}{{item.dosage && item.frequency ? ' · ' : ''}}{{item.frequency}}</text>
+      <text class="sug-name">{{item.name || '未知药物'}}</text>
+      <text class="sug-detail" wx:if="{{item.dosage || item.frequency}}">{{item.dosage || ''}}{{item.dosage && item.frequency ? ' · ' : ''}}{{item.frequency || ''}}</text>
     </view>
     <view class="sug-actions">
       <view class="sug-confirm" data-id="{{item.id}}" bindtap="onConfirmSuggestion">确认添加</view>
@@ -97,8 +97,8 @@
     <view class="task-left">
       <text class="task-icon">{{item.completed ? '✅' : '⬜'}}</text>
       <view class="task-info">
-        <text class="task-name">{{item.medication_name}}</text>
-        <text class="task-time">{{item.scheduled_time}}</text>
+        <text class="task-name">{{item.name}}</text>
+        <text class="task-time">{{item.time}}</text>
       </view>
     </view>
     <view class="task-btn {{item.completed ? 'done' : ''}}" data-id="{{item.id}}" data-completed="{{item.completed}}" bindtap="onToggleTask">
@@ -214,7 +214,7 @@
 
     <scroll-view scroll-y class="mc-body">
       <!-- 药名 -->
-      <view class="mc-drug-name">{{medConfirmName}}</view>
+      <view class="mc-drug-name">{{medConfirmName || '未知药物'}}</view>
 
       <!-- 用量 -->
       <view class="mc-field">

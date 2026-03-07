@@ -91,38 +91,122 @@ page { background: var(--bg); height: 100vh; overflow: hidden; }
 .chart-title { font-size: 26rpx; font-weight: 600; color: var(--text); }
 .chart-period { font-size: 20rpx; color: var(--muted); margin-left: auto; }
 
-.bar-chart { display: flex; flex-direction: column; gap: 12rpx; }
-.bar-row { display: flex; align-items: center; gap: 12rpx; }
-.bar-label { font-size: 22rpx; color: var(--sub); width: 80rpx; flex-shrink: 0; }
-.bar-bg { flex: 1; height: 24rpx; background: var(--bg); border-radius: 12rpx; overflow: hidden; }
-.bar-fill { height: 100%; border-radius: 12rpx; transition: width 0.6s; }
-.bar-value { font-size: 22rpx; color: var(--text); width: 80rpx; text-align: right; }
+/* ── Pie / Donut Ring Chart ── */
+.pie-visual { display: flex; align-items: center; gap: 32rpx; padding: 12rpx 0; }
+.pie-ring {
+  width: 180rpx; height: 180rpx; border-radius: 50%;
+  position: relative; flex-shrink: 0;
+  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.08);
+}
+.pie-ring-hole {
+  position: absolute; top: 30rpx; left: 30rpx;
+  width: 120rpx; height: 120rpx; border-radius: 50%;
+  background: var(--card);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.pie-total-val { font-size: 32rpx; font-weight: 700; color: var(--text); line-height: 1.2; }
+.pie-total-unit { font-size: 18rpx; color: var(--muted); }
+.pie-legend { flex: 1; display: flex; flex-direction: column; gap: 14rpx; }
+.pie-legend-row { display: flex; align-items: center; gap: 10rpx; }
+.pie-legend-dot { width: 16rpx; height: 16rpx; border-radius: 4rpx; flex-shrink: 0; }
+.pie-legend-name { font-size: 24rpx; color: var(--sub); flex: 1; }
+.pie-legend-g { font-size: 24rpx; font-weight: 500; color: var(--text); }
+.pie-legend-pct { font-size: 22rpx; color: var(--muted); width: 56rpx; text-align: right; }
 
-.pie-chart { display: flex; flex-direction: column; gap: 12rpx; }
-.pie-row { display: flex; align-items: center; gap: 12rpx; }
-.pie-dot { width: 16rpx; height: 16rpx; border-radius: 8rpx; flex-shrink: 0; }
-.pie-label { font-size: 22rpx; color: var(--sub); flex: 1; }
-.pie-value { font-size: 22rpx; color: var(--text); }
-.pie-pct { font-size: 20rpx; color: var(--muted); width: 60rpx; text-align: right; }
+/* ── Med Adherence V2 ── */
+.med-item { margin-bottom: 20rpx; padding-bottom: 20rpx; border-bottom: 1rpx solid var(--border); }
+.med-item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+.med-top-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12rpx; }
+.med-name-v2 { font-size: 26rpx; font-weight: 500; color: var(--text); }
+.med-badge { padding: 4rpx 16rpx; border-radius: 16rpx; font-size: 20rpx; font-weight: 500; }
+.med-badge.good { background: rgba(45,139,111,0.1); color: #2D8B6F; }
+.med-badge.warn { background: rgba(245,166,35,0.1); color: #F5A623; }
+.med-bar-row { display: flex; align-items: center; gap: 16rpx; }
+.med-bar-bg-v2 { flex: 1; height: 16rpx; background: var(--bg); border-radius: 8rpx; overflow: hidden; }
+.med-bar-fill-v2 { height: 100%; border-radius: 8rpx; transition: width 0.8s ease; }
+.med-pct-v2 { font-size: 28rpx; font-weight: 700; color: var(--text); min-width: 70rpx; text-align: right; }
+.med-detail-v2 { font-size: 22rpx; color: var(--muted); margin-top: 8rpx; display: block; }
 
-.med-row { display: flex; align-items: center; gap: 12rpx; margin-bottom: 12rpx; }
-.med-name { font-size: 24rpx; color: var(--sub); width: 120rpx; flex-shrink: 0; }
-.med-bar-bg { flex: 1; height: 24rpx; background: var(--bg); border-radius: 12rpx; overflow: hidden; }
-.med-bar-fill { height: 100%; border-radius: 12rpx; }
-.med-ratio { font-size: 22rpx; color: var(--text); width: 60rpx; text-align: right; }
+/* ── Indicator Cards V2 ── */
+.ind-grid-v2 { display: flex; flex-wrap: wrap; gap: 16rpx; }
+.ind-card-v2 {
+  flex: 1; min-width: calc(50% - 8rpx); background: var(--bg); border-radius: 16rpx;
+  padding: 20rpx; display: flex; flex-direction: column; align-items: center;
+  gap: 4rpx; position: relative; border: 1rpx solid transparent; box-sizing: border-box;
+}
+.ind-card-v2.danger { background: rgba(229,91,91,0.06); border-color: rgba(229,91,91,0.15); }
+.ind-card-v2.warning { background: rgba(245,166,35,0.06); border-color: rgba(245,166,35,0.15); }
+.ind-card-v2.normal { background: rgba(45,139,111,0.06); border-color: rgba(45,139,111,0.15); }
+.ind-dot-v2 {
+  position: absolute; top: 14rpx; right: 14rpx;
+  width: 12rpx; height: 12rpx; border-radius: 50%;
+}
+.ind-dot-v2.danger { background: #E55B5B; }
+.ind-dot-v2.warning { background: #F5A623; }
+.ind-dot-v2.normal { background: #2D8B6F; }
+.ind-val-v2 { font-size: 36rpx; font-weight: 700; line-height: 1.2; }
+.ind-unit-v2 { font-size: 20rpx; color: var(--muted); }
+.ind-label-v2 { font-size: 22rpx; color: var(--sub); margin-top: 4rpx; }
 
-.alert-item { display: flex; gap: 12rpx; margin-bottom: 12rpx; }
-.alert-icon { font-size: 28rpx; flex-shrink: 0; }
-.alert-info { display: flex; flex-direction: column; }
-.alert-title { font-size: 24rpx; font-weight: 500; color: var(--text); }
-.alert-desc { font-size: 22rpx; color: var(--sub); }
+/* ── Horizontal Bar Chart (line type) ── */
+.hbar-chart { display: flex; flex-direction: column; gap: 16rpx; }
+.hbar-row { display: flex; align-items: center; gap: 16rpx; }
+.hbar-label { font-size: 24rpx; color: var(--sub); width: 100rpx; flex-shrink: 0; }
+.hbar-track { flex: 1; height: 20rpx; background: var(--bg); border-radius: 10rpx; overflow: hidden; }
+.hbar-fill { height: 100%; border-radius: 10rpx; transition: width 0.8s ease; }
+.hbar-value { font-size: 24rpx; font-weight: 600; color: var(--text); min-width: 80rpx; text-align: right; }
 
-.ins-item { margin-bottom: 12rpx; }
-.ins-header-row { display: flex; align-items: center; gap: 12rpx; }
-.ins-name { font-size: 24rpx; font-weight: 500; color: var(--text); }
-.ins-urgent { padding: 4rpx 12rpx; border-radius: 12rpx; background: var(--accent-light); color: var(--accent); font-size: 20rpx; font-weight: 600; }
-.ins-detail { display: block; font-size: 22rpx; color: var(--sub); margin-top: 4rpx; }
+/* ── Stacked Bar Chart ── */
+.stack-chart {
+  display: flex; align-items: flex-end; gap: 20rpx;
+  justify-content: space-around; padding: 16rpx 0; min-height: 160rpx;
+}
+.stack-col { display: flex; flex-direction: column; align-items: center; gap: 8rpx; flex: 1; }
+.stack-bars {
+  display: flex; flex-direction: column-reverse;
+  width: 44rpx; border-radius: 8rpx 8rpx 0 0; overflow: hidden;
+}
+.stack-seg { width: 100%; min-height: 4rpx; }
+.stack-label { font-size: 20rpx; color: var(--muted); text-align: center; }
+.stack-legend { display: flex; flex-wrap: wrap; gap: 20rpx; margin-top: 16rpx; justify-content: center; }
+.stack-legend-item { display: flex; align-items: center; gap: 8rpx; }
+.stack-legend-dot { width: 12rpx; height: 12rpx; border-radius: 3rpx; }
+.stack-legend-text { font-size: 20rpx; color: var(--sub); }
 
+/* ── Alert Cards ── */
+.alert-card {
+  display: flex; gap: 16rpx; padding: 16rpx;
+  margin-bottom: 12rpx; background: var(--bg); border-radius: 12rpx;
+}
+.alert-card:last-child { margin-bottom: 0; }
+.alert-icon-wrap {
+  width: 48rpx; height: 48rpx; border-radius: 12rpx;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.alert-icon-wrap.med { background: rgba(155,89,182,0.1); }
+.alert-icon-wrap.ins { background: rgba(45,139,111,0.1); }
+.alert-icon-wrap.check { background: rgba(91,155,213,0.1); }
+.alert-icon-wrap.other { background: rgba(245,166,35,0.1); }
+.alert-icon-v2 { font-size: 24rpx; }
+.alert-content { flex: 1; display: flex; flex-direction: column; gap: 4rpx; }
+.alert-title-v2 { font-size: 26rpx; font-weight: 500; color: var(--text); }
+.alert-desc-v2 { font-size: 22rpx; color: var(--sub); line-height: 1.4; }
+
+/* ── Insurance Cards ── */
+.ins-card { padding: 16rpx; margin-bottom: 12rpx; background: var(--bg); border-radius: 12rpx; }
+.ins-card:last-child { margin-bottom: 0; }
+.ins-top-row { display: flex; align-items: center; justify-content: space-between; }
+.ins-provider { font-size: 26rpx; font-weight: 600; color: var(--text); }
+.ins-urgent-badge {
+  padding: 4rpx 16rpx; border-radius: 16rpx;
+  background: #FEF2F2; color: #E55B5B; font-size: 20rpx; font-weight: 600;
+}
+.ins-bottom-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8rpx; }
+.ins-date { font-size: 22rpx; color: var(--sub); }
+.ins-days { font-size: 22rpx; color: var(--sub); }
+.ins-days.urgent { color: #E55B5B; font-weight: 500; }
+
+/* ── Chart AI Tip ── */
 .chart-ai-tip { display: flex; gap: 10rpx; align-items: flex-start; margin-top: 16rpx; padding: 16rpx 20rpx; background: #F5F8FF; border-radius: 16rpx; }
 .tip-icon { font-size: 22rpx; flex-shrink: 0; }
 .tip-text { font-size: 22rpx; color: var(--sub); line-height: 1.5; }
