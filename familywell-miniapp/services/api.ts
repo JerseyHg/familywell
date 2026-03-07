@@ -32,6 +32,14 @@ interface RequestOptions {
   silent429?: boolean  // ★ [Fix-5] 新增：429 时是否静默（不弹 toast）
 }
 
+// ★ 延迟导入 cache，避免循环依赖
+function _clearCacheOnLogout() {
+  try {
+    const cache = require('./cache')
+    cache.clearAllCache()
+  } catch { /* ignore if cache module not ready */ }
+}
+
 function getToken(): string {
   return wx.getStorageSync('token') || ''
 }
@@ -60,7 +68,8 @@ export function request<T = any>(options: RequestOptions): Promise<T> {
 
         if (res.statusCode === 401) {
           wx.removeStorageSync('token')
-          wx.removeStorageSync('userInfo')
+          wx.removeStorageSync('user')
+          _clearCacheOnLogout()
           wx.redirectTo({ url: '/pages/login/login' })
           reject(new Error('未登录'))
           return

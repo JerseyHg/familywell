@@ -1,4 +1,5 @@
 import { recordsApi, projectsApi } from '../../services/api'
+import { swr, forceRefresh, CACHE_KEYS, invalidation } from '../../services/cache'
 
 const CATEGORY_MAP: Record<string, string> = {
   checkup: '体检',
@@ -127,7 +128,12 @@ Page({
 
   async loadProjects() {
     try {
-      const res: any = await projectsApi.list()
+      const self = this
+      const res: any = await swr(
+        CACHE_KEYS.PROJECTS,
+        () => projectsApi.list(),
+        (fresh: any) => { self._applyProjects(fresh) },
+      )
       const projects = Array.isArray(res) ? res : (res.data || res.items || [])
       const active = projects
         .filter((p: any) => !p.is_archived)
@@ -287,5 +293,23 @@ Page({
     const id = e.currentTarget.dataset.id
     if (!id) return
     wx.navigateTo({ url: `/pages/record-detail/record-detail?id=${id}` })
+  },
+
+  /** ★ SWR 后台刷新回调：将项目数据应用到页面 */
+  _applyProjects(res: any) {
+    const projects = Array.isArray(res) ? res : (res.data || res.items || [])
+    const active = projects
+      .filter((p: any) => !p.is_archived)
+      .map((p: any) => ({
+        ...p,
+        dateRange: formatDateRange(p.start_date, p.end_date),
+      }))
+    const archived = projects
+      .filter((p: any) => p.is_archived)
+      .map((p: any) => ({
+        ...p,
+        dateRange: formatDateRange(p.start_date, p.end_date),
+      }))
+    this.setData({ activeProjects: active, archivedProjects: archived })
   },
 })
