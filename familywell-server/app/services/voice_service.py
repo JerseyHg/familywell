@@ -26,6 +26,7 @@ from app.models.nutrition import NutritionLog
 from app.models.insurance import Insurance
 from app.models.medication import Medication, MedicationTask, MedicationSuggestion
 from app.services.llm_client import get_llm_client
+from app.utils.timezone import user_today
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -127,12 +128,13 @@ async def dispatch_items(
     user: User,
     items: list[dict],
     original_text: str,
+    tz_offset: int | None = None,
 ) -> dict:
     """
     遍历 items 列表，分发到各 _process_* 函数，统一处理 embedding 和缓存。
     voice_add 和 voice_add_audio 共用此逻辑。
     """
-    today = date.today()
+    today = user_today(tz_offset)
     response_items = []
     record_ids_to_embed = []
 

@@ -3,6 +3,7 @@ app/routers/medications.py — 用药管理
 ──────────────────────────────────────────────────
 ★ 重构后：仅保留药物 CRUD / 任务打卡 / Suggestion 确认。
   语音录入已迁移至 voice_input.py。
+★ 修复：所有日期使用用户本地时区
 """
 from datetime import date, datetime, time as time_type, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -18,6 +19,7 @@ from app.schemas.medication import (
     SuggestionConfirmRequest,
 )
 from app.utils.deps import get_current_user
+from app.utils.timezone import get_tz_offset, user_today
 
 router = APIRouter(prefix="/api/medications", tags=["medications"])
 
@@ -88,22 +90,22 @@ async def create_medication(
     req: MedicationCreate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    tz_offset: int | None = Depends(get_tz_offset),
 ):
+    today = user_today(tz_offset)
     med = Medication(
         user_id=user.id,
         name=req.name,
         dosage=req.dosage,
         frequency=req.frequency,
         scheduled_times=req.scheduled_times or ["08:00"],
-        start_date=req.start_date or date.today(),
+        start_date=req.start_date or today,
         end_date=req.end_date,
         remaining_count=req.remaining_count,
         is_active=True,
     )
     db.add(med)
     await db.flush()
-
-    today = date.today()
     if med.start_date <= today and (med.end_date is None or med.end_date >= today):
         await _generate_tasks_for_med(db, med, today)
         await db.flush()
@@ -179,6 +181,7 @@ async def confirm_suggestion(
     req: SuggestionConfirmRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    tz_offset: int | None = Depends(get_tz_offset),
 ):
     """
     用户确认药物建议 → 创建 Medication + 当天 Task。
@@ -206,7 +209,7 @@ async def confirm_suggestion(
     else:
         freq_text = f"每{interval}天{times_per_day}次"
 
-    today = date.today()
+    today = user_today(tz_offset)
     end_date = None
     if req.med_type == "course" and req.total_days:
         end_date = today + timedelta(days=req.total_days)
@@ -277,11 +280,14 @@ async def dismiss_suggestion(
 
 @router.get("/tasks")
 async def list_tasks(
-    start_date: date = Query(default_factory=date.today),
+    start_date: date | None = Query(None),
     end_date: date | None = None,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    tz_offset: int | None = Depends(get_tz_offset),
 ):
+    if start_date is None:
+        start_date = user_today(tz_offset)
     if end_date is None:
         end_date = start_date
 

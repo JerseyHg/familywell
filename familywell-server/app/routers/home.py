@@ -4,6 +4,7 @@ app/routers/home.py — 首页聚合接口
 ★ 修复：nickname 优先使用 profile.real_name
 ★ 新增：返回 medication_suggestions（待确认药物建议）
 ★ 优化：AI tip 与 DB 查询并行执行，避免 LLM 调用阻塞首页渲染
+★ 修复：所有日期使用用户本地时区，避免跨时区日期偏移
 """
 import asyncio
 from datetime import date
@@ -19,6 +20,7 @@ from app.models.medication import MedicationTask, MedicationSuggestion
 from app.models.reminder import Reminder
 from app.schemas.home import HomeResponse
 from app.utils.deps import get_current_user
+from app.utils.timezone import get_tz_offset, user_today, utc_to_user_local
 from app.services import rag_service
 
 router = APIRouter(prefix="/api/home", tags=["home"])
@@ -28,9 +30,10 @@ router = APIRouter(prefix="/api/home", tags=["home"])
 async def get_home_data(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    tz_offset: int | None = Depends(get_tz_offset),
 ):
     """Simplified homepage data for v2 chat-centric design."""
-    today = date.today()
+    today = user_today(tz_offset)
 
     # ── AI tip 使用独立 session，与下方 DB 查询并行执行 ──
     # quick_health_summary 包含 embedding 搜索 + LLM 调用（1-3s），
@@ -108,7 +111,10 @@ async def get_home_data(
         "id": r.id,
         "category": r.category,
         "title": r.title or "处理中…",
-        "date": r.created_at.strftime("%m/%d"),
+        # ★ 返回 record_date (ISO) 供前端用本地时间格式化；
+        #   同时保留 date 字段作为后备，使用用户时区转换 created_at
+        "record_date": r.record_date.isoformat() if r.record_date else None,
+        "date": utc_to_user_local(r.created_at, tz_offset).strftime("%m/%d") if r.created_at else "",
         "ai_status": r.ai_status,
     } for r in records]
 
@@ -136,7 +142,7 @@ async def get_home_data(
         "name": s.name,
         "dosage": s.dosage,
         "frequency": s.frequency,
-        "created_at": s.created_at.strftime("%m/%d") if s.created_at else None,
+        "created_at": utc_to_user_local(s.created_at, tz_offset).strftime("%m/%d") if s.created_at else None,
     } for s in suggestions]
 
     # ── 等待 AI tip 完成（此时 DB 查询已全部结束）──
