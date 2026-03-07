@@ -1,7 +1,7 @@
 import logging
 from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import select, update, func, and_
+from sqlalchemy import select, update, func, and_, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import async_session
@@ -27,30 +27,38 @@ async def run_daily_tasks():
     logger.info("Daily cron tasks completed.")
 
 
-async def generate_medication_tasks(db: AsyncSession):
-    """Generate today's medication tasks for all active medications."""
-    today = date.today()
-
+async def _generate_tasks_for_user(
+    db: AsyncSession, user_id: int, target_date: date,
+) -> int:
+    """为指定用户在指定日期生成用药任务（检查 interval_days / start_date）。"""
     result = await db.execute(
         select(Medication).where(
+            Medication.user_id == user_id,
             Medication.is_active == True,
-            (Medication.end_date == None) | (Medication.end_date >= today),
+            (Medication.end_date == None) | (Medication.end_date >= target_date),
+            (Medication.start_date == None) | (Medication.start_date <= target_date),
         )
     )
     medications = result.scalars().all()
 
     count = 0
     for med in medications:
+        # ★ 检查 interval_days：隔 N 天服药一次
+        interval = med.interval_days or 1
+        if interval > 1 and med.start_date:
+            days_since_start = (target_date - med.start_date).days
+            if days_since_start < 0 or days_since_start % interval != 0:
+                continue
+
         scheduled_times = med.scheduled_times or ["08:00"]
         for t_str in scheduled_times:
             h, m = t_str.split(":")
             scheduled_time = time(int(h), int(m))
 
-            # Check if task already exists
             existing = await db.execute(
                 select(MedicationTask).where(
                     MedicationTask.medication_id == med.id,
-                    MedicationTask.scheduled_date == today,
+                    MedicationTask.scheduled_date == target_date,
                     MedicationTask.scheduled_time == scheduled_time,
                 )
             )
@@ -58,14 +66,62 @@ async def generate_medication_tasks(db: AsyncSession):
                 task = MedicationTask(
                     medication_id=med.id,
                     user_id=med.user_id,
-                    scheduled_date=today,
+                    scheduled_date=target_date,
                     scheduled_time=scheduled_time,
                     status="pending",
                 )
                 db.add(task)
                 count += 1
+    return count
 
-    logger.info(f"Generated {count} medication tasks for {today}")
+
+async def ensure_user_tasks_for_date(
+    db: AsyncSession, user_id: int, target_date: date,
+) -> None:
+    """按需生成：若该用户当天没有任何任务，则立即生成。
+    解决 cron 未执行（服务器重启/休眠）导致当天无任务的问题。
+    """
+    existing = await db.execute(
+        select(func.count(MedicationTask.id)).where(
+            MedicationTask.user_id == user_id,
+            MedicationTask.scheduled_date == target_date,
+        )
+    )
+    if existing.scalar() > 0:
+        return  # 已有任务，无需生成
+
+    # 检查用户是否有活跃药物
+    med_count = await db.execute(
+        select(func.count(Medication.id)).where(
+            Medication.user_id == user_id,
+            Medication.is_active == True,
+        )
+    )
+    if med_count.scalar() == 0:
+        return  # 无活跃药物
+
+    count = await _generate_tasks_for_user(db, user_id, target_date)
+    if count > 0:
+        await db.flush()
+        logger.info(f"On-demand generated {count} tasks for user {user_id} on {target_date}")
+
+
+async def generate_medication_tasks(db: AsyncSession):
+    """Generate today's medication tasks for all active medications."""
+    today = date.today()
+
+    # 获取所有有活跃药物的用户
+    result = await db.execute(
+        select(distinct(Medication.user_id)).where(Medication.is_active == True)
+    )
+    user_ids = [row[0] for row in result.all()]
+
+    total = 0
+    for uid in user_ids:
+        count = await _generate_tasks_for_user(db, uid, today)
+        total += count
+
+    logger.info(f"Generated {total} medication tasks for {today}")
 
 
 async def mark_missed_tasks(db: AsyncSession):
