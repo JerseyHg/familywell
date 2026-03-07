@@ -349,15 +349,26 @@ async def _process_food(
     db.add(record)
     await db.flush()
 
+    # 如果 LLM 未返回营养数据，根据热量做粗略估算
+    protein = data.get("protein_g")
+    fat = data.get("fat_g")
+    carb = data.get("carb_g")
+
+    if protein is None and fat is None and carb is None and calories:
+        cal = float(calories)
+        protein = round(cal * 0.15 / 4, 1)
+        fat = round(cal * 0.30 / 9, 1)
+        carb = round(cal * 0.55 / 4, 1)
+
     log = NutritionLog(
         user_id=user.id,
         record_id=record.id,
         meal_type=data.get("meal_type"),
         food_items=data.get("food_items"),
-        calories=data.get("calories"),
-        protein_g=data.get("protein_g"),
-        fat_g=data.get("fat_g"),
-        carb_g=data.get("carb_g"),
+        calories=calories,
+        protein_g=protein,
+        fat_g=fat,
+        carb_g=carb,
         logged_at=today,
     )
     db.add(log)

@@ -321,15 +321,28 @@ async def _process_food(
     db: AsyncSession, user_id: int, record: Record, ai_result: dict
 ):
     """Extract nutrition data from food photo."""
+    # 如果 AI 未返回营养数据，根据热量做粗略估算
+    calories = ai_result.get("calories")
+    protein = ai_result.get("protein_g")
+    fat = ai_result.get("fat_g")
+    carb = ai_result.get("carb_g")
+
+    if protein is None and fat is None and carb is None and calories:
+        # 有热量无三大营养素：按常规中餐比例粗略拆分
+        cal = float(calories)
+        protein = round(cal * 0.15 / 4, 1)   # 15% 热量来自蛋白质
+        fat = round(cal * 0.30 / 9, 1)        # 30% 热量来自脂肪
+        carb = round(cal * 0.55 / 4, 1)       # 55% 热量来自碳水
+
     log = NutritionLog(
         user_id=user_id,
         record_id=record.id,
         meal_type=ai_result.get("meal_type"),
         food_items=ai_result.get("food_items"),
-        calories=ai_result.get("calories"),
-        protein_g=ai_result.get("protein_g"),
-        fat_g=ai_result.get("fat_g"),
-        carb_g=ai_result.get("carb_g"),
+        calories=calories,
+        protein_g=protein,
+        fat_g=fat,
+        carb_g=carb,
         fiber_g=ai_result.get("fiber_g"),
         sodium_mg=ai_result.get("sodium_mg"),
         logged_at=record.record_date or date.today(),
