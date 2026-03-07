@@ -12,6 +12,6 @@
       "@/*": ["./miniprogram/*"]
     }
   },
-  "include": ["./miniprogram/**/*.ts"],
+  "include": ["./**/*.ts"],
   "exclude": ["node_modules"]
 }
