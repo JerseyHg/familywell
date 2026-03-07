@@ -1,5 +1,5 @@
 import { profileApi, medsApi } from '../../services/api'
-import { getCached, CACHE_KEYS } from '../../services/cache'
+import { getCached, CACHE_KEYS, invalidation } from '../../services/cache'
 
 const DEFAULT_TIMES: Record<number, string[]> = {
   1: ['08:00'],
@@ -362,6 +362,9 @@ Page({
       }
 
       await profileApi.update(payload)
+
+      // ★ 保存后失效 profile 缓存，避免返回设置页仍显示旧数据
+      invalidation.onProfileChange()
 
       this.setData({ saving: false })
       wx.showToast({ title: '已保存', icon: 'success' })

@@ -202,4 +202,60 @@
   </view>
 </view>
 
+<!-- ══════════════════════════════════════════
+     ★ 药物确认弹窗 — 收集用药详细信息
+     ══════════════════════════════════════════ -->
+<view class="modal-mask" wx:if="{{showMedConfirm}}" bindtap="hideMedConfirm">
+  <view class="med-confirm-modal" catchtap="noop">
+    <view class="vm-header">
+      <text class="vm-title">确认添加药物</text>
+      <view class="vm-close" bindtap="hideMedConfirm">✕</view>
+    </view>
+
+    <scroll-view scroll-y class="mc-body">
+      <!-- 药名 -->
+      <view class="mc-drug-name">{{medConfirmName}}</view>
+
+      <!-- 用量 -->
+      <view class="mc-field">
+        <text class="mc-label">用量（如"每次1片"）</text>
+        <input class="mc-input" placeholder="选填" value="{{medConfirmDosage}}" bindinput="onMedConfirmDosage" />
+      </view>
+
+      <!-- 用药类型 -->
+      <view class="mc-field">
+        <text class="mc-label">用药类型</text>
+        <view class="mc-tag-row">
+          <view class="mc-tag {{medConfirmType === 'long_term' ? 'active' : ''}}" data-val="long_term" bindtap="onMedConfirmType">长期</view>
+          <view class="mc-tag {{medConfirmType === 'course' ? 'active' : ''}}" data-val="course" bindtap="onMedConfirmType">疗程</view>
+          <view class="mc-tag {{medConfirmType === 'temporary' ? 'active' : ''}}" data-val="temporary" bindtap="onMedConfirmType">临时</view>
+        </view>
+      </view>
+
+      <!-- 服用天数（疗程/临时时显示） -->
+      <view class="mc-field" wx:if="{{medConfirmType === 'course' || medConfirmType === 'temporary'}}">
+        <text class="mc-label">总共服用天数</text>
+        <input class="mc-input" type="number" placeholder="请输入天数" value="{{medConfirmDays}}" bindinput="onMedConfirmDays" />
+      </view>
+
+      <!-- 每天几次 -->
+      <view class="mc-field">
+        <text class="mc-label">每天几次</text>
+        <view class="mc-tag-row">
+          <view class="mc-tag {{medConfirmTimes === 1 ? 'active' : ''}}" data-val="{{1}}" bindtap="onMedConfirmTimes">每天1次</view>
+          <view class="mc-tag {{medConfirmTimes === 2 ? 'active' : ''}}" data-val="{{2}}" bindtap="onMedConfirmTimes">每天2次</view>
+          <view class="mc-tag {{medConfirmTimes === 3 ? 'active' : ''}}" data-val="{{3}}" bindtap="onMedConfirmTimes">每天3次</view>
+        </view>
+      </view>
+    </scroll-view>
+
+    <view class="mc-footer">
+      <view class="mc-cancel" bindtap="hideMedConfirm">取消</view>
+      <view class="mc-submit {{medConfirmSubmitting ? 'disabled' : ''}}" bindtap="onSubmitMedConfirm">
+        {{medConfirmSubmitting ? '添加中...' : '确认添加'}}
+      </view>
+    </view>
+  </view>
+</view>
+
 <view class="safe-bottom" />
