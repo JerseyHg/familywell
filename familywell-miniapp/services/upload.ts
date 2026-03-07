@@ -23,7 +23,7 @@ export function chooseAndUpload(): Promise<{ recordId: number }> {
         const filePath = file.tempFilePath
         const fileName = filePath.split('/').pop() || 'photo.jpg'
 
-        wx.showLoading({ title: '上传中...', mask: true })
+        wx.showToast({ title: '后台上传中...', icon: 'none', duration: 1500 })
 
         try {
           const urlRes: any = await recordsApi.getUploadUrl({
@@ -39,12 +39,10 @@ export function chooseAndUpload(): Promise<{ recordId: number }> {
             source: 'camera',
           })
 
-          wx.hideLoading()
           wx.showToast({ title: 'AI 识别中...', icon: 'none', duration: 2000 })
 
           resolve({ recordId: recordRes.id })
         } catch (err) {
-          wx.hideLoading()
           wx.showToast({ title: '上传失败', icon: 'none' })
           reject(err)
         }
@@ -75,7 +73,7 @@ export function batchUpload(options?: {
         const files = res.tempFiles
         const total = files.length
 
-        wx.showLoading({ title: `上传中 0/${total}`, mask: true })
+        wx.showToast({ title: '后台上传中...', icon: 'none', duration: 1500 })
 
         const recordIds: number[] = []
         let success = 0
@@ -109,11 +107,7 @@ export function batchUpload(options?: {
             console.error(`Upload failed for file ${i}:`, err)
             failed++
           }
-
-          wx.showLoading({ title: `上传中 ${i + 1}/${total}`, mask: true })
         }
-
-        wx.hideLoading()
 
         if (success > 0) {
           const msg = failed > 0
@@ -156,7 +150,7 @@ export function chooseAndUploadFile(options?: {
         const files = res.tempFiles
         const total = files.length
 
-        wx.showLoading({ title: `上传中 0/${total}`, mask: true })
+        wx.showToast({ title: '后台上传中...', icon: 'none', duration: 1500 })
 
         const recordIds: number[] = []
         let success = 0
@@ -204,11 +198,7 @@ export function chooseAndUploadFile(options?: {
             console.error(`Upload failed for file ${i}:`, err)
             failed++
           }
-
-          wx.showLoading({ title: `上传中 ${i + 1}/${total}`, mask: true })
         }
-
-        wx.hideLoading()
 
         if (success > 0) {
           const msg = failed > 0
