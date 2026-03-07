@@ -336,7 +336,7 @@ async def complete_task(
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
 
-    task.status = "completed"
+    task.status = "done"  # ★ 修复：与仪表盘/统计的计数逻辑一致（均使用 "done"）
     task.completed_at = datetime.utcnow()
     await db.flush()
 
@@ -357,4 +357,4 @@ async def complete_task(
     except Exception:
         pass
 
-    return {"status": "completed", "completed_at": task.completed_at.isoformat()}
+    return {"status": "done", "completed_at": task.completed_at.isoformat()}
