@@ -25,6 +25,7 @@ from app.schemas.home import HomeResponse
 from app.utils.deps import get_current_user
 from app.utils.timezone import get_tz_offset, user_today, utc_to_user_local
 from app.services import rag_service
+from sqlalchemy import update as sa_update
 from app.services.cron_service import ensure_user_tasks_for_date
 
 # 指标类型的中文显示名和单位
@@ -252,6 +253,12 @@ async def get_home_data(
         profile_data["tags"] = profile.medical_history or []
 
     # 2. Pending medication tasks (today, status=pending only)
+    # ★ 一次性修复：将该用户历史 "completed" 状态统一为 "done"
+    await db.execute(
+        sa_update(MedicationTask)
+        .where(MedicationTask.user_id == user.id, MedicationTask.status == "completed")
+        .values(status="done")
+    )
     # ★ 按需生成：若 cron 未执行（服务器重启/休眠），在此处补生成当天任务
     await ensure_user_tasks_for_date(db, user.id, today)
 

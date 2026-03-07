@@ -18,6 +18,12 @@ async def run_daily_tasks():
     """Run all daily scheduled tasks. Called at 00:05 every day."""
     logger.info("Starting daily cron tasks...")
     async with async_session() as db:
+        # ★ 修复历史数据：将旧的 "completed" 状态统一为 "done"
+        await db.execute(
+            update(MedicationTask)
+            .where(MedicationTask.status == "completed")
+            .values(status="done")
+        )
         await generate_medication_tasks(db)
         await mark_missed_tasks(db)
         await check_insurance_expiry(db)
@@ -78,28 +84,9 @@ async def _generate_tasks_for_user(
 async def ensure_user_tasks_for_date(
     db: AsyncSession, user_id: int, target_date: date,
 ) -> None:
-    """按需生成：若该用户当天没有任何任务，则立即生成。
-    解决 cron 未执行（服务器重启/休眠）导致当天无任务的问题。
+    """按需生成当天用药任务。
+    _generate_tasks_for_user 内部已做去重（唯一约束），可安全重复调用。
     """
-    existing = await db.execute(
-        select(func.count(MedicationTask.id)).where(
-            MedicationTask.user_id == user_id,
-            MedicationTask.scheduled_date == target_date,
-        )
-    )
-    if existing.scalar() > 0:
-        return  # 已有任务，无需生成
-
-    # 检查用户是否有活跃药物
-    med_count = await db.execute(
-        select(func.count(Medication.id)).where(
-            Medication.user_id == user_id,
-            Medication.is_active == True,
-        )
-    )
-    if med_count.scalar() == 0:
-        return  # 无活跃药物
-
     count = await _generate_tasks_for_user(db, user_id, target_date)
     if count > 0:
         await db.flush()
