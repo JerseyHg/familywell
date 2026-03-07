@@ -335,29 +335,19 @@ Page({
   onConfirmSuggestion: function (e) {
     var self = this;
     var id = e.currentTarget.dataset.id;
-    if (!id) return;
-    var name = '该药物';
-    var suggestions = self.data.medSuggestions || [];
-    for (var i = 0; i < suggestions.length; i++) {
-      if (suggestions[i].id === id) { name = suggestions[i].name; break; }
-    }
-    wx.showModal({
-      title: '确认添加',
-      content: '确认将「' + name + '」添加到用药管理？',
-      success: function (res) {
-        if (!res.confirm) return;
-        api_1.medsApi.confirmSuggestion(id, {}).then(function () {
-          var remaining = [];
-          for (var j = 0; j < self.data.medSuggestions.length; j++) {
-            if (self.data.medSuggestions[j].id !== id) remaining.push(self.data.medSuggestions[j]);
-          }
-          self.setData({ medSuggestions: remaining });
-          cache_1.invalidation.onMedicationChange();
-          wx.showToast({ title: '已添加', icon: 'success' });
-        }).catch(function () {
-          wx.showToast({ title: '添加失败', icon: 'none' });
-        });
+    console.log('[home] onConfirmSuggestion tap, id=', id, typeof id);
+    if (!id && id !== 0) return;
+    api_1.medsApi.confirmSuggestion(id, {}).then(function () {
+      var remaining = [];
+      for (var j = 0; j < self.data.medSuggestions.length; j++) {
+        if (self.data.medSuggestions[j].id != id) remaining.push(self.data.medSuggestions[j]);
       }
+      self.setData({ medSuggestions: remaining });
+      cache_1.invalidation.onMedicationChange();
+      wx.showToast({ title: '已添加', icon: 'success' });
+    }).catch(function (err) {
+      console.error('[home] confirmSuggestion failed:', err);
+      wx.showToast({ title: '添加失败', icon: 'none' });
     });
   },
 
