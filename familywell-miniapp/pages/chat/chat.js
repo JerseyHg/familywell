@@ -467,11 +467,52 @@ Page({
 
   _processCharts: function (charts) {
     return (charts || []).map(function (chart) {
+      // pie: compute conic-gradient for donut ring visualization
       if (chart.type === 'pie' && Array.isArray(chart.data)) {
         var total = chart.data.reduce(function (s, d) { return s + (d.value || 0); }, 0);
+        var cumPct = 0;
         chart.data = chart.data.map(function (d) {
-          return Object.assign({}, d, { pct: total > 0 ? Math.round((d.value / total) * 100) : 0 });
+          var pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
+          var startPct = cumPct;
+          cumPct += pct;
+          return Object.assign({}, d, { pct: pct, startPct: startPct, endPct: cumPct });
         });
+        if (chart.data.length > 0) {
+          chart.data[chart.data.length - 1].endPct = 100;
+        }
+        var parts = [];
+        for (var i = 0; i < chart.data.length; i++) {
+          var dd = chart.data[i];
+          parts.push((dd.color || '#ccc') + ' ' + dd.startPct + '% ' + dd.endPct + '%');
+        }
+        chart.conicGradient = parts.join(', ');
+        chart.total = total;
+      }
+      // donut: same ring visualization
+      if (chart.type === 'donut' && Array.isArray(chart.data)) {
+        var defColors = ['#4DB892', '#5B9BD5', '#F5A623', '#E55B5B', '#9B59B6'];
+        var colors = chart.colors || defColors;
+        var total2 = chart.data.reduce(function (s, d) { return s + (d.value || 0); }, 0);
+        var cumPct2 = 0;
+        chart.data = chart.data.map(function (d, idx) {
+          var pct = d.pct || (total2 > 0 ? Math.round((d.value / total2) * 100) : 0);
+          var startPct = cumPct2;
+          cumPct2 += pct;
+          return Object.assign({}, d, {
+            pct: pct, startPct: startPct, endPct: cumPct2,
+            color: colors[idx % colors.length]
+          });
+        });
+        if (chart.data.length > 0) {
+          chart.data[chart.data.length - 1].endPct = 100;
+        }
+        var parts2 = [];
+        for (var j = 0; j < chart.data.length; j++) {
+          var dd2 = chart.data[j];
+          parts2.push(dd2.color + ' ' + dd2.startPct + '% ' + dd2.endPct + '%');
+        }
+        chart.conicGradient = parts2.join(', ');
+        chart.total = total2;
       }
       return chart;
     });

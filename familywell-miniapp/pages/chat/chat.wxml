@@ -52,12 +52,7 @@
 
         <!-- User bubble -->
         <view class="user-bubble" wx:if="{{item.role === 'user'}}">
-          <!-- 如果是语音消息，显示语音图标 -->
-          <view class="voice-msg-indicator" wx:if="{{item.isVoice}}">
-            <text class="voice-msg-icon">🎙️</text>
-            <text>语音提问</text>
-          </view>
-          <text wx:else>{{item.text}}</text>
+          <text>{{item.text}}</text>
         </view>
 
         <!-- Assistant bubble -->
@@ -78,103 +73,135 @@
                   <text class="chart-title">{{chart.title}}</text>
                 </view>
 
-                <!-- bar_stack -->
+                <!-- bar_stack → 堆叠柱形图 -->
                 <view class="chart-body" wx:if="{{chart.type === 'bar_stack'}}">
-                  <view class="bar-row">
-                    <view class="bar-col" wx:for="{{chart.data}}" wx:for-item="d" wx:key="label">
-                      <view class="bar-stack">
+                  <view class="stack-chart">
+                    <view class="stack-col" wx:for="{{chart.data}}" wx:for-item="d" wx:key="label">
+                      <view class="stack-bars">
                         <view wx:for="{{chart.keys}}" wx:for-item="k" wx:for-index="ki" wx:key="k"
-                          class="bar-seg"
+                          class="stack-seg"
                           style="height: {{d[k] / 4}}rpx; background: {{chart.colors[ki]}};"
                         />
                       </view>
-                      <text class="bar-label">{{d.label}}</text>
+                      <text class="stack-label">{{d.label}}</text>
                     </view>
                   </view>
-                  <view class="chart-legend" wx:if="{{chart.keys.length > 1}}">
-                    <view class="legend-item" wx:for="{{chart.keys}}" wx:for-item="k" wx:for-index="ki" wx:key="k">
-                      <view class="legend-dot" style="background: {{chart.colors[ki]}};" />
-                      <text class="legend-text">{{k}}</text>
+                  <view class="stack-legend" wx:if="{{chart.keys.length > 1}}">
+                    <view class="stack-legend-item" wx:for="{{chart.keys}}" wx:for-item="k" wx:for-index="ki" wx:key="k">
+                      <view class="stack-legend-dot" style="background: {{chart.colors[ki]}};" />
+                      <text class="stack-legend-text">{{k}}</text>
                     </view>
                   </view>
                 </view>
 
-                <!-- line -->
+                <!-- line → 水平条形图 -->
                 <view class="chart-body" wx:if="{{chart.type === 'line'}}">
-                  <view class="line-chart">
-                    <view class="line-row" wx:for="{{chart.data}}" wx:for-item="d" wx:key="label">
-                      <text class="line-label">{{d.label}}</text>
-                      <view class="line-bar-bg">
-                        <view class="line-bar-fill" style="width: {{d.pct || 50}}%; background: {{chart.colors[0] || '#2D8B6F'}};" />
+                  <view class="hbar-chart">
+                    <view class="hbar-row" wx:for="{{chart.data}}" wx:for-item="d" wx:key="label">
+                      <text class="hbar-label">{{d.label}}</text>
+                      <view class="hbar-track">
+                        <view class="hbar-fill" style="width: {{d.pct || 50}}%; background: linear-gradient(90deg, {{chart.colors[0] || '#2D8B6F'}}, {{chart.colors[0] || '#4DB892'}});" />
                       </view>
-                      <text class="line-value">{{d.value}}{{chart.unit || ''}}</text>
+                      <text class="hbar-value">{{d.value}}{{chart.unit || ''}}</text>
                     </view>
                   </view>
                 </view>
 
-                <!-- donut -->
+                <!-- donut → 环形图 -->
                 <view class="chart-body" wx:if="{{chart.type === 'donut'}}">
-                  <view class="donut-list">
-                    <view class="donut-item" wx:for="{{chart.data}}" wx:for-item="d" wx:for-index="di" wx:key="label">
-                      <view class="donut-color" style="background: {{chart.colors[di % chart.colors.length]}};" />
-                      <text class="donut-label">{{d.label}}</text>
-                      <text class="donut-value">{{d.value}}{{chart.unit || ''}} ({{d.pct || '—'}}%)</text>
+                  <view class="pie-visual">
+                    <view class="pie-ring" style="background: conic-gradient({{chart.conicGradient}});">
+                      <view class="pie-ring-hole">
+                        <text class="pie-total-val">{{chart.total}}</text>
+                        <text class="pie-total-unit">{{chart.unit || ''}}</text>
+                      </view>
+                    </view>
+                    <view class="pie-legend">
+                      <view class="pie-legend-row" wx:for="{{chart.data}}" wx:for-item="d" wx:for-index="di" wx:key="label">
+                        <view class="pie-legend-dot" style="background: {{d.color}};" />
+                        <text class="pie-legend-name">{{d.label}}</text>
+                        <text class="pie-legend-g">{{d.value}}{{chart.unit || ''}}</text>
+                        <text class="pie-legend-pct">{{d.pct}}%</text>
+                      </view>
                     </view>
                   </view>
                 </view>
 
-                <!-- pie（营养摄入占比） -->
+                <!-- pie → 营养环形图 -->
                 <view class="chart-body" wx:if="{{chart.type === 'pie'}}">
-                  <view class="pie-chart">
-                    <view class="pie-row" wx:for="{{chart.data}}" wx:for-item="d" wx:key="name">
-                      <view class="pie-dot" style="background: {{d.color}};" />
-                      <text class="pie-label">{{d.name}}</text>
-                      <text class="pie-value">{{d.value}}g</text>
-                      <text class="pie-pct">{{d.pct}}%</text>
+                  <view class="pie-visual">
+                    <view class="pie-ring" style="background: conic-gradient({{chart.conicGradient}});">
+                      <view class="pie-ring-hole">
+                        <text class="pie-total-val">{{chart.total}}</text>
+                        <text class="pie-total-unit">g</text>
+                      </view>
+                    </view>
+                    <view class="pie-legend">
+                      <view class="pie-legend-row" wx:for="{{chart.data}}" wx:for-item="d" wx:key="name">
+                        <view class="pie-legend-dot" style="background: {{d.color}};" />
+                        <text class="pie-legend-name">{{d.name}}</text>
+                        <text class="pie-legend-g">{{d.value}}g</text>
+                        <text class="pie-legend-pct">{{d.pct}}%</text>
+                      </view>
                     </view>
                   </view>
                 </view>
 
-                <!-- indicator_card -->
+                <!-- indicator_card → 指标卡片 -->
                 <view class="chart-body" wx:if="{{chart.type === 'indicator_card'}}">
-                  <view class="ind-grid">
-                    <view class="ind-item" wx:for="{{chart.data}}" wx:for-item="d" wx:key="label">
-                      <text class="ind-value" style="color: {{d.status === 'danger' ? '#E55B5B' : d.status === 'warning' ? '#F5A623' : '#2D8B6F'}};">{{d.value}}{{d.unit || ''}}</text>
-                      <text class="ind-label">{{d.label}}</text>
+                  <view class="ind-grid-v2">
+                    <view class="ind-card-v2 {{d.status}}" wx:for="{{chart.data}}" wx:for-item="d" wx:key="label">
+                      <view class="ind-dot-v2 {{d.status}}" />
+                      <text class="ind-val-v2" style="color: {{d.status === 'danger' ? '#E55B5B' : d.status === 'warning' ? '#F5A623' : '#2D8B6F'}};">{{d.value}}</text>
+                      <text class="ind-unit-v2">{{d.unit || ''}}</text>
+                      <text class="ind-label-v2">{{d.label}}</text>
                     </view>
                   </view>
                 </view>
 
-                <!-- med_adherence -->
+                <!-- med_adherence → 用药依从性 -->
                 <view class="chart-body" wx:if="{{chart.type === 'med_adherence'}}">
-                  <view class="med-row" wx:for="{{chart.data}}" wx:for-item="med" wx:key="name">
-                    <text class="med-name">{{med.name}}</text>
-                    <view class="med-bar-bg">
-                      <view class="med-bar-fill" style="width: {{med.pct}}%; background: {{med.pct >= 80 ? '#2D8B6F' : '#F5A623'}};" />
+                  <view class="med-item" wx:for="{{chart.data}}" wx:for-item="med" wx:key="name">
+                    <view class="med-top-row">
+                      <text class="med-name-v2">{{med.name}}</text>
+                      <view class="med-badge {{med.pct >= 80 ? 'good' : 'warn'}}">
+                        <text>{{med.pct >= 90 ? '优秀' : med.pct >= 80 ? '良好' : '待改善'}}</text>
+                      </view>
                     </view>
-                    <text class="med-ratio">{{med.done}}/{{med.total}}</text>
+                    <view class="med-bar-row">
+                      <view class="med-bar-bg-v2">
+                        <view class="med-bar-fill-v2" style="width: {{med.pct}}%; background: linear-gradient(90deg, {{med.pct >= 80 ? '#2D8B6F' : '#F5A623'}}, {{med.pct >= 80 ? '#4DB892' : '#F7C948'}});" />
+                      </view>
+                      <text class="med-pct-v2">{{med.pct}}%</text>
+                    </view>
+                    <text class="med-detail-v2">已完成 {{med.done}}/{{med.total}} 次</text>
                   </view>
                 </view>
 
-                <!-- alerts -->
+                <!-- alerts → 提醒卡片 -->
                 <view class="chart-body" wx:if="{{chart.type === 'alerts'}}">
-                  <view class="alert-item" wx:for="{{chart.data}}" wx:for-item="a" wx:key="title">
-                    <text class="alert-icon">{{a.type === 'med_low_stock' ? '💊' : a.type === 'insurance_expiry' ? '🛡️' : a.type === 'checkup_due' ? '📊' : '⚠️'}}</text>
-                    <view class="alert-info">
-                      <text class="alert-title">{{a.title}}</text>
-                      <text class="alert-desc">{{a.description}}</text>
+                  <view class="alert-card" wx:for="{{chart.data}}" wx:for-item="a" wx:key="title">
+                    <view class="alert-icon-wrap {{a.type === 'med_low_stock' ? 'med' : a.type === 'insurance_expiry' ? 'ins' : a.type === 'checkup_due' ? 'check' : 'other'}}">
+                      <text class="alert-icon-v2">{{a.type === 'med_low_stock' ? '💊' : a.type === 'insurance_expiry' ? '🛡️' : a.type === 'checkup_due' ? '📊' : '⚠️'}}</text>
+                    </view>
+                    <view class="alert-content">
+                      <text class="alert-title-v2">{{a.title}}</text>
+                      <text class="alert-desc-v2">{{a.description}}</text>
                     </view>
                   </view>
                 </view>
 
-                <!-- insurance -->
+                <!-- insurance → 保险信息 -->
                 <view class="chart-body" wx:if="{{chart.type === 'insurance'}}">
-                  <view class="ins-item" wx:for="{{chart.data}}" wx:for-item="ins" wx:key="provider">
-                    <view class="ins-header-row">
-                      <text class="ins-name">{{ins.provider}} {{ins.policy_type}}</text>
-                      <text class="ins-urgent" wx:if="{{ins.urgent}}">即将到期</text>
+                  <view class="ins-card" wx:for="{{chart.data}}" wx:for-item="ins" wx:key="provider">
+                    <view class="ins-top-row">
+                      <text class="ins-provider">{{ins.provider}} · {{ins.policy_type}}</text>
+                      <view class="ins-urgent-badge" wx:if="{{ins.urgent}}">即将到期</view>
                     </view>
-                    <text class="ins-detail" wx:if="{{ins.days_left !== null}}">到期日 {{ins.end_date}} · 还剩 {{ins.days_left}} 天</text>
+                    <view class="ins-bottom-row" wx:if="{{ins.days_left !== null}}">
+                      <text class="ins-date">到期 {{ins.end_date}}</text>
+                      <text class="ins-days {{ins.urgent ? 'urgent' : ''}}">还剩 {{ins.days_left}} 天</text>
+                    </view>
                   </view>
                 </view>
 

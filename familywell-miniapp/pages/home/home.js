@@ -242,7 +242,13 @@ Page({
       aiTip: homeData.ai_tip || '',
       recentActivity: recentActivity.slice(0, 5),
       alertCount: homeData.alert_count || 0,
-      medSuggestions: homeData.medication_suggestions || [],
+      medSuggestions: (homeData.medication_suggestions || []).map(function (s) {
+        return Object.assign({}, s, {
+          name: s.name || '',
+          dosage: s.dosage || '',
+          frequency: s.frequency || '',
+        });
+      }),
     });
   },
 
