@@ -252,9 +252,18 @@ Page({
     });
   },
 
+  // ★ Fix: "YYYY-MM-DD" 会被 new Date() 当作 UTC 解析，导致时区偏移
+  //   手动拆分为本地日期，避免跨时区日期错位
   _formatLocalDate: function (dateStr) {
     if (!dateStr) return '';
-    var d = new Date(dateStr);
+    var d;
+    var s = dateStr.slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      var parts = s.split('-');
+      d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    } else {
+      d = new Date(dateStr);
+    }
     var now = new Date();
     var dLocal = new Date(d.getFullYear(), d.getMonth(), d.getDate());
     var nowLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());

@@ -1,5 +1,6 @@
 import { recordsApi, projectsApi } from '../../services/api'
 import { swr, forceRefresh, CACHE_KEYS, invalidation } from '../../services/cache'
+import { formatDate as helperFormatDate, parseLocalDate } from '../../utils/helpers'
 
 const CATEGORY_MAP: Record<string, string> = {
   checkup: '体检',
@@ -34,15 +35,19 @@ const TEMPLATES = [
   { key: 'custom', icon: '📁', name: '自定义' },
 ]
 
+// ★ Fix: 使用 helpers 中的时区感知日期格式化，替代简单的字符串截取
 function formatDate(d: string | null): string {
   if (!d) return ''
-  return d.slice(0, 10)
+  return helperFormatDate(d, 'short')
 }
 
 function formatDateRange(start: string | null, end: string | null): string {
   if (!start && !end) return '无时间范围'
-  const s = start ? start.slice(5, 10).replace('-', '/') : '?'
-  const e = end ? end.slice(5, 10).replace('-', '/') : '至今'
+  // ★ Fix: 使用 parseLocalDate 避免 UTC 偏移
+  const sf = start ? parseLocalDate(start) : null
+  const ef = end ? parseLocalDate(end) : null
+  const s = sf ? `${sf.getMonth() + 1}/${sf.getDate()}` : '?'
+  const e = ef ? `${ef.getMonth() + 1}/${ef.getDate()}` : '至今'
   return `${s} — ${e}`
 }
 

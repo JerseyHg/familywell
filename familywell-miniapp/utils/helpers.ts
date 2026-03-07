@@ -4,15 +4,31 @@
  */
 
 /**
+ * ★ 安全解析日期字符串为本地 Date 对象
+ * "YYYY-MM-DD" 格式的纯日期字符串会被 new Date() 当作 UTC 解析，
+ * 导致在非 UTC 时区产生日期偏移。此函数统一将其解析为本地日期。
+ * 带时间的 ISO 字符串（如 "2026-03-07T15:30:00Z"）正常使用 new Date() 解析。
+ */
+export function parseLocalDate(dateStr: string): Date {
+  // 纯日期格式 "YYYY-MM-DD"：手动解析为本地日期，避免 UTC 偏移
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const parts = dateStr.split('-')
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+  }
+  // 带时间的字符串：正常解析（浏览器会自动转本地时间）
+  return new Date(dateStr)
+}
+
+/**
  * Format date string to display
- * ★ Fix: 使用本地时区进行日期比较
+ * ★ Fix: 使用 parseLocalDate 避免 UTC 偏移
  */
 export function formatDate(dateStr: string, style: 'short' | 'full' = 'short'): string {
   if (!dateStr) return ''
-  const d = new Date(dateStr)
+  const d = parseLocalDate(dateStr)
   const now = new Date()
 
-  // ★ 使用本地日期进行比较（而不是 getTime() 的 UTC 差值）
+  // 使用本地日期进行比较
   const dLocal = new Date(d.getFullYear(), d.getMonth(), d.getDate())
   const nowLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const diffDays = Math.round((nowLocal.getTime() - dLocal.getTime()) / 86400000)
@@ -43,7 +59,7 @@ export function formatTime(timeStr: string): string {
  */
 export function getWeekday(dateStr: string): string {
   const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
-  return days[new Date(dateStr).getDay()]
+  return days[parseLocalDate(dateStr).getDay()]
 }
 
 /**
@@ -76,7 +92,7 @@ export function daysAgo(n: number): string {
  * Calculate age from birthday
  */
 export function calcAge(birthday: string): number {
-  const birth = new Date(birthday)
+  const birth = parseLocalDate(birthday)
   const now = new Date()
   let age = now.getFullYear() - birth.getFullYear()
   const monthDiff = now.getMonth() - birth.getMonth()
