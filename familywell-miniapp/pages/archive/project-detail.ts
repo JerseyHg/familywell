@@ -3,6 +3,7 @@
  * ★ Fix 4: 移出记录后立即更新本地计数（乐观更新）
  */
 import { projectsApi, recordsApi } from '../../services/api'
+import { formatDate as helperFormatDate, parseLocalDate } from '../../utils/helpers'
 
 const CATEGORY_CONFIG: { key: string; label: string; icon: string; cats: string[] }[] = [
   { key: 'medical', label: '医疗', icon: '🩺', cats: ['checkup', 'lab', 'visit', 'bp_reading'] },
@@ -14,15 +15,18 @@ const CATEGORY_CONFIG: { key: string; label: string; icon: string; cats: string[
 
 const ICON_OPTIONS = ['📁', '💉', '📊', '🤰', '🏥', '⚖️', '🦿', '💊', '🫀', '🧪', '🩺', '🏋️']
 
+// ★ Fix: 使用 helpers 中的时区感知日期格式化
 function formatDate(d: string | null): string {
   if (!d) return ''
-  return d.slice(0, 10)
+  return helperFormatDate(d, 'short')
 }
 
 function formatDateRange(start: string | null, end: string | null): string {
   if (!start && !end) return '无时间范围'
-  const s = start ? start.slice(5, 10).replace('-', '/') : '?'
-  const e = end ? end.slice(5, 10).replace('-', '/') : '至今'
+  const sf = start ? parseLocalDate(start) : null
+  const ef = end ? parseLocalDate(end) : null
+  const s = sf ? `${sf.getMonth() + 1}/${sf.getDate()}` : '?'
+  const e = ef ? `${ef.getMonth() + 1}/${ef.getDate()}` : '至今'
   return `${s} — ${e}`
 }
 
