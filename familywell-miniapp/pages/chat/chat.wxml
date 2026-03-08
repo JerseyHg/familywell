@@ -255,7 +255,7 @@
     </block>
 
     <!-- Typing indicator -->
-    <view class="msg-row assistant" wx:if="{{typing && !messages[messages.length - 1].text}}">
+    <view class="msg-row assistant" wx:if="{{typing && (messages.length === 0 || !messages[messages.length - 1].text)}}">
       <view class="ai-row">
         <view class="ai-avatar-sm">🤖</view>
         <view class="ai-bubble typing-bubble">

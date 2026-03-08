@@ -119,7 +119,7 @@
   <!-- 🍽️ 营养摄入 -->
   <view class="dash-mini-card" wx:if="{{dashNutrition}}">
     <text class="dash-mini-title">🍽️ 营养</text>
-    <view class="dash-mini-pie" style="background: conic-gradient({{dashNutrition.conicGradient}});">
+    <view class="dash-mini-pie" style="background: {{dashNutrition.conicGradient ? 'conic-gradient(' + dashNutrition.conicGradient + ')' : '#E8E4DD'}};">
       <view class="dash-mini-pie-hole">
         <text class="dash-mini-pie-val">{{dashNutrition.avgCalories}}</text>
       </view>
