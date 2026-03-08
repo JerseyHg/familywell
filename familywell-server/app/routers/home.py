@@ -288,6 +288,7 @@ async def get_home_data(
             or_(
                 Record.ai_status == "completed",
                 Record.ai_status == "processing",
+                Record.ai_status == "pending",
                 Record.ai_status == "failed",
             ),
         )
