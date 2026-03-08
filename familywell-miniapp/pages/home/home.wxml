@@ -185,12 +185,12 @@
     <text class="section-title">📋 最近动态</text>
   </view>
   <view class="activity-card" wx:for="{{recentActivity}}" wx:key="id" data-id="{{item.id}}" data-text="{{item._voiceText || ''}}" bindtap="{{item.ai_status === 'failed' ? 'onRetryVoice' : 'onActivityTap'}}">
-    <text class="activity-icon">{{item.ai_status === 'processing' ? '⏳' : item.ai_status === 'failed' ? '❌' : item.category === 'checkup' ? '📊' : item.category === 'prescription' ? '💊' : item.category === 'food' ? '🍽️' : item.category === 'bp_reading' ? '❤️' : '📄'}}</text>
+    <text class="activity-icon">{{item.ai_status === 'pending' || item.ai_status === 'processing' ? '⏳' : item.ai_status === 'failed' ? '❌' : item.category === 'checkup' ? '📊' : item.category === 'prescription' ? '💊' : item.category === 'food' ? '🍽️' : item.category === 'bp_reading' ? '❤️' : '📄'}}</text>
     <view class="activity-info">
       <text class="activity-title">{{item.title}}</text>
       <text class="activity-date">{{item.date}}</text>
     </view>
-    <text class="activity-status" wx:if="{{item.ai_status === 'processing'}}">识别中...</text>
+    <text class="activity-status" wx:if="{{item.ai_status === 'pending' || item.ai_status === 'processing'}}">识别中...</text>
     <text class="activity-status fail" wx:if="{{item.ai_status === 'failed'}}">点击重试</text>
   </view>
 </view>

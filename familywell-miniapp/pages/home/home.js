@@ -329,8 +329,10 @@ Page({
     if (!this._requireLogin()) return;
     (0, upload_1.batchUpload)({ maxCount: 9 })
       .then(function (result) {
-        // ★ 上传成功后失效相关缓存
+        // ★ 上传成功后失效相关缓存，立即刷新首页显示 pending 记录
         cache_1.invalidation.onRecordChange();
+        self.loadHomeData(true);
+        // AI 处理完成后再次刷新，更新状态和分类
         (0, upload_1.pollBatchAIStatus)(result.recordIds, function () { self.loadHomeData(true); });
       })
       .catch(function () {});
@@ -346,8 +348,10 @@ Page({
     }
     (0, upload_1.chooseAndUploadFile)({ maxCount: 5 })
         .then(function (result) {
-          // ★ 上传成功后失效相关缓存
+          // ★ 上传成功后失效相关缓存，立即刷新首页显示 pending 记录
           cache_1.invalidation.onRecordChange();
+          self.loadHomeData(true);
+          // AI 处理完成后再次刷新，更新状态和分类
           (0, upload_1.pollBatchAIStatus)(result.recordIds, function () { self.loadHomeData(true); });
         })
         .catch(function (err) { console.error('[onFileUpload] error:', err); });
