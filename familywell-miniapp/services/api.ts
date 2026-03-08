@@ -30,6 +30,7 @@ interface RequestOptions {
   header?: Record<string, string>
   showLoading?: boolean
   silent429?: boolean  // ★ [Fix-5] 新增：429 时是否静默（不弹 toast）
+  silent?: boolean     // ★ 完全静默：不弹任何错误 toast（用于后台轮询等）
 }
 
 // ★ 延迟导入 cache，避免循环依赖
@@ -45,7 +46,7 @@ function getToken(): string {
 }
 
 export function request<T = any>(options: RequestOptions): Promise<T> {
-  const { url, method = 'GET', data, header = {}, showLoading = false, silent429 = false } = options
+  const { url, method = 'GET', data, header = {}, showLoading = false, silent429 = false, silent = false } = options
 
   if (showLoading) {
     wx.showLoading({ title: '加载中', mask: true })
@@ -89,16 +90,16 @@ export function request<T = any>(options: RequestOptions): Promise<T> {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data as T)
         } else {
-          console.log('[request] error status:', res.statusCode, JSON.stringify(res.data))
+          console.log('[request] error status:', res.statusCode, url, JSON.stringify(res.data))
           const msg = (res.data as any)?.detail || '请求失败'
-          wx.showToast({ title: msg, icon: 'none' })
+          if (!silent) wx.showToast({ title: msg, icon: 'none' })
           reject(new Error(msg))
         }
       },
       fail(err) {
         if (showLoading) wx.hideLoading()
-        console.log('[request] fail details:', JSON.stringify(err))
-        wx.showToast({ title: '网络错误', icon: 'none' })
+        console.log('[request] fail details:', url, JSON.stringify(err))
+        if (!silent) wx.showToast({ title: '网络错误', icon: 'none' })
         reject(err)
       },
     })
@@ -145,7 +146,7 @@ export const recordsApi = {
 
   // ★ [Fix-5] status 轮询使用 silent429，避免频繁弹 toast
   getStatus: (id: number) =>
-    request({ url: `/records/${id}/status`, silent429: true }),
+    request({ url: `/records/${id}/status`, silent: true }),
 
   list: (params: {
     category?: string;
