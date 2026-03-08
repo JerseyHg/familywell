@@ -42,9 +42,9 @@
           <text class="info-label">医院</text>
           <text class="info-value">{{record.hospital}}</text>
         </view>
-        <view class="info-row" wx:if="{{record.record_date}}">
+        <view class="info-row" wx:if="{{displayDate}}">
           <text class="info-label">日期</text>
-          <text class="info-value">{{record.record_date}}</text>
+          <text class="info-value">{{displayDate}}</text>
         </view>
         <view class="info-row" wx:if="{{record.source}}">
           <text class="info-label">来源</text>

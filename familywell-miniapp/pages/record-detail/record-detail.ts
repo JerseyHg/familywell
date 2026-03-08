@@ -9,6 +9,7 @@
  */
 import { recordsApi } from '../../services/api'
 import { invalidation } from '../../services/cache'
+import { parseLocalDate } from '../../utils/helpers'
 
 // 分类中文映射
 const CATEGORY_MAP: Record<string, string> = {
@@ -37,6 +38,9 @@ Page({
     rawText: '',
     validationWarnings: [] as string[],
 
+    // ★ 格式化后的日期显示
+    displayDate: '',
+
     // 编辑模式
     editing: false,
     editForm: {} as any,
@@ -63,8 +67,16 @@ Page({
       const record: any = await recordsApi.detail(id)
       const ai = record.ai_raw_result || {}
 
+      // ★ 格式化日期：将 "2026-03-07" → "2026/3/7"
+      let displayDate = ''
+      if (record.record_date) {
+        const d = parseLocalDate(record.record_date)
+        displayDate = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`
+      }
+
       this.setData({
         record,
+        displayDate,
         categoryName: CATEGORY_MAP[record.category] || record.category,
         categoryIcon: CATEGORY_ICON[record.category] || '📄',
         imageUrl: record.image_url || '',

@@ -6,7 +6,7 @@ app/models/user.py — 用户模型
 """
 from datetime import datetime, date
 from sqlalchemy import (
-    BigInteger, String, Boolean, DateTime, Date, DECIMAL, JSON,
+    BigInteger, SmallInteger, String, Boolean, DateTime, Date, DECIMAL, JSON,
     ForeignKey, Index,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -27,6 +27,10 @@ class User(Base):
 
     nickname: Mapped[str | None] = mapped_column(String(50))
     avatar_url: Mapped[str | None] = mapped_column(String(500))
+
+    # ★ 用户最近一次请求的时区偏移（JS getTimezoneOffset 值，如 UTC+8 → -480）
+    tz_offset: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

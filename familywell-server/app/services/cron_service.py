@@ -1,5 +1,5 @@
 import logging
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy import select, update, func, and_, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +12,20 @@ from app.models.reminder import Reminder, ReminderSetting
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
+
+# ★ 默认时区偏移（UTC+8 = -480），用于未记录时区的用户
+_DEFAULT_TZ_OFFSET = -480
+
+
+def _user_local_today(tz_offset: int | None) -> date:
+    """根据用户存储的时区偏移量计算其本地"今天"。
+    tz_offset 是 JS getTimezoneOffset() 的值：UTC+8 → -480, UTC-5 → 300
+    未知时区的用户默认按 UTC+8 处理。
+    """
+    offset = tz_offset if tz_offset is not None else _DEFAULT_TZ_OFFSET
+    utc_now = datetime.utcnow()
+    user_now = utc_now + timedelta(minutes=-offset)
+    return user_now.date()
 
 
 async def run_daily_tasks():
@@ -94,42 +108,51 @@ async def ensure_user_tasks_for_date(
 
 
 async def generate_medication_tasks(db: AsyncSession):
-    """Generate today's medication tasks for all active medications."""
-    today = date.today()
-
-    # 获取所有有活跃药物的用户
+    """Generate today's medication tasks for all active medications.
+    ★ 使用每个用户存储的 tz_offset 计算其本地"今天"。
+    """
+    # 查询所有有活跃药物的用户及其时区
     result = await db.execute(
-        select(distinct(Medication.user_id)).where(Medication.is_active == True)
+        select(User.id, User.tz_offset)
+        .where(
+            User.id.in_(
+                select(distinct(Medication.user_id)).where(Medication.is_active == True)
+            )
+        )
     )
-    user_ids = [row[0] for row in result.all()]
+    users = result.all()
 
     total = 0
-    for uid in user_ids:
+    for uid, tz_offset in users:
+        today = _user_local_today(tz_offset)
         count = await _generate_tasks_for_user(db, uid, today)
         total += count
 
-    logger.info(f"Generated {total} medication tasks for {today}")
+    logger.info(f"Generated {total} medication tasks for {len(users)} users")
 
 
 async def mark_missed_tasks(db: AsyncSession):
-    """Mark yesterday's incomplete tasks as missed."""
-    yesterday = date.today() - timedelta(days=1)
+    """Mark tasks from before yesterday as missed.
+    ★ 使用每个用户时区的"昨天"，避免过早标记未到期任务。
+    对于不同时区的用户，安全地取 2 天前作为全局截止日——
+    确保不会误标当天/昨天的任务为 missed。
+    """
+    # 安全截止日：UTC 今天 - 2 天，对任何时区都已经是"昨天或更早"
+    safe_cutoff = (datetime.utcnow() - timedelta(days=2)).date()
 
     result = await db.execute(
         update(MedicationTask)
         .where(
-            MedicationTask.scheduled_date == yesterday,
+            MedicationTask.scheduled_date <= safe_cutoff,
             MedicationTask.status == "pending",
         )
         .values(status="missed")
     )
-    logger.info(f"Marked {result.rowcount} tasks as missed for {yesterday}")
+    logger.info(f"Marked {result.rowcount} tasks as missed (cutoff={safe_cutoff})")
 
 
 async def check_insurance_expiry(db: AsyncSession):
     """Create reminders for insurance policies expiring soon."""
-    today = date.today()
-
     result = await db.execute(
         select(Insurance).where(
             Insurance.is_active == True,
@@ -139,6 +162,13 @@ async def check_insurance_expiry(db: AsyncSession):
     insurances = result.scalars().all()
 
     for ins in insurances:
+        # 查询该用户的时区
+        user_result = await db.execute(
+            select(User.tz_offset).where(User.id == ins.user_id)
+        )
+        tz_offset = user_result.scalar_one_or_none()
+        today = _user_local_today(tz_offset)
+
         days_left = (ins.end_date - today).days
         if days_left < 0:
             continue
@@ -198,15 +228,16 @@ async def check_checkup_due(db: AsyncSession):
         )
         last = last_checkup.scalar_one_or_none()
 
-        threshold = date.today() - timedelta(days=interval * 30)
+        today = _user_local_today(user.tz_offset)
+        threshold = today - timedelta(days=interval * 30)
         if last is None or (last.record_date and last.record_date < threshold):
             # Check if already reminded this month
             existing = await db.execute(
                 select(Reminder).where(
                     Reminder.user_id == user.id,
                     Reminder.type == "checkup_due",
-                    func.month(Reminder.created_at) == date.today().month,
-                    func.year(Reminder.created_at) == date.today().year,
+                    func.month(Reminder.created_at) == today.month,
+                    func.year(Reminder.created_at) == today.year,
                 )
             )
             if existing.scalar_one_or_none() is None:
@@ -233,8 +264,14 @@ async def check_low_stock(db: AsyncSession):
     )
     medications = result.scalars().all()
 
-    today = date.today()
     for med in medications:
+        # 查询用户时区
+        user_result = await db.execute(
+            select(User.tz_offset).where(User.id == med.user_id)
+        )
+        tz_offset = user_result.scalar_one_or_none()
+        today = _user_local_today(tz_offset)
+
         existing = await db.execute(
             select(Reminder).where(
                 Reminder.user_id == med.user_id,
