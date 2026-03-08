@@ -15,7 +15,14 @@ export function parseLocalDate(dateStr: string): Date {
     const parts = dateStr.split('-')
     return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
   }
-  // 带时间的字符串：正常解析（浏览器会自动转本地时间）
+  // ★ Fix: 无时区后缀的 datetime 字符串（如 "2026-03-07T15:30:00"）
+  //   后端 created_at 存的是 UTC，Pydantic 序列化时不带 Z，
+  //   JS new Date() 会当作本地时间解析，导致跨时区日期偏移。
+  //   补上 'Z' 让 JS 按 UTC 解析，getDate()/getMonth() 自动转本地。
+  if (/^\d{4}-\d{2}-\d{2}T[\d:.]+$/.test(dateStr)) {
+    return new Date(dateStr + 'Z')
+  }
+  // 带时区的字符串（如 "...Z" 或 "...+08:00"）：正常解析
   return new Date(dateStr)
 }
 

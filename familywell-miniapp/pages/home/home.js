@@ -294,15 +294,21 @@ Page({
     });
   },
 
-  // ★ Fix: "YYYY-MM-DD" 会被 new Date() 当作 UTC 解析，导致时区偏移
-  //   手动拆分为本地日期，避免跨时区日期错位
+  // ★ Fix: 日期解析统一处理：
+  //   1. "YYYY-MM-DD" → 手动拆分为本地日期，避免 UTC 偏移
+  //   2. "YYYY-MM-DDTHH:mm:ss"（无时区后缀）→ 补 Z 按 UTC 解析
+  //   3. 其他（带 Z 或 +08:00）→ 正常解析
   _formatLocalDate: function (dateStr) {
     if (!dateStr) return '';
     var d;
     var s = dateStr.slice(0, 10);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s) && dateStr.length === 10) {
+      // 纯日期：手动解析为本地
       var parts = s.split('-');
       d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    } else if (/^\d{4}-\d{2}-\d{2}T[\d:.]+$/.test(dateStr)) {
+      // 无时区的 datetime：后端 UTC，补 Z 按 UTC 解析
+      d = new Date(dateStr + 'Z');
     } else {
       d = new Date(dateStr);
     }

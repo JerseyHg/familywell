@@ -215,6 +215,10 @@ async def get_home_data(
     """Simplified homepage data for v2 chat-centric design."""
     today = user_today(tz_offset)
 
+    # ★ 持久化用户时区偏移量，供定时任务使用
+    if tz_offset is not None and user.tz_offset != tz_offset:
+        user.tz_offset = tz_offset
+
     # ── AI tip 使用独立 session，与下方 DB 查询并行执行 ──
     # quick_health_summary 包含 embedding 搜索 + LLM 调用（1-3s），
     # 用独立 session 让它不阻塞其他快速 DB 查询
