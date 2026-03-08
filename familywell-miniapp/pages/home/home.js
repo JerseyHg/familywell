@@ -345,7 +345,6 @@ Page({
   },
 
   onFileUpload: function () {
-    console.log('[onFileUpload] called, chooseAndUploadFile =', typeof upload_1.chooseAndUploadFile);
     var self = this;
     if (!this._requireLogin()) return;
     if (typeof upload_1.chooseAndUploadFile !== 'function') {

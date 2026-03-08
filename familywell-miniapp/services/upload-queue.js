@@ -33,7 +33,6 @@ function addToQueue(item) {
     createdAt: Date.now(),
   }));
   _saveQueue(queue);
-  console.log('[UploadQueue] Item added, queue size:', queue.length);
 }
 exports.addToQueue = addToQueue;
 
@@ -128,7 +127,6 @@ function processQueue() {
     return Promise.resolve({ success: 0, failed: 0 });
   }
 
-  console.log('[UploadQueue] Processing', retryable.length, 'items');
   var success = 0;
   var failed = 0;
 
