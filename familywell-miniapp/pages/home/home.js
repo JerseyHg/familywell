@@ -366,9 +366,9 @@ Page({
   },
 
   onActivityTap: function (e) {
-    var item = e.currentTarget.dataset.item;
-    if (item && item.id && !String(item.id).startsWith('temp_')) {
-      wx.navigateTo({ url: '/pages/record-detail/record-detail?id=' + item.id });
+    var id = e.currentTarget.dataset.id;
+    if (id && !String(id).startsWith('temp_')) {
+      wx.navigateTo({ url: '/pages/record-detail/record-detail?id=' + id });
     }
   },
 
